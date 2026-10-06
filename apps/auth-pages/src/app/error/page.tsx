@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { traceEvent } from '@autional-cn/shared';
+import { traceEvent } from '@autional/shared';
 import { AuthCard } from '@/components/auth/AuthCard';
 
 type ErrorType =

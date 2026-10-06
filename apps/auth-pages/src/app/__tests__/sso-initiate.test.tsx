@@ -26,13 +26,13 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional-cn/shared', () => ({
+vi.mock('@autional/shared', () => ({
 	apiClient: { get: vi.fn(() => Promise.resolve({ data: {} })) },
 }));
 
 const mockInitiateSSO = vi.fn();
-vi.mock('@autional-cn/shared/generated/api', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@autional-cn/shared/generated/api')>();
+vi.mock('@autional/shared/generated/api', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@autional/shared/generated/api')>();
 	return {
 		...actual,
 		authSsoInitiatePost: (...args: any[]) => mockInitiateSSO(...args),

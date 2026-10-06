@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@autional-cn/ui';
+import { Button } from '@autional/ui';
 import { Fingerprint } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { beginPasskeyRegister, completePasskeyRegister } from '@/lib/api.generated';

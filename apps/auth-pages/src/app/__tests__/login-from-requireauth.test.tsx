@@ -38,7 +38,7 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional-cn/shared', () => ({
+vi.mock('@autional/shared', () => ({
 	loginWithTokens: vi.fn(),
 	getAccessToken: () => mockState.token,
 	initiateOAuthLogin: (clientId: string, target?: string) => {
@@ -72,8 +72,8 @@ vi.mock('@autional-cn/shared', () => ({
 	getRootDomain: () => 'autional.cn',
 }));
 
-vi.mock('@autional-cn/shared/generated/api', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@autional-cn/shared/generated/api')>();
+vi.mock('@autional/shared/generated/api', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@autional/shared/generated/api')>();
 	return {
 		...actual,
 		authLoginPost: vi.fn(),

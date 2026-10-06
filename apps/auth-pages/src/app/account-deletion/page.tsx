@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Input, Label } from '@autional-cn/ui';
-import { logout, END_USER_PORTAL_URL, crossAppUrl } from '@autional-cn/shared';
+import { Button, Input, Label } from '@autional/ui';
+import { logout, END_USER_PORTAL_URL, crossAppUrl } from '@autional/shared';
 import { createAccountDeletionSchema } from '@/lib/validators';
 import type { AccountDeletionFormData } from '@/lib/validators';
 import { useI18n } from '@/lib/i18n';
@@ -47,7 +47,7 @@ export default function AccountDeletionPage() {
 		setLoading(true);
 		setError('');
 		try {
-			const { authMeDeleteAccountPost } = await import('@autional-cn/shared/generated/api');
+			const { authMeDeleteAccountPost } = await import('@autional/shared/generated/api');
 			await (authMeDeleteAccountPost as any)({ password: passwordValue });
 			setSuccess(true);
 			setShowModal(false);

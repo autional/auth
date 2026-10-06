@@ -4,19 +4,19 @@ import { useState, useMemo } from 'react';
 import { Link, useParams } from 'react-router';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { Button, Input, Label } from '@autional-cn/ui';
+import { Button, Input, Label } from '@autional/ui';
 import {
 	authRecoveryRequestPost,
 	authRecoveryVerifyPost,
 	authRecoveryCompletePost,
 	PublicAuthConfigBySlugByBySlug,
-} from '@autional-cn/shared/generated/api';
-import { processPasswordForTransmission } from '@autional-cn/shared';
+} from '@autional/shared/generated/api';
+import { processPasswordForTransmission } from '@autional/shared';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { useTenantStore } from '@/lib/tenant-store';
 import { PasswordInput } from '@/components/form/PasswordInput';
-import { useTenantBrandingStore } from '@autional-cn/shared/branding';
+import { useTenantBrandingStore } from '@autional/shared/branding';
 
 export default function RecoverAccountPage() {
 	const { t } = useI18n();

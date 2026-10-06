@@ -8,7 +8,7 @@ import type {
 	RequestAccountRecoveryRequest,
 	VerifyAccountRecoveryRequest,
 	CompleteAccountRecoveryRequest,
-} from '@autional-cn/shared/generated/types';
+} from '@autional/shared/generated/types';
 
 /**
  * TASK-155 recover-account 单测（17 用例 R1-R17）
@@ -21,7 +21,7 @@ import type {
  * - @/hooks/use-page-title 空 mock
  * - react-router        importOriginal spread + Link 透传 <a href>；useParams 用可控 mockParams
  *                       （默认 {}，等价 MemoryRouter 无 Route 的真实行为；R14/R16 置 tenantSlug）
- * - @autional-cn/shared/generated/api  importOriginal spread + 覆盖 3 个 authRecovery*Post
+ * - @autional/shared/generated/api  importOriginal spread + 覆盖 3 个 authRecovery*Post
  *                       + PublicAuthConfigBySlugByBySlug（2026-08-17 契约：reset 步据 slug 取传输模式）
  * - @/lib/tenant-store  整模块 mock（ADR-003 — 模块顶层 L108 localStorage 副作用）
  * - @/lib/check-hibp    防御性 mock（ADR-002 — PasswordInput 内部 crypto.subtle+fetch，零出网）
@@ -77,8 +77,8 @@ vi.mock('@/hooks/use-page-title', () => ({
 	usePageTitle: vi.fn(),
 }));
 
-vi.mock('@autional-cn/shared/generated/api', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@autional-cn/shared/generated/api')>();
+vi.mock('@autional/shared/generated/api', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@autional/shared/generated/api')>();
 	return {
 		...actual,
 		authRecoveryRequestPost: (data: RequestAccountRecoveryRequest) => mockRecoveryRequestPost(data),

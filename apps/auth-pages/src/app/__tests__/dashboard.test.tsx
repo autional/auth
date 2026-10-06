@@ -70,7 +70,7 @@ vi.mock('react-i18next', () => ({
 	I18nextProvider: ({ children }: any) => children,
 }));
 
-// 仅保留 Provider 透传：页面数据管线已全部由 @autional-cn/shared mock 提供
+// 仅保留 Provider 透传：页面数据管线已全部由 @autional/shared mock 提供
 vi.mock('@tanstack/react-query', () => ({
 	QueryClient: class {
 		clear = vi.fn();
@@ -89,7 +89,7 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional-cn/shared', () => {
+vi.mock('@autional/shared', () => {
 	const portalUrl = (code: string) => `http://${code}.example.com`;
 	return {
 		useAuthStore: Object.assign(
@@ -148,7 +148,7 @@ vi.mock('@autional-cn/shared', () => {
 	};
 });
 
-vi.mock('@autional-cn/shared/generated/api', () => ({
+vi.mock('@autional/shared/generated/api', () => ({
 	authMeMemberships: (...args: any[]) => (mockAuthMeMemberships as any)(...args),
 	sessionsUserSessionsByUser: (...args: any[]) =>
 		(mockSessionsUserSessionsByUserId as any)(...args),

@@ -22,7 +22,7 @@ vi.mock('react-router', async () => {
 });
 
 const mockApiClientPost = vi.fn();
-vi.mock('@autional-cn/shared', () => ({
+vi.mock('@autional/shared', () => ({
 	apiClient: {
 		post: (...args: any[]) => mockApiClientPost(...args),
 	},
@@ -34,8 +34,8 @@ const mockAuthMeConsentPost = vi.fn();
 const mockCompliancePublicLegalDocuments = vi.fn();
 const mockVerificationOcrPost = vi.fn();
 const mockVerificationVerifyPost = vi.fn();
-vi.mock('@autional-cn/shared/generated/api', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('@autional-cn/shared/generated/api')>();
+vi.mock('@autional/shared/generated/api', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@autional/shared/generated/api')>();
 	return {
 		...actual,
 		authMeConsentPost: (...args: any[]) => mockAuthMeConsentPost(...args),

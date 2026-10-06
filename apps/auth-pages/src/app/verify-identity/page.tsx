@@ -5,14 +5,14 @@ import { useSearchParams, useParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button, Input, Label, showToast, ToastProvider, StatusBadge } from '@autional-cn/ui';
+import { Button, Input, Label, showToast, ToastProvider, StatusBadge } from '@autional/ui';
 import { useI18n } from '@/lib/i18n';
 import { createVerifyIdentityConfirmSchema } from '@/lib/validators';
 import {
 	authMeConsentPost,
 	verificationOcrPost,
 	verificationVerifyPost,
-} from '@autional-cn/shared/generated/api';
+} from '@autional/shared/generated/api';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
 import { AuthCard } from '@/components/auth/AuthCard';
 

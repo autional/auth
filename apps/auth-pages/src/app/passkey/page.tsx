@@ -2,8 +2,8 @@
 
 import { useState, Suspense } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router';
-import { Button } from '@autional-cn/ui';
-import { loginWithTokens, extractApiError, END_USER_PORTAL_URL, crossAppUrl } from '@autional-cn/shared';
+import { Button } from '@autional/ui';
+import { loginWithTokens, extractApiError, END_USER_PORTAL_URL, crossAppUrl } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { beginPasskeyLogin, completePasskeyLogin } from '@/lib/api.generated';
 import RedirectCountdown from '@/components/ui/RedirectCountdown';

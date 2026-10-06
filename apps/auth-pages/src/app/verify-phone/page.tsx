@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Input, Label } from '@autional-cn/ui';
+import { Button, Input, Label } from '@autional/ui';
 import { createVerifyPhoneSchema } from '@/lib/validators';
 import type { VerifyPhoneFormData } from '@/lib/validators';
 import { sendSmsCode, verifyPhone } from '@/lib/api.generated';

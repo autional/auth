@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router';
-import { Button } from '@autional-cn/ui';
-import { authMagicLinkCallbackPost } from '@autional-cn/shared/generated/api';
+import { Button } from '@autional/ui';
+import { authMagicLinkCallbackPost } from '@autional/shared/generated/api';
 import {
 	loginWithTokens,
 	isValidRedirect,
@@ -11,11 +11,11 @@ import {
 	crossAppUrl,
 	ADMIN_CONSOLE_URL,
 	SECURITY_DASHBOARD_URL,
-} from '@autional-cn/shared';
+} from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { ErrorState } from '@autional-cn/ui';
+import { ErrorState } from '@autional/ui';
 import { useI18n } from '@/lib/i18n';
 
 type ConfirmStatus = 'verifying' | 'success' | 'error';

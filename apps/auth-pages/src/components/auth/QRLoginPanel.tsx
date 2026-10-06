@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { Button } from '@autional-cn/ui';
-import { loginWithTokens } from '@autional-cn/shared';
+import { Button } from '@autional/ui';
+import { loginWithTokens } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
-import { authQrLoginInitiatePost, authQrLoginStatus } from '@autional-cn/shared/generated/api';
+import { authQrLoginInitiatePost, authQrLoginStatus } from '@autional/shared/generated/api';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
 import { useCountdown } from '@/hooks/use-countdown';

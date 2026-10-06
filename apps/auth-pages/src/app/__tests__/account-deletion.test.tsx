@@ -25,7 +25,7 @@ vi.mock('react-router', async () => {
 const mockLogout = vi.fn();
 const mockApiClientPost = vi.fn();
 const mockAuthMeDeleteAccountPost = vi.fn();
-vi.mock('@autional-cn/shared', () => ({
+vi.mock('@autional/shared', () => ({
 	apiClient: {
 		post: (...args: any[]) => (mockApiClientPost as any)(...args),
 	},
@@ -36,7 +36,7 @@ vi.mock('@autional-cn/shared', () => ({
 	getAccessToken: () => null,
 }));
 
-vi.mock('@autional-cn/shared/generated/api', () => ({
+vi.mock('@autional/shared/generated/api', () => ({
 	authMeDeleteAccountPost: (...args: any[]) => mockAuthMeDeleteAccountPost(...args),
 }));
 

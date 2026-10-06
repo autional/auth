@@ -1,4 +1,4 @@
-import { END_USER_PORTAL_URL } from '@autional-cn/shared';
+import { END_USER_PORTAL_URL } from '@autional/shared';
 import { useParams } from 'react-router';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router';
-import { Button } from '@autional-cn/ui';
-import { loginWithTokens, extractApiError, decodeJwtPayload } from '@autional-cn/shared';
+import { Button } from '@autional/ui';
+import { loginWithTokens, extractApiError, decodeJwtPayload } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { exchangeCodeForToken } from '@/lib/api.generated';
 import RedirectCountdown from '@/components/ui/RedirectCountdown';

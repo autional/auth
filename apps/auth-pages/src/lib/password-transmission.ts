@@ -1,2 +1,2 @@
-export { processPasswordForTransmission, hashPasswordForTransmission } from '@autional-cn/shared';
-export type { TransmissionResult } from '@autional-cn/shared';
+export { processPasswordForTransmission, hashPasswordForTransmission } from '@autional/shared';
+export type { TransmissionResult } from '@autional/shared';
