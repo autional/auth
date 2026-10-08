@@ -5,8 +5,8 @@
   "description": "Auth Pages - Login, Register, Forgot Password, MFA (Vite + React Router)",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 13101",
-    "build": "vite build",
+    "dev": "node ../../scripts/gen-env.mjs && vite --port 13101",
+    "build": "node ../../scripts/gen-env.mjs && vite build",
     "preview": "vite preview --port 13101",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
