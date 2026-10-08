@@ -11,6 +11,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 // Both work, but nested is more maintainable.
 import zhCN from './locales/zh-CN.json';
 import enUS from './locales/en-US.json';
+import { FALLBACK_LANG, localeOf } from '@/lib/site-env';
 
 i18n
 	.use(LanguageDetector)
@@ -20,7 +21,7 @@ i18n
 			'zh-CN': { translation: zhCN },
 			'en-US': { translation: enUS },
 		},
-		fallbackLng: 'zh-CN',
+		fallbackLng: localeOf(FALLBACK_LANG),
 		// keySeparator: false means dots in keys are treated as literal characters,
 		// not path separators. Required because locale files contain flat keys like
 		// "auth.login.passwordTab" alongside nested keys like { login: { title: "..." } }.
@@ -30,7 +31,9 @@ i18n
 		keySeparator: false,
 		interpolation: { escapeValue: false },
 		detection: {
-			order: ['querystring', 'localStorage', 'navigator'],
+			// navigator 探测关停：首访语言 = 区域默认（B3 单源双区契约，见 docs/positioning/24）；
+			// querystring/localStorage 仅承载显式语言选择。
+			order: ['querystring', 'localStorage'],
 			caches: ['localStorage'],
 			lookupQuerystring: 'lang',
 		},

@@ -49,6 +49,8 @@
     "underTenant": "来自 {{tenant}}"
   },
   "mfa": {
+    "trustDevice": "信任此设备 30 天",
+    "trustDeviceDesc": "此设备在 30 天内无需再次验证",
     "challengeTitle": "多因素认证",
     "challengeSubtitle": "请选择一种验证方式完成登录",
     "totp": "身份验证器",
