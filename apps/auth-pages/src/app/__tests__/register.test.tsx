@@ -38,6 +38,9 @@ vi.mock('@autional/shared', () => ({
 		}),
 	},
 	getAccessToken: () => null,
+	// AUTH-53⑤：注册自动登录后 anchorSessionFromToken 会解 JWT 兜底 tenant_id；
+	// 测试 token 非 JWT → null 即可（租户上下文由 options.tenantId 权威给值）
+	decodeJwtPayload: () => null,
 	processPasswordForTransmission: async (password: string, mode?: string) => ({
 		password,
 		passwordTransmission: mode || 'plain',
@@ -56,8 +59,8 @@ vi.mock('@autional/shared/generated/api', async (importOriginal) => {
 	return {
 		...actual,
 		authRegisterPost: (...args: any[]) => mockAuthRegisterPost(...args),
-		authRegisterCheckUsername: (...args: any[]) => mockAuthRegisterCheckUsername(...args),
-		authRegisterCheckEmail: (...args: any[]) => mockAuthRegisterCheckEmail(...args),
+		authRegisterCheckUsernamePost: (...args: any[]) => mockAuthRegisterCheckUsername(...args),
+		authRegisterCheckEmailPost: (...args: any[]) => mockAuthRegisterCheckEmail(...args),
 		authLoginPost: (...args: any[]) => mockAuthLoginPost(...args),
 		authMeConsentPost: (...args: any[]) => mockAuthMeConsentPost(...args),
 		compliancePublicLegalDocuments: (...args: any[]) => mockCompliancePublicLegalDocuments(...args),

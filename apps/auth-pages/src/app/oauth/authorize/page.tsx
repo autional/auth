@@ -7,6 +7,7 @@ import { getAccessToken, apiClient, extractItem, decodeJwtPayload } from '@autio
 import { getOAuthClient } from '@/lib/api.generated';
 import { PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
 import { buildTenantLoginUrl, fetchTenantSlugByClientId } from '@/lib/oauth-cold-start';
+import { oauthErrorText } from '@/lib/oauth-error-text';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
@@ -58,6 +59,9 @@ function OAuthAuthorizeContent() {
 	const [error, setError] = useState('');
 	const [userId, setUserId] = useState('');
 	const [tenantId, setTenantId] = useState('');
+	// AUTH-03：会话未确认（无 token 时 redirectToLogin 的异步 slug 解析在途）不渲染
+	// 同意界面——原实现先渲染完整表单 ~0.5s 再跳走，未登录用户看到同意页闪烁。
+	const [sessionState, setSessionState] = useState<'checking' | 'ready'>('checking');
 
 	// 无会话时的出口：`<slug>/login?redirect=<本 authorize URL>`（TASK-07，短路 brand）。
 	// slug 解析失败回退旧交棒链（由 EntryRouter 决定落点），不白屏。
@@ -74,6 +78,7 @@ function OAuthAuthorizeContent() {
 	useEffect(() => {
 		const token = getAccessToken();
 		if (!token || token === 'undefined' || token === 'null') {
+			// 保持 sessionState='checking'：重定向完成前只渲染加载卡片（AUTH-03）
 			void redirectToLogin();
 			return;
 		}
@@ -82,6 +87,7 @@ function OAuthAuthorizeContent() {
 			setUserId((payload.user_id || payload.sub || '') as string);
 			setTenantId((payload.tenant_id || payload.tenantId || '') as string);
 		}
+		setSessionState('ready');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -119,6 +125,12 @@ function OAuthAuthorizeContent() {
 	// Bearer 得到 user_id，与 body 断言交叉校验。Accept: application/json 时服务端回
 	// 200 {redirect_to}（fetch 读不到 302 的 Location），前端整页跳转。
 	const submitConsent = async (): Promise<void> => {
+		// AUTH-46①：缺参预校验——client_id/redirect_uri 缺失时不再发起注定失败的 POST
+		// （此前打到后端收 Gin binding 原文并落屏）
+		if (!clientId || !redirectUri) {
+			setError(t('oauth.authorize.missingParams'));
+			return;
+		}
 		const token = getAccessToken();
 		if (!token || token === 'undefined' || token === 'null') {
 			await redirectToLogin(); // 会话中途失效 → 回登录页（redirect 指回本页）
@@ -126,6 +138,7 @@ function OAuthAuthorizeContent() {
 		}
 		setLoading(true);
 		setError('');
+		const fallback = t('oauth.authorize.authorizeFailed', '授权失败，请稍后重试');
 		try {
 			const body = new URLSearchParams({
 				client_id: clientId,
@@ -149,11 +162,41 @@ function OAuthAuthorizeContent() {
 				body: body.toString(),
 			});
 			const payload: any = await res.json().catch(() => null);
+
+			// AUTH-47：服务端错误路径已按 Accept 协商回 JSON（oauth 3949cd1）；若仍收到 302
+			// （旧版本/中间层），fetch 跟随重定向后真实错误只存在于 res.url 查询串——
+			// 此前 payload=null 一律误报「授权响应异常」，真实原因（如缺 PKCE）被整条吞掉
+			if (res.redirected && res.url) {
+				try {
+					const q = new URL(res.url).searchParams;
+					const redirectErr = q.get('error');
+					if (redirectErr) {
+						setError(
+							oauthErrorText(t, {
+								code: redirectErr,
+								description: q.get('error_description'),
+								fallback,
+							}),
+						);
+						setLoading(false);
+						return;
+					}
+				} catch {
+					/* res.url 不可解析 → 落通用分支 */
+				}
+			}
+
 			if (!res.ok) {
-				setError(
-					pickErrorText(payload?.error_description, payload?.error, payload?.message) ??
-						t('oauth.authorize.authorizeFailed', '授权失败，请稍后重试'),
+				// 错误体归一化（U85）：error/error_description 可能是对象（Vercel 平台错误），
+				// 对象直接进 JSX 会触发 React #31 整页崩溃——先经 pickErrorText 取字符串。
+				// AUTH-46①：已知错误码 → 本地化（Gin binding 原文经码级映射被吸收，不再落屏）。
+				const code = typeof payload?.error === 'string' ? payload.error : '';
+				const description = pickErrorText(
+					payload?.error_description,
+					typeof payload?.error === 'object' ? payload.error : null,
+					code ? null : payload?.message,
 				);
+				setError(oauthErrorText(t, { code, description, fallback }));
 				setLoading(false);
 				return;
 			}
@@ -165,7 +208,7 @@ function OAuthAuthorizeContent() {
 			}
 			window.location.href = target;
 		} catch {
-			setError(t('oauth.authorize.authorizeFailed', '授权失败，请稍后重试'));
+			setError(fallback);
 			setLoading(false);
 		}
 	};
@@ -190,6 +233,16 @@ function OAuthAuthorizeContent() {
 	}, [clientId, userId]);
 
 	const scopes = scope.split(' ').filter(Boolean);
+
+	// AUTH-03：会话未确认前不渲染同意界面（含表单/权限清单），仅加载卡片；
+	// 无会话时 redirectToLogin 已在途，用户不会看到「同意→跳登录」的闪烁。
+	if (sessionState !== 'ready') {
+		return (
+			<AuthCard>
+				<AuthHeader title={t('auth.oauth.authorizeTitle')} subtitle={t('common.loading')} />
+			</AuthCard>
+		);
+	}
 
 	const handleDeny = () => {
 		if (!redirectUri) {
@@ -237,7 +290,7 @@ function OAuthAuthorizeContent() {
 			</div>
 
 			{error && (
-				<div className="rounded-md bg-[var(--color-danger)]/10 p-3 text-sm text-danger">
+				<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 					{error}
 				</div>
 			)}
@@ -257,7 +310,7 @@ function OAuthAuthorizeContent() {
 							key={s}
 							className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]"
 						>
-							<span className="text-[var(--color-success)]">&#x2713;</span>
+							<span className="text-success-text">&#x2713;</span>
 							{t(scopeToI18nKey(s))}
 						</li>
 					))}

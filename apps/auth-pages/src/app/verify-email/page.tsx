@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams, useParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,7 +19,8 @@ function VerifyEmailContent() {
 	const { t } = useI18n();
 	const [searchParams] = useSearchParams();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
-	const token = searchParams.get('token') || '';
+	const email = searchParams.get('email') || '';
+	const code = searchParams.get('code') || '';
 
 	const [status, setStatus] = useState<VerifyStatus>('verifying');
 	const [message, setMessage] = useState('');
@@ -45,14 +46,23 @@ function VerifyEmailContent() {
 		resolver: zodResolver(resendSchema),
 	});
 
-	useEffect(() => {
-		if (!token) {
-			setStatus('error');
-			setMessage(t('auth.verifyEmail.invalidToken'));
-			return;
-		}
+	const invalidParams = !email || !code;
 
-		authVerifyEmailPost({ code: token, email: '' })
+	// 初检：参数缺失直接落错误态；不在此 setMessage（避免任何重跑覆盖请求回调写入的结果）
+	useEffect(() => {
+		if (invalidParams) setStatus('error');
+	}, [invalidParams]);
+
+	// 验证请求按 (email, code) 单发守卫：验证码一次性消费，重复 POST 会让后续 400
+	// 覆盖首个 200 的成功态（AUTH-24；同时防 React StrictMode 开发态双调用）
+	const verifyKeyRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (invalidParams) return;
+		const key = `${email}|${code}`;
+		if (verifyKeyRef.current === key) return;
+		verifyKeyRef.current = key;
+
+		authVerifyEmailPost({ email, code })
 			.then(() => {
 				setStatus('success');
 			})
@@ -65,7 +75,7 @@ function VerifyEmailContent() {
 					setStatus('error');
 				}
 			});
-	}, [token, t]);
+	}, [email, code, t, invalidParams]);
 
 	const onResend = async (data: ResendFormData) => {
 		setResending(true);
@@ -74,7 +84,13 @@ function VerifyEmailContent() {
 			await authResendVerificationEmailPost({ email: data.email });
 			setResendSuccess(true);
 		} catch (err: any) {
-			setMessage(err.response?.data?.message || t('auth.verifyEmail.sendFailed'));
+			// 429 限流专属文案（AUTH-24③）：后端 RFC7807 无 message 字段，
+			// 之前落通用「发送失败」；现在 message 不再被覆盖，需给出准确归因。
+			if (err.response?.status === 429) {
+				setMessage(t('auth.verifyEmail.resendTooFrequent'));
+			} else {
+				setMessage(err.response?.data?.message || t('auth.verifyEmail.sendFailed'));
+			}
 		} finally {
 			setResending(false);
 		}
@@ -92,7 +108,7 @@ function VerifyEmailContent() {
 		if (status === 'success') {
 			return (
 				<div className="space-y-6">
-					<div className="rounded-md bg-[var(--color-success)]/10 p-4 text-center text-sm text-success">
+					<div className="rounded-md bg-success/10 p-4 text-center text-sm text-success-text">
 						{t('auth.verifyEmail.successMessage')}
 					</div>
 					<Link to={tenantSlug ? `/${tenantSlug}/login` : '/'}>
@@ -105,7 +121,7 @@ function VerifyEmailContent() {
 		if (status === 'already-verified') {
 			return (
 				<div className="space-y-6">
-					<div className="rounded-md bg-[var(--color-success)]/10 p-4 text-center text-sm text-success">
+					<div className="rounded-md bg-success/10 p-4 text-center text-sm text-success-text">
 						{t('auth.verifyEmail.alreadyVerified')}
 					</div>
 					<Link to={tenantSlug ? `/${tenantSlug}/login` : '/'}>
@@ -118,12 +134,15 @@ function VerifyEmailContent() {
 		// error
 		return (
 			<div className="space-y-6">
-				<div className="rounded-md bg-[var(--color-danger)]/10 p-4 text-center text-sm text-danger">
-					{message || t('auth.verifyEmail.expiredOrInvalid')}
+				<div className="rounded-md bg-danger/10 p-4 text-center text-sm text-danger-text">
+					{message ||
+						(invalidParams
+							? t('auth.verifyEmail.invalidToken')
+							: t('auth.verifyEmail.expiredOrInvalid'))}
 				</div>
 
 				{resendSuccess ? (
-					<div className="rounded-md bg-[var(--color-success)]/10 p-4 text-center text-sm text-success">
+					<div className="rounded-md bg-success/10 p-4 text-center text-sm text-success-text">
 						{t('auth.verifyEmail.resendSuccess')}
 					</div>
 				) : (
@@ -161,7 +180,7 @@ function VerifyEmailContent() {
 			<div className="text-center text-sm">
 				<Link
 					to={tenantSlug ? `/${tenantSlug}/login` : '/'}
-					className="text-[var(--color-brand)] hover:underline"
+					className="text-brand-text hover:underline"
 				>
 					{t('auth.common.backToLogin')}
 				</Link>

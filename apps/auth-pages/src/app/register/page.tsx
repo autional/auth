@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { Button, Label, Input } from '@autional/ui';
 import {
 	authRegisterPost,
-	authRegisterCheckUsername,
-	authRegisterCheckEmail,
+	authRegisterCheckUsernamePost,
+	authRegisterCheckEmailPost,
 	authLoginPost,
 	authMeConsentPost,
 	tenantPublicTenants,
@@ -19,6 +19,7 @@ import { checkPasswordBreached } from '@/lib/breach-check';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
 import { loadAuthExtras } from '@/lib/api';
 import { loginWithTokens, bffLogin, isBFFAvailable, useAuthStore, navigateTo } from '@autional/shared';
+import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { processPasswordForTransmission } from '@/lib/password-transmission';
 import { createRegisterSchema } from '@/lib/validators';
 import { useI18n } from '@/lib/i18n';
@@ -110,7 +111,7 @@ function PolicyChecklist({
 				return (
 					<div key={req.key} className="flex items-center gap-2 transition-all duration-300">
 						<span
-							className={`transition-all duration-300 ${satisfied ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}
+							className={`transition-all duration-300 ${satisfied ? 'text-success-text' : 'text-[var(--color-text-muted)]'}`}
 						>
 							{satisfied ? (
 								<svg
@@ -135,7 +136,7 @@ function PolicyChecklist({
 							)}
 						</span>
 						<span
-							className={`transition-all duration-300 ${satisfied ? 'text-[var(--color-success)] line-through opacity-60' : 'text-neutral-500'}`}
+							className={`transition-all duration-300 ${satisfied ? 'text-success-text line-through opacity-60' : 'text-neutral-500'}`}
 						>
 							{req.label}
 						</span>
@@ -162,11 +163,14 @@ export default function RegisterPage() {
 	const [usernameStatus, setUsernameStatus] = useState<CheckStatus>('idle');
 	const [emailStatus, setEmailStatus] = useState<CheckStatus>('idle');
 	const [registrationSuccess, setRegistrationSuccess] = useState(false);
+	// 注册成功后的 Passkey 登记需要原口令重认证（begin 端点 password 必填）
+	const [registeredPassword, setRegisteredPassword] = useState('');
 	const [rateLimitStep, setRateLimitStep] = useState(0);
 	const turnstileTokenRef = useRef<string>('');
 
 	const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const prevTenantIdRef = useRef(''); // AUTH-04: 上次选中的租户 id（检测真实切换以清字段）
 
 	// Tenant loading
 	const [tenants, setTenants] = useState<TenantOption[]>([]);
@@ -216,8 +220,8 @@ export default function RegisterPage() {
 	const [inlineConfigId, setInlineConfigId] = useState<string | null>(null);
 	const { data: inlineAuthConfig } = useTenantAuthConfig(inlineConfigId);
 
-	// Resolved config
-	const authConfig = tenantSlug ? slugAuthConfig : inlineAuthConfig;
+	// Resolved config：slug 配置优先；未知 slug（探测失败）时回落手动选择的租户配置
+	const authConfig = slugAuthConfig || inlineAuthConfig;
 
 	// Resolved membership mode
 	const membershipMode = authConfig?.membershipApproval;
@@ -259,7 +263,8 @@ export default function RegisterPage() {
 		setUsernameStatus('checking');
 		usernameTimer.current = setTimeout(async () => {
 			try {
-				const res = await authRegisterCheckUsername({ username: watchedUsername });
+				// POST 变体：GET 变体只读第二参 params，传 data 会被忽略 → 后端 400（AUTH-14）
+				const res = await authRegisterCheckUsernamePost({ username: watchedUsername });
 				setUsernameStatus(res.available ? 'available' : 'taken');
 			} catch {
 				setUsernameStatus('idle');
@@ -279,7 +284,7 @@ export default function RegisterPage() {
 		setEmailStatus('checking');
 		emailTimer.current = setTimeout(async () => {
 			try {
-				const res = await authRegisterCheckEmail({ email: watchedEmail });
+				const res = await authRegisterCheckEmailPost({ email: watchedEmail });
 				setEmailStatus(res.available ? 'available' : 'taken');
 			} catch {
 				setEmailStatus('idle');
@@ -376,16 +381,13 @@ export default function RegisterPage() {
 				password: transmissionResult.password,
 				passwordTransmission: transmissionResult.passwordTransmission,
 			};
-			if (transmissionResult.client_nonce) {
-				payload.client_nonce = transmissionResult.client_nonce;
-			}
 
 			if (selectedTenantId) {
-				payload.tenant_id = selectedTenantId;
+				payload.tenantId = selectedTenantId;
 			}
 
 			if ((data as any).invitation_code) {
-				payload.invitation_code = (data as any).invitation_code;
+				payload.invitationCode = (data as any).invitation_code;
 			}
 
 			if ((data as any).reason) {
@@ -400,19 +402,56 @@ export default function RegisterPage() {
 
 			await authRegisterPost(payload);
 
-			if (isBFFAvailable()) {
-				const bffRes = await bffLogin(data.username, data.password, selectedTenantId || undefined);
-				if (bffRes.code === 0 && bffRes.data?.user) {
-					useAuthStore.getState().setAuth('', '', bffRes.data.user as any);
+			// 自动登录 = best-effort：注册已成功，登录失败绝不能把结果改写为「注册失败」（AUTH-13）。
+			// 密码必须用与注册相同的传输处理结果 —— 裸明文在 hash 租户必 401。
+			let sessionEstablished = false;
+			let establishedToken = '';
+			try {
+				if (isBFFAvailable()) {
+					const bffRes = await bffLogin(
+						data.username,
+						data.password,
+						selectedTenantId || undefined,
+					);
+					if (bffRes.code === 0 && bffRes.data?.user) {
+						useAuthStore.getState().setAuth('', '', bffRes.data.user as any);
+						sessionEstablished = true;
+					}
+				} else {
+					const loginData: Record<string, unknown> = {
+						identity: data.username,
+						password: transmissionResult.password,
+						passwordTransmission: transmissionResult.passwordTransmission,
+						tenantId: selectedTenantId || undefined,
+					};
+					if (transmissionResult.clientNonce) {
+						loginData.clientNonce = transmissionResult.clientNonce;
+					}
+					if (transmissionResult.keyExchangeId) {
+						loginData.keyExchangeId = transmissionResult.keyExchangeId;
+					}
+					if (transmissionResult.clientPubKey) {
+						loginData.clientPubKey = transmissionResult.clientPubKey;
+					}
+					const loginRes = await authLoginPost(loginData as any);
+					if (loginRes.accessToken) {
+						loginWithTokens(loginRes.accessToken, loginRes.refreshToken, loginRes.user);
+						sessionEstablished = true;
+						establishedToken = loginRes.accessToken;
+					}
 				}
-			} else {
-				const loginRes = await authLoginPost({
-					identity: data.username,
-					password: data.password,
+			} catch {
+				// 静默：不弹错误、不阻断注册成功流程；用户可随后手动登录
+			}
+
+			// AUTH-53 约束⑤ / U384：自动登录建成会话后必须锚定租户（store 租户 id +
+			// slug 标记）——否则残留的旧租户上下文让后续请求按错租户发出（注册后 403×4 实锤）
+			if (sessionEstablished) {
+				anchorSessionFromToken(establishedToken, {
+					slug: slugAuthConfig?.tenantId ? tenantSlug : null,
+					tenantId: selectedTenantId || slugAuthConfig?.tenantId || null,
+					knownTenants: tenants,
 				});
-				if (loginRes.accessToken) {
-					loginWithTokens(loginRes.accessToken, loginRes.refreshToken, loginRes.user);
-				}
 			}
 
 			// 合规闭环：注册成功后记录用户对条款的同意（best-effort，失败不阻塞注册）
@@ -431,9 +470,13 @@ export default function RegisterPage() {
 			}
 
 			await loadAuthExtras().catch(() => {});
+			setRegisteredPassword(data.password);
 			setRegistrationSuccess(true);
 		} catch (err: any) {
-			setError(err.response?.data?.message || '注册失败，请稍后重试');
+			const status = err?.response?.status;
+			const message = err?.response?.data?.message;
+			// 409 = 账号已存在（ErrCodeUserAlreadyExists 61000102）→ 给「去登录」指路，而非笼统失败
+			setError(status === 409 ? message || t('auth.register.conflict') : message || '注册失败，请稍后重试');
 			const step = parseInt(err?.response?.headers?.['x-ratelimit-step'] || '0', 10);
 			if (step >= 1) {
 				setRateLimitStep(step);
@@ -459,9 +502,9 @@ export default function RegisterPage() {
 			case 'checking':
 				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">检查中...</p>;
 			case 'available':
-				return <p className="mt-1 text-xs text-[var(--color-success)]">✅ 该用户名可用</p>;
+				return <p className="mt-1 text-xs text-success-text">✅ 该用户名可用</p>;
 			case 'taken':
-				return <p className="mt-1 text-xs text-danger">❌ 该用户名已被占用</p>;
+				return <p className="mt-1 text-xs text-danger-text">❌ 该用户名已被占用</p>;
 			default:
 				return null;
 		}
@@ -473,20 +516,30 @@ export default function RegisterPage() {
 			case 'checking':
 				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">检查中...</p>;
 			case 'available':
-				return <p className="mt-1 text-xs text-[var(--color-success)]">该邮箱可用</p>;
+				return <p className="mt-1 text-xs text-success-text">该邮箱可用</p>;
 			case 'taken':
-				return <p className="mt-1 text-xs text-danger">该邮箱已被注册</p>;
+				return <p className="mt-1 text-xs text-danger-text">该邮箱已被注册</p>;
 			default:
 				return null;
 		}
 	}
 
-	const handleTenantChange = useCallback((tenantId: string) => {
-		setSelectedTenantId(tenantId);
-		if (tenantId) {
-			setInlineConfigId(tenantId);
-		}
-	}, []);
+	const handleTenantChange = useCallback(
+		(tenantId: string) => {
+			// AUTH-04/H5：实际切换租户时清空已填字段（同值重选不动），防前租户输入残留
+			if (tenantId !== prevTenantIdRef.current) {
+				prevTenantIdRef.current = tenantId;
+				setValue('username', '');
+				setValue('email', '');
+				setValue('password', '');
+			}
+			setSelectedTenantId(tenantId);
+			if (tenantId) {
+				setInlineConfigId(tenantId);
+			}
+		},
+		[setValue],
+	);
 
 	const handleAuthConfigLoaded = useCallback((config: any) => {
 		if (config) {
@@ -501,6 +554,8 @@ export default function RegisterPage() {
 
 				{authConfig?.passkeyEnabled !== false && (
 					<PasskeyRegisterButton
+						password={registeredPassword}
+						tenantId={authConfig?.tenantId || selectedTenantId || undefined}
 						onSkip={() =>
 							(window.location.href = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard')
 						}
@@ -528,7 +583,7 @@ export default function RegisterPage() {
 						onClick={() => setRegisterMethod(key as typeof registerMethod)}
 						className={`flex flex-col items-center gap-0.5 rounded-md px-1 py-2 text-xs font-medium transition-all duration-200 ${
 							registerMethod === key
-								? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+								? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-card'
 								: 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
 						}`}
 					>
@@ -630,7 +685,7 @@ export default function RegisterPage() {
 								{...register('reason' as any)}
 							/>
 							{(errors as any).reason?.message && (
-								<p className="text-xs text-danger">{(errors as any).reason.message}</p>
+								<p className="text-xs text-danger-text">{(errors as any).reason.message}</p>
 							)}
 						</div>
 					)}
@@ -690,7 +745,7 @@ export default function RegisterPage() {
 								id="agreeTerms"
 								name="agreeTerms"
 								type="checkbox"
-								className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
+								className="mt-0.5 h-4 w-4 rounded-xs border-neutral-300 text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
 								checked={watchedAgreeTerms || false}
 								onChange={(e) =>
 									setValue('agreeTerms' as any, e.target.checked as true, { shouldValidate: true })
@@ -700,7 +755,7 @@ export default function RegisterPage() {
 								{t('register.agreeTerms')}
 								<Link
 									to={tenantSlug ? `/${tenantSlug}/terms` : '/terms'}
-									className="text-[var(--color-brand)] transition-all duration-200 hover:underline decoration-2 underline-offset-4"
+									className="text-brand-text transition-all duration-200 hover:underline decoration-2 underline-offset-4"
 									target="_blank"
 									rel="noopener"
 								>
@@ -709,7 +764,7 @@ export default function RegisterPage() {
 								{t('register.and')}
 								<Link
 									to={tenantSlug ? `/${tenantSlug}/privacy` : '/privacy'}
-									className="text-[var(--color-brand)] transition-all duration-200 hover:underline decoration-2 underline-offset-4"
+									className="text-brand-text transition-all duration-200 hover:underline decoration-2 underline-offset-4"
 									target="_blank"
 									rel="noopener"
 								>
@@ -718,12 +773,12 @@ export default function RegisterPage() {
 							</span>
 						</label>
 						{errors.agreeTerms && (
-							<p className="text-xs text-danger">{errors.agreeTerms.message}</p>
+							<p className="text-xs text-danger-text">{errors.agreeTerms.message}</p>
 						)}
 					</div>
 
 					{error && (
-						<div className="rounded-md bg-[var(--color-danger)]/10 p-3 text-sm text-danger">
+						<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 							{error}
 						</div>
 					)}
@@ -770,7 +825,7 @@ export default function RegisterPage() {
 				{t('register.hasAccount')}{' '}
 				<Link
 					to={tenantSlug ? `/${tenantSlug}/login` : '/login'}
-					className="text-[var(--color-brand)] transition-all duration-200 hover:underline decoration-2 underline-offset-4"
+					className="text-brand-text transition-all duration-200 hover:underline decoration-2 underline-offset-4"
 				>
 					{t('register.login')}
 				</Link>

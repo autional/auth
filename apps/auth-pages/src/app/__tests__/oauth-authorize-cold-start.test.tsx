@@ -125,6 +125,23 @@ describe('同意页冷启动（无会话）', () => {
 			);
 		});
 	});
+
+	it('AUTH-03：无会话时同意表单不渲染——跳转在途仅加载卡片（无 0.5s 表单闪烁）', async () => {
+		renderPage();
+
+		// 首帧即断言：修复前完整同意表单（approve/deny + 权限清单）先渲染、后跳走
+		expect(screen.queryByRole('button', { name: 'auth.oauth.approve' })).toBeNull();
+		expect(screen.queryByRole('button', { name: 'auth.oauth.deny' })).toBeNull();
+		expect(screen.queryByText('auth.oauth.requestedPermissions')).toBeNull();
+		expect(screen.getByText('common.loading')).toBeInTheDocument();
+
+		await waitFor(() => {
+			expect(mockReplace).toHaveBeenCalled();
+		});
+		// 跳转在途仍不渲染表单
+		expect(screen.queryByRole('button', { name: 'auth.oauth.approve' })).toBeNull();
+		expect(screen.getByText('common.loading')).toBeInTheDocument();
+	});
 });
 
 describe('同意提交（有会话）', () => {
@@ -163,7 +180,7 @@ describe('同意提交（有会话）', () => {
 		expect(mockReplace).not.toHaveBeenCalled();
 	});
 
-	it('服务端拒绝 → 呈现 error_description，不跳转', async () => {
+	it('服务端拒绝（已知码 login_required）→ 码级本地化，不跳转', async () => {
 		const user = userEvent.setup();
 		mockFetch.mockImplementation((url: string, init?: any) => {
 			if (String(url).includes('/bff/oauth/api/v1/oauth/authorize')) {
@@ -182,9 +199,11 @@ describe('同意提交（有会话）', () => {
 
 		await user.click(screen.getByRole('button', { name: 'auth.oauth.approve' }));
 
+		// AUTH-46①：已知错误码经 oauthErrorText 映射为本地化键（描述原文不落屏）
 		await waitFor(() => {
-			expect(screen.getByText('会话已失效')).toBeInTheDocument();
+			expect(screen.getByText('oauth.error.loginRequired')).toBeInTheDocument();
 		});
+		expect(screen.queryByText('会话已失效')).toBeNull();
 		expect(locationMock.href).toBe('');
 	});
 });

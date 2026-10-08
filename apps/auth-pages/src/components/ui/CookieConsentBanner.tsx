@@ -61,7 +61,7 @@ export function CookieConsentBanner() {
 
 	return (
 		<>
-			<div className="fixed bottom-0 left-0 z-50 w-full border-t border-neutral-200 bg-white px-4 py-4 shadow-lg dark:border-neutral-700 dark:bg-neutral-900 sm:px-6">
+			<div className="fixed bottom-0 left-0 z-50 w-full border-t border-neutral-200 bg-white px-4 py-4 shadow-brand dark:border-neutral-700 dark:bg-neutral-900 sm:px-6">
 				<div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div className="flex items-start gap-3">
 						<svg
@@ -101,7 +101,7 @@ export function CookieConsentBanner() {
 						</Button>
 						<button
 							onClick={() => setConsent({ analytics: false })}
-							className="ml-1 rounded p-1 text-[var(--color-text-muted)] hover:text-neutral-600 dark:hover:text-neutral-300"
+							className="ml-1 rounded-xs p-1 text-[var(--color-text-muted)] hover:text-neutral-600 dark:hover:text-neutral-300"
 							aria-label={t('cookie.close') ?? 'Close'}
 						>
 							<X size={18} />
@@ -138,14 +138,14 @@ function CookieSettingsPanel({
 
 	return (
 		<div className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim/50 sm:items-center">
-			<div className="relative w-full max-w-md rounded-t-xl bg-white p-6 shadow-xl dark:bg-neutral-900 sm:rounded-xl">
+			<div className="relative w-full max-w-md rounded-t-xl bg-white p-6 shadow-card dark:bg-neutral-900 sm:rounded-xl">
 				<div className="flex items-center justify-between">
 					<h3 className="text-lg font-semibold text-neutral-900 dark:text-white">
 						{t('cookie.title')}
 					</h3>
 					<button
 						onClick={onClose}
-						className="rounded p-1 text-[var(--color-text-muted)] hover:text-neutral-600 dark:hover:text-neutral-300"
+						className="rounded-xs p-1 text-[var(--color-text-muted)] hover:text-neutral-600 dark:hover:text-neutral-300"
 					>
 						<X size={20} />
 					</button>
@@ -168,7 +168,7 @@ function CookieSettingsPanel({
 								disabled
 								className="peer sr-only"
 							/>
-							<div className="h-5 w-9 rounded-full bg-[var(--color-brand)] opacity-60 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition" />
+							<div className="h-5 w-9 rounded-full bg-[var(--color-brand)] opacity-60 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition" />
 						</label>
 					</div>
 
@@ -192,7 +192,7 @@ function CookieSettingsPanel({
 							}`}
 						>
 							<span
-								className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${
+								className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-soft transition ${
 									analytics ? 'translate-x-[18px]' : 'translate-x-[2px]'
 								}`}
 							/>

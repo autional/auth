@@ -4,11 +4,11 @@ import { useI18n } from '@/lib/i18n';
 import { CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export interface MembershipInfo {
-	tenant_id: string;
-	tenant_name: string;
+	tenantId: string;
+	tenantName: string;
 	role?: string;
 	status: string;
-	joined_at?: string;
+	joinedAt?: string;
 }
 
 export interface MembershipStatusCardProps {
@@ -43,7 +43,7 @@ export function MembershipStatusCard({ memberships, loading = false }: Membershi
 	if (loading) {
 		return (
 			<div className="space-y-3 rounded-lg border border-neutral-200 p-4">
-				<div className="h-5 w-32 animate-pulse rounded bg-neutral-200" />
+				<div className="h-5 w-32 animate-pulse rounded-xs bg-neutral-200" />
 				{[1, 2, 3].map((i) => (
 					<div key={i} className="h-14 animate-pulse rounded-md bg-neutral-100" />
 				))}
@@ -66,14 +66,14 @@ export function MembershipStatusCard({ memberships, loading = false }: Membershi
 					const Icon = cfg.icon;
 					return (
 						<div
-							key={m.tenant_id}
+							key={m.tenantId}
 							className="flex items-center justify-between rounded-md border border-neutral-100 bg-white px-3 py-2.5"
 						>
 							<div className="flex items-center gap-2.5">
 								<Icon className={`h-4 w-4 ${cfg.className}`} />
 								<div>
 									<p className="text-sm font-medium text-neutral-800">
-										{m.tenant_name || m.tenant_id}
+										{m.tenantName || m.tenantId}
 									</p>
 									{m.role && <p className="text-xs text-neutral-500">{m.role}</p>}
 								</div>

@@ -10,6 +10,7 @@ import {
 	authWebauthnAuthenticateCompletePost,
 } from '@autional/shared/generated/api';
 import { loadAuthExtras } from '@/lib/api';
+import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
 import { CredentialManagementGate } from './CredentialManagementGate';
@@ -80,7 +81,8 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 					mediation: 'conditional',
 					tenantId: tenantId || undefined,
 				});
-				const options = beginData.response || beginData;
+				// 后端返回 go-webauthn CredentialAssertion（{publicKey:{...}}，经 NewDataResponse 解包后亦然）
+				const options = (beginData as any)?.publicKey ?? (beginData as any)?.response ?? beginData;
 
 				// 2. 构建WebAuthn请求选项
 				const publicKey: PublicKeyCredentialRequestOptions = {
@@ -123,6 +125,11 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 				} as any);
 
 				loginWithTokens(completeData.accessToken, completeData.refreshToken, completeData.user);
+				// AUTH-53⑤：会话建立即锚定（slug 取路由上下文；tenantId 尽 prop、JWT claim 兜底）
+				anchorSessionFromToken(completeData.accessToken || '', {
+					slug: tenantSlug || null,
+					tenantId: tenantId || null,
+				});
 				await loadAuthExtras();
 				window.location.href = getPostLoginTarget({
 					tenantSlug,
@@ -164,7 +171,7 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 				tenantId: tenantId || undefined,
 				mediation: email ? undefined : 'conditional',
 			});
-			const options = beginData.response || beginData;
+			const options = (beginData as any)?.publicKey ?? (beginData as any)?.response ?? beginData;
 
 			// 2. Convert server response to WebAuthn request options
 			const publicKey: PublicKeyCredentialRequestOptions = {
@@ -186,21 +193,28 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 			const cred = credential as PublicKeyCredential;
 			const assertion = cred.response as AuthenticatorAssertionResponse;
 
-			// 4. Send signed assertion to server
+			// 4. Send signed assertion to server (后端契约: 顶层 credential 包裹)
 			const data = await authWebauthnAuthenticateCompletePost({
-				id: cred.id,
-				rawId: bufferToBase64url(cred.rawId),
-				type: cred.type,
-				response: {
-					clientDataJSON: bufferToBase64url(assertion.clientDataJSON),
-					authenticatorData: bufferToBase64url(assertion.authenticatorData),
-					signature: bufferToBase64url(assertion.signature),
-					userHandle: assertion.userHandle ? bufferToBase64url(assertion.userHandle) : null,
+				credential: {
+					id: cred.id,
+					rawId: bufferToBase64url(cred.rawId),
+					type: cred.type,
+					response: {
+						clientDataJSON: bufferToBase64url(assertion.clientDataJSON),
+						authenticatorData: bufferToBase64url(assertion.authenticatorData),
+						signature: bufferToBase64url(assertion.signature),
+						userHandle: assertion.userHandle ? bufferToBase64url(assertion.userHandle) : null,
+					},
 				},
 			} as any);
 
 			// 5. Complete login
 			loginWithTokens(data.accessToken, data.refreshToken, data.user);
+			// AUTH-53⑤：会话建立即锚定（与条件 UI 路径同法）
+			anchorSessionFromToken(data.accessToken || '', {
+				slug: tenantSlug || null,
+				tenantId: tenantId || null,
+			});
 			await loadAuthExtras().catch(() => {});
 			window.location.href = getPostLoginTarget({ tenantSlug, redirect, user: data.user });
 		} catch (err: any) {
@@ -231,7 +245,7 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 				{t('passkey.submitLogin')}
 			</Button>
 			{error && (
-				<p className="mt-2 text-center text-xs text-danger" data-testid="passkey-error">
+				<p className="mt-2 text-center text-xs text-danger-text" data-testid="passkey-error">
 					{error}
 				</p>
 			)}

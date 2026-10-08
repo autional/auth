@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Input, Label } from '@autional/ui';
-import { extractApiError, useAuth, END_USER_PORTAL_URL, crossAppUrl } from '@autional/shared';
+import { extractApiError, useAuth } from '@autional/shared';
 import {
 	enableMFA,
 	verifyTOTPMFA,
@@ -31,6 +31,8 @@ import type {
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
+import { userPortalUrl } from '@/lib/portal-links';
+import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
 
 type MFAMethod = 'totp' | 'sms' | 'email';
 type Step = 1 | 2 | 3;
@@ -55,6 +57,8 @@ export default function MFASetupPage() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
+	// AUTH-41：跨门户深链（账户中心 /security）必须带生效租户 slug，裸链会 404
+	const slug = useEffectiveTenantSlug();
 	const totpSetupSchema = createMfaTOTPSetupSchema(t);
 	const phoneSetupSchema = createMfaPhoneSetupSchema(t);
 	const emailSetupSchema = createMfaEmailSetupSchema(t);
@@ -515,7 +519,7 @@ export default function MFASetupPage() {
 		const hasCodes = backupCodes.length > 0;
 		return (
 			<div className="space-y-4">
-				<div className="rounded-md bg-[var(--color-success)]/10 p-4 text-center text-sm text-success">
+				<div className="rounded-md bg-success/10 p-4 text-center text-sm text-success-text">
 					{t('auth.mfa.enabled')}
 				</div>
 				{hasCodes && (
@@ -539,7 +543,7 @@ export default function MFASetupPage() {
 							<input
 								type="checkbox"
 								id="saved-check"
-								className="mt-0.5 h-4 w-4 rounded border-[var(--color-border-subtle)]"
+								className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-subtle)]"
 								checked={saved}
 								onChange={(e) => setSaved(e.target.checked)}
 							/>
@@ -592,7 +596,7 @@ export default function MFASetupPage() {
 				<AuthHeader title={t('auth.mfa.setupTitle')} subtitle={t('auth.mfa.enabledDesc')} />
 
 				{error && (
-					<div className="rounded-md bg-[var(--color-danger)]/10 p-3 text-sm text-danger">
+					<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 						{error}
 					</div>
 				)}
@@ -619,7 +623,7 @@ export default function MFASetupPage() {
 									}}
 									className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
 										target === m
-											? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+											? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-card'
 											: 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
 									}`}
 								>
@@ -674,7 +678,7 @@ export default function MFASetupPage() {
 						}
 						isLoading={disableLoading}
 						onClick={() => handleDisableMFA(target)}
-						className="!border-[var(--color-danger)]/30 !text-[var(--color-danger)] hover:!bg-[var(--color-danger)]/10"
+						className="!border-danger/30 !text-danger-text hover:!bg-danger/10"
 					>
 						{t('auth.mfa.disableBtn')}
 					</Button>
@@ -683,8 +687,8 @@ export default function MFASetupPage() {
 				<div className="rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-muted)] p-4 text-sm text-[var(--color-text-secondary)] space-y-1">
 					<p>{t('mfa.accountCenter')}</p>
 					<a
-						href={crossAppUrl(`${END_USER_PORTAL_URL()}/security`)}
-						className="text-[var(--color-brand)] hover:underline font-medium"
+						href={userPortalUrl(slug, '/security')}
+						className="text-brand-text hover:underline font-medium"
 					>
 						{t('mfa.goToAccountCenter')} →
 					</a>
@@ -694,7 +698,7 @@ export default function MFASetupPage() {
 					<button
 						type="button"
 						onClick={() => navigate(tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard')}
-						className="text-[var(--color-brand)] hover:underline"
+						className="text-brand-text hover:underline"
 					>
 						{t('auth.mfa.back')}
 					</button>
@@ -729,7 +733,7 @@ export default function MFASetupPage() {
 			/>
 
 			{error && (
-				<div className="rounded-md bg-[var(--color-danger)]/10 p-3 text-sm text-danger">
+				<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 					{error}
 				</div>
 			)}
@@ -743,7 +747,7 @@ export default function MFASetupPage() {
 					<button
 						type="button"
 						onClick={() => navigate(tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard')}
-						className="text-[var(--color-brand)] hover:underline"
+						className="text-brand-text hover:underline"
 					>
 						{t('auth.mfa.back')}
 					</button>
@@ -753,8 +757,8 @@ export default function MFASetupPage() {
 			<div className="rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-muted)] p-4 text-sm text-[var(--color-text-secondary)] space-y-1">
 				<p>{t('mfa.accountCenter')}</p>
 				<a
-					href={crossAppUrl(`${END_USER_PORTAL_URL()}/security`)}
-					className="text-[var(--color-brand)] hover:underline font-medium"
+					href={userPortalUrl(slug, '/security')}
+					className="text-brand-text hover:underline font-medium"
 				>
 					{t('mfa.goToAccountCenter')} →
 				</a>

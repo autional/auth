@@ -10,6 +10,7 @@ import {
 } from '@autional/shared/generated/api';
 import { loginWithTokens } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
+import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
 import { useCountdown } from '@/hooks/use-countdown';
@@ -105,12 +106,18 @@ export default function EmailCodeLoginForm({
 				res = await authLoginEmailCodePost(loginPayload as any);
 			}
 
-			const accessToken = res?.access_token || res?.data?.access_token;
-			const refreshToken = res?.refresh_token || res?.data?.refresh_token;
+			// 拦截器已解包信封并转 camelCase（{code,data:{access_token..}} → {accessToken..}）
+			const accessToken = res?.accessToken || res?.data?.accessToken;
+			const refreshToken = res?.refreshToken || res?.data?.refreshToken;
 			const user = res?.user || res?.data?.user;
 
 			if (accessToken && user) {
 				loginWithTokens(accessToken, refreshToken || '', user);
+				// AUTH-53⑤：会话建立即锚定（邮箱验证码登录/注册自动登录，与其余入口同法）
+				anchorSessionFromToken(accessToken, {
+					slug: tenantSlug || null,
+					tenantId: tenantId || null,
+				});
 				await loadAuthExtras();
 				window.location.href = getPostLoginTarget({ tenantSlug, redirect });
 			} else {
@@ -163,7 +170,7 @@ export default function EmailCodeLoginForm({
 			) : (
 				<>
 					{sent && (
-						<p className="text-sm text-[var(--color-success)]">
+						<p className="text-sm text-success-text">
 							{(t('auth.emailCode.sentTo') || '验证码已发送至').replace('{email}', email)}
 						</p>
 					)}
@@ -199,7 +206,7 @@ export default function EmailCodeLoginForm({
 					</div>
 				</>
 			)}
-			{error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
+			{error && <p className="text-sm text-danger-text">{error}</p>}
 		</div>
 	);
 }

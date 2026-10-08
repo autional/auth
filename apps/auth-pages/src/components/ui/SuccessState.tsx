@@ -23,7 +23,7 @@ export function SuccessState({ title, description, action }: SuccessStateProps) 
 	return (
 		<div className="flex flex-col items-center justify-center gap-4 py-8 text-center">
 			{/* 绿色勾选图标 */}
-			<div className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--color-success)]/10">
+			<div className="flex h-20 w-20 items-center justify-center rounded-full bg-success/10">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="40"
@@ -34,7 +34,7 @@ export function SuccessState({ title, description, action }: SuccessStateProps) 
 					strokeWidth="2"
 					strokeLinecap="round"
 					strokeLinejoin="round"
-					className="text-[var(--color-success)]"
+					className="text-success-text"
 				>
 					<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
 					<polyline points="22 4 12 14.01 9 11.01" />

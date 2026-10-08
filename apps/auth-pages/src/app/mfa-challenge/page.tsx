@@ -6,10 +6,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Input, Label } from '@autional/ui';
-import { loginWithTokens, decodeJwtPayload, extractApiError } from '@autional/shared';
+import {
+	loginWithTokens,
+	decodeJwtPayload,
+	extractApiError,
+	usePublicTenantSlugs,
+} from '@autional/shared';
 import { createMfaTOTPSchema, createMfaSMSSchema } from '@/lib/validators';
 import type { MFATOTPFormData, MFASMSFormData } from '@/lib/validators';
 import { verifyMFAChallenge } from '@/lib/api.generated';
+import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
@@ -64,6 +70,7 @@ export default function MFAChallengePage() {
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
 	const loginPath = tenantSlug ? `/${tenantSlug}/login` : '/';
 	const dashboardPath = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard';
+	const { data: knownTenants } = usePublicTenantSlugs();
 
 	const mfaTotpSchema = createMfaTOTPSchema(t);
 	const mfaSmsSchema = createMfaSMSSchema(t);
@@ -129,6 +136,13 @@ export default function MFAChallengePage() {
 				mfaMethod: type,
 			});
 			loginWithTokens(res?.accessToken || '', res?.refreshToken || '', res?.user);
+			// AUTH-53 约束⑤：会话建立即锚定租户（tenantId = 登录页写入的权威值；
+			// oauth 挑战链无 tenantId → 由 JWT claim 兜底）
+			anchorSessionFromToken(res?.accessToken || '', {
+				slug: tenantSlug || null,
+				tenantId: preAuth.tenantId || null,
+				knownTenants,
+			});
 			sessionStorage.removeItem('mfa_pre_auth');
 			navigate(dashboardPath);
 		} catch (err) {
@@ -211,7 +225,7 @@ export default function MFAChallengePage() {
 							}}
 							className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
 								activeTab === key
-									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-card'
 									: 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
 							}`}
 						>
@@ -222,7 +236,7 @@ export default function MFAChallengePage() {
 			)}
 
 			{error && (
-				<div className="rounded-md bg-[var(--color-danger)]/10 p-3 text-sm text-danger">
+				<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 					{error}
 				</div>
 			)}
@@ -231,10 +245,10 @@ export default function MFAChallengePage() {
 				<div
 					className={`rounded-md p-3 text-sm font-medium ${
 						preAuth.riskLevel === 'low'
-							? 'bg-[var(--color-brand)]/10 text-[var(--color-brand)]'
+							? 'bg-brand/10 text-brand-text'
 							: preAuth.riskLevel === 'medium'
-								? 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]'
-								: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]'
+								? 'bg-warning/10 text-warning-text'
+								: 'bg-danger/10 text-danger-text'
 					}`}
 					data-testid="mfa-risk-level-banner"
 				>
@@ -356,7 +370,7 @@ export default function MFAChallengePage() {
 			)}
 
 			<div className="text-center text-sm">
-				<Link to={loginPath} className="text-[var(--color-brand)] hover:underline">
+				<Link to={loginPath} className="text-brand-text hover:underline">
 					{t('mfa.challenge.backToLogin')}
 				</Link>
 			</div>

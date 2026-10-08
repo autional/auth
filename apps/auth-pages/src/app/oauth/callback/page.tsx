@@ -3,9 +3,16 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router';
 import { Button } from '@autional/ui';
-import { loginWithTokens, extractApiError, decodeJwtPayload } from '@autional/shared';
+import {
+	loginWithTokens,
+	extractApiError,
+	decodeJwtPayload,
+	usePublicTenantSlugs,
+} from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
+import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { exchangeCodeForToken } from '@/lib/api.generated';
+import { oauthErrorText } from '@/lib/oauth-error-text';
 import RedirectCountdown from '@/components/ui/RedirectCountdown';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
@@ -22,6 +29,7 @@ function OAuthCallbackContent() {
 	const state = searchParams.get('state') || '';
 	const errorParam = searchParams.get('error') || '';
 	const errorDescription = searchParams.get('error_description') || '';
+	const { data: knownTenants } = usePublicTenantSlugs();
 
 	// 从URL路径提取provider: /oauth/callback/github → github
 	const pathProvider = (() => {
@@ -36,7 +44,14 @@ function OAuthCallbackContent() {
 		const handleCallback = async () => {
 			if (errorParam) {
 				setStatus('error');
-				setMessage(errorDescription || t('auth.oauth.errorOccurred'));
+				// AUTH-46③：error 码/描述 → 本地化（未知码回落描述原文，不直出英文裸句）
+				setMessage(
+					oauthErrorText(t, {
+						code: errorParam,
+						description: errorDescription,
+						fallback: t('auth.oauth.errorOccurred'),
+					}),
+				);
 				return;
 			}
 
@@ -91,6 +106,10 @@ function OAuthCallbackContent() {
 						(user || { id: '', username: '', email: '', status: 'active' }) as any,
 					);
 
+					// AUTH-53 约束⑤：会话建立即锚定租户（JWT tenant_id + 名单解析 slug），
+					// 防从旧租户上下文发起的 OAuth 新会话被跨租户守卫误清
+					anchorSessionFromToken(data.accessToken, { knownTenants });
+
 					// Fire-and-forget: 从 /auth/me 获取完整用户信息
 					loadAuthExtras().catch(() => {});
 
@@ -98,7 +117,9 @@ function OAuthCallbackContent() {
 				}
 			} catch (err) {
 				setStatus('error');
-				setMessage(extractApiError(err, t('oauth.callback.failed')).message);
+				// AUTH-46③：错误体带 i18n_key 时按本地化键渲染；无键回落归一化消息
+				const e = extractApiError(err, t('oauth.callback.failed'));
+				setMessage(e.i18nKey ? t(e.i18nKey, e.message) : e.message);
 			}
 		};
 

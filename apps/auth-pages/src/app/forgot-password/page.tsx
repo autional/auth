@@ -85,7 +85,7 @@ export default function ForgotPasswordPage() {
 
 			{submitted ? (
 				<div className="space-y-4">
-					<div className="rounded-md bg-[var(--color-success)]/10 p-4 text-center text-sm text-success">
+					<div className="rounded-md bg-success/10 p-4 text-center text-sm text-success-text">
 						{channel === 'email' ? t('forgot.sentHintEmail') : t('forgot.sentHintPhone')}
 					</div>
 					<CountdownButton seconds={seconds} fullWidth isLoading={loading} onClick={onResend}>
@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
 							type="button"
 							className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
 								channel === 'email'
-									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-card'
 									: 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
 							}`}
 							onClick={() => switchChannel('email')}
@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
 							type="button"
 							className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
 								channel === 'phone'
-									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-sm'
+									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-card'
 									: 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
 							}`}
 							onClick={() => switchChannel('phone')}
@@ -160,14 +160,14 @@ export default function ForgotPasswordPage() {
 			<div className="text-center text-sm mt-2">
 				<Link
 					to={tenantSlug ? `/${tenantSlug}/recover-account` : '/recover-account'}
-					className="text-[var(--color-brand)] hover:underline"
+					className="text-brand-text hover:underline"
 				>
 					{t('forgot.recoverAccountHint')}
 				</Link>
 			</div>
 
 			<div className="text-center text-sm">
-				<Link to={tenantSlug ? `/${tenantSlug}/login` : '/login'} className="text-[var(--color-brand)] hover:underline">
+				<Link to={tenantSlug ? `/${tenantSlug}/login` : '/login'} className="text-brand-text hover:underline">
 					{t('forgot.back')}
 				</Link>
 			</div>
