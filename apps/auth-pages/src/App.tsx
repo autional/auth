@@ -100,7 +100,7 @@ function SkipLink() {
 function AppHeader() {
 	const { lang, setLang } = useI18n();
 	const chromeButtonClass =
-		'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700';
+		'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-neutral-500 dark:text-[var(--color-text-muted)] hover:bg-neutral-50 dark:hover:bg-neutral-700';
 	return (
 		<>
 			{/* 右对齐浮层：chip 在左，主题/语言钉在右侧（新增 chip 不挪动既有按钮） */}

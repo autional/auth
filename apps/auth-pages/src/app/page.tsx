@@ -859,7 +859,7 @@ export default function LoginPage() {
 				{/* Compliance profile badge */}
 				{authConfig?.complianceProfile?.standards &&
 					authConfig.complianceProfile.standards.length > 0 && (
-						<div className="flex items-center gap-2 rounded-md border border-green-100 bg-[var(--color-success)]/10 px-3 py-2 text-xs text-[var(--color-success)] animate-[fadeIn_300ms_ease-out]">
+						<div className="flex items-center gap-2 rounded-md border border-success-soft bg-[var(--color-success)]/10 px-3 py-2 text-xs text-[var(--color-success)] animate-[fadeIn_300ms_ease-out]">
 							<svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
 								<path
 									fillRule="evenodd"

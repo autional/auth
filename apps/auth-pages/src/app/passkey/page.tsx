@@ -114,7 +114,7 @@ function PasskeyContent() {
 		<AuthCard>
 			{isRegisterRedirect ? (
 				<>
-					<div className="rounded-md bg-blue-50 p-4 text-sm text-blue-700 space-y-2">
+					<div className="rounded-md bg-info-soft p-4 text-sm text-info-text space-y-2">
 						<p className="font-medium">{t('passkey.registerMoved')}</p>
 						<a
 							href={crossAppUrl(`${END_USER_PORTAL_URL()}/security`)}
@@ -142,7 +142,7 @@ function PasskeyContent() {
 					/>
 
 					{!supported && (
-						<div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700">
+						<div className="rounded-md bg-warning-soft p-3 text-sm text-warning-text">
 							{t('passkey.unsupported')}
 						</div>
 					)}
