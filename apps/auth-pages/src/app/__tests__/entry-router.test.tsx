@@ -86,7 +86,11 @@ function stubTenantsFetch(payload: unknown, ok = true) {
 	} as any);
 }
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+// retryDelay 0：hook 内部 retry:1 覆盖 retry，重试退避仍走 defaultOptions；
+// 不设 0 时失败路径用例要白等默认 1s 退避（waitFor 默认 1000ms 超时 → 假红）
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+});
 
 function renderEntry() {
 	return render(

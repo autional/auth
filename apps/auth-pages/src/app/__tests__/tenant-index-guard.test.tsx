@@ -57,7 +57,11 @@ function stubTenants(payload: unknown, ok = true) {
 	} as any);
 }
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+// retryDelay 0：hook 内部 retry:1 覆盖 retry，重试退避仍走 defaultOptions；
+// 不设 0 时失败路径用例（G3）要白等默认 1s 退避（findBy 默认 1000ms 超时 → 假红）
+const queryClient = new QueryClient({
+	defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+});
 const originalWindowLocation = window.location;
 
 /** TenantIndexGuard 的 slug 取自 window.location.pathname（非路由参数），须与 MemoryRouter 同步驱动 */

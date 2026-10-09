@@ -66,8 +66,9 @@ export function EntryRouter() {
 	const hasToken = !!token && token !== 'undefined' && token !== 'null';
 
 	// 复用 shared 的公开租户名单（public-tenants 查询键与 TenantIndexGuard 共享缓存）。
-	// 该 hook 任何失败都回落空数组且置 isSuccess ⇒ ready 必达，不会卡加载态。
-	const { data: knownTenants, isSuccess: slugsLoaded } = usePublicTenantSlugs();
+	// rc.35 起错误上抛（不再吞成空数组）：重试耗尽 → isError；错误按「名单不可用」
+	// 处理（fail-open 到 brand），ready 仍必有界，不会卡加载态。
+	const { data: knownTenants, isSuccess: slugsLoaded, isError: slugsError } = usePublicTenantSlugs();
 	const sessionSlug = useSessionSlug(hasToken, knownTenants);
 
 	const knownSlugs = useMemo(
@@ -79,13 +80,14 @@ export function EntryRouter() {
 	);
 
 	// 有会话时也要等名单：会话租户 → slug 的唯一权威来源就是它，
-	// 等不到就跳 brand 会把已登录用户整页送走（名单必达，故等待有界）
-	const ready = slugsLoaded || (!hasToken && !candidate);
+	// 等不到就跳 brand 会把已登录用户整页送走（名单必达，故等待有界；
+	// rc.35：错误重试耗尽 = 名单不可用，同样放行 → fail-open 到 brand）
+	const ready = slugsLoaded || slugsError || (!hasToken && !candidate);
 	const redirectSlug = candidate && knownSlugs.includes(candidate) ? candidate : undefined;
 
 	// 登出回程：先终结会话（唯一登出实现），落点后定（声明先于下方导航 effect）。
 	// 落点等待有界：无 redirect/无候选 slug 时无需名单即刻可定；反之等名单到
-	//（hook 任何失败都置 isSuccess ⇒ 必达，不会卡加载态）。
+	//（rc.35：失败重试耗尽 → isError 也算到，fail-open 回落 brand 裸根）。
 	const [logoutSettled, setLogoutSettled] = useState(false);
 	const logoutFinalizedRef = useRef(false);
 	useEffect(() => {
@@ -94,7 +96,7 @@ export function EntryRouter() {
 		void AuthService.logout().finally(() => setLogoutSettled(true));
 	}, [logoutRequested]);
 
-	const logoutReady = logoutSettled && (!redirect || !candidate || slugsLoaded);
+	const logoutReady = logoutSettled && (!redirect || !candidate || slugsLoaded || slugsError);
 
 	useEffect(() => {
 		if (!logoutRequested || !logoutReady) return;
