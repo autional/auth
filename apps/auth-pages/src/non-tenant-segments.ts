@@ -22,6 +22,7 @@ export const NON_TENANT_SEGMENTS = [
 	'error',
 	'login',
 	'logout',
+	'logout-confirm',
 	'magic-link',
 	'mfa',
 	'mfa-challenge',

@@ -1794,5 +1794,16 @@
   "mfa.challenge.smsDelivered": "A code was sent to {{target}} — enter it below",
   "mfa.challenge.smsDeliveredGeneric": "A login code was sent to your phone — enter it below",
   "mfa.challenge.emailDelivered": "A code was sent to {{target}} — enter it below",
-  "mfa.challenge.emailDeliveredGeneric": "A login code was sent to your registered email — enter it below"
+  "mfa.challenge.emailDeliveredGeneric": "A login code was sent to your registered email — enter it below",
+  "logoutConfirm": {
+    "title": "Sign out",
+    "subtitle": "Confirm signing out of your account",
+    "clientId": "Application",
+    "redirectUri": "Return to",
+    "state": "State",
+    "confirm": "Sign out",
+    "confirming": "Signing out…",
+    "doneTitle": "Signed out",
+    "doneDesc": "Redirecting…"
+  }
 }

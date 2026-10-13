@@ -34,6 +34,8 @@ const MagicLinkConfirmPage = lazy(() => import('./app/magic-link/confirm/page'))
 const VerifyIdentityPage = lazy(() => import('./app/verify-identity/page'));
 const TermsPage = lazy(() => import('./app/terms/page'));
 const PrivacyPage = lazy(() => import('./app/privacy/page'));
+// TASK-LS-06 登出确认页：oauth 无 hint 无会话浏览器支 302 的承接面（裸段，与 /logout 同族）
+const LogoutConfirmPage = lazy(() => import('./app/logout-confirm/page'));
 // CookieConsentBanner — 已隐藏 (2026-07-29)
 // 隐藏原因:
 //   1. 应用零 cookie 使用 — 整个项目无 document.cookie 调用
@@ -173,6 +175,8 @@ export default function App() {
 								<Route path="/sso/initiate" element={<SSOInitiatePage />} />
 								<Route path="/error" element={<ErrorPage />} />
 								<Route path="/logout" element={<LogoutHandler />} />
+								{/* TASK-LS-06：RP-Initiated Logout 确认页（静态段优先于 /:tenantSlug 贪心路由） */}
+								<Route path="/logout-confirm" element={<LogoutConfirmPage />} />
 								<Route path="/terms" element={<TermsPage />} />
 								<Route path="/privacy" element={<PrivacyPage />} />
 

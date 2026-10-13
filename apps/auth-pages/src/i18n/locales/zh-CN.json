@@ -1794,5 +1794,16 @@
   "mfa.challenge.smsDelivered": "验证码已发送至 {{target}}，请在下方输入",
   "mfa.challenge.smsDeliveredGeneric": "登录验证码已通过短信发送至您绑定的手机号，请查收后输入",
   "mfa.challenge.emailDelivered": "验证码已发送至 {{target}}，请在下方输入",
-  "mfa.challenge.emailDeliveredGeneric": "登录验证码已发送至您绑定的邮箱，请查收后输入"
+  "mfa.challenge.emailDeliveredGeneric": "登录验证码已发送至您绑定的邮箱，请查收后输入",
+  "logoutConfirm": {
+    "title": "退出登录",
+    "subtitle": "请确认是否退出当前账号",
+    "clientId": "应用",
+    "redirectUri": "退出后返回",
+    "state": "状态参数",
+    "confirm": "确认退出",
+    "confirming": "正在退出…",
+    "doneTitle": "已退出登录",
+    "doneDesc": "正在跳转…"
+  }
 }
