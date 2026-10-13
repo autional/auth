@@ -96,16 +96,16 @@ beforeEach(() => {
 describe('RegisterPage', () => {
 	it('renders registration form fields', () => {
 		renderRegister();
-		expect(screen.getByPlaceholderText('请输入用户名')).toBeInTheDocument();
-		expect(screen.getByPlaceholderText('请输入邮箱地址')).toBeInTheDocument();
-		expect(screen.getByPlaceholderText('至少8个字符')).toBeInTheDocument();
-		expect(screen.getByPlaceholderText('再次输入密码')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText('register.usernamePlaceholder')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText('register.emailPlaceholder')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText('register.passwordPlaceholder')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText('register.confirmPasswordPlaceholder')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'register.submit' })).toBeInTheDocument();
 	});
 
 	it('shows validation error for short password', async () => {
 		renderRegister();
-		fireEvent.change(screen.getByPlaceholderText('至少8个字符'), { target: { value: 'short' } });
+		fireEvent.change(screen.getByPlaceholderText('register.passwordPlaceholder'), { target: { value: 'short' } });
 		await act(async () => {
 			fireEvent.click(screen.getByRole('button', { name: 'register.submit' }));
 		});
@@ -119,22 +119,22 @@ describe('RegisterPage', () => {
 			() => new Promise((resolve) => setTimeout(() => resolve({ available: true }), 100)),
 		);
 		renderRegister();
-		fireEvent.change(screen.getByPlaceholderText('请输入用户名'), {
+		fireEvent.change(screen.getByPlaceholderText('register.usernamePlaceholder'), {
 			target: { value: 'testuser' },
 		});
 		await waitFor(() => {
-			expect(screen.getByText('检查中...')).toBeInTheDocument();
+			expect(screen.getByText('register.hintChecking')).toBeInTheDocument();
 		});
 	});
 
 	it('shows username taken indicator', async () => {
 		mockAuthRegisterCheckUsername.mockResolvedValue({ available: false });
 		renderRegister();
-		fireEvent.change(screen.getByPlaceholderText('请输入用户名'), {
+		fireEvent.change(screen.getByPlaceholderText('register.usernamePlaceholder'), {
 			target: { value: 'takenuser' },
 		});
 		await waitFor(() => {
-			expect(screen.getByText(/该用户名已被占用/)).toBeInTheDocument();
+			expect(screen.getByText('register.hintUsernameTaken')).toBeInTheDocument();
 		});
 	});
 
@@ -144,10 +144,10 @@ describe('RegisterPage', () => {
 		});
 		const user = userEvent.setup();
 		renderRegister();
-		await user.type(screen.getByPlaceholderText('请输入用户名'), 'newuser');
-		await user.type(screen.getByPlaceholderText('请输入邮箱地址'), 'new@example.com');
-		await user.type(screen.getByPlaceholderText('至少8个字符'), 'Str0ngPass!');
-		await user.type(screen.getByPlaceholderText('再次输入密码'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
+		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
+		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
@@ -166,10 +166,10 @@ describe('RegisterPage', () => {
 		mockCompliancePublicLegalDocuments.mockResolvedValue({ version: 'v2' });
 		const user = userEvent.setup();
 		renderRegister();
-		await user.type(screen.getByPlaceholderText('请输入用户名'), 'newuser');
-		await user.type(screen.getByPlaceholderText('请输入邮箱地址'), 'new@example.com');
-		await user.type(screen.getByPlaceholderText('至少8个字符'), 'Str0ngPass!');
-		await user.type(screen.getByPlaceholderText('再次输入密码'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
+		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
+		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
@@ -201,10 +201,10 @@ describe('RegisterPage', () => {
 		mockCompliancePublicLegalDocuments.mockRejectedValue(new Error('502'));
 		const user = userEvent.setup();
 		renderRegister();
-		await user.type(screen.getByPlaceholderText('请输入用户名'), 'newuser');
-		await user.type(screen.getByPlaceholderText('请输入邮箱地址'), 'new@example.com');
-		await user.type(screen.getByPlaceholderText('至少8个字符'), 'Str0ngPass!');
-		await user.type(screen.getByPlaceholderText('再次输入密码'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
+		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
+		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));

@@ -411,10 +411,10 @@ export default function LoginPage() {
 		const interval = setInterval(() => {
 			const { current, max } = captchaProgressRef.current;
 			const pct = Math.min(Math.round((current / max) * 100), 99);
-			setCaptchaProgressText(`安全检测中... ${pct}%`);
+			setCaptchaProgressText(t('captcha.solvingProgress', { pct }));
 		}, 200);
 		return () => clearInterval(interval);
-	}, [captchaStatus]);
+	}, [captchaStatus, t]);
 
 	// P1-01: Auto-retry captcha when expired (500ms delay)
 	useEffect(() => {
@@ -790,7 +790,7 @@ export default function LoginPage() {
 		<div className="text-center">
 			{logoUrl && (
 				<div className="mb-4 flex justify-center">
-					<img src={logoUrl} alt="租户标志" className="h-12 w-auto object-contain" />
+					<img src={logoUrl} alt={t('login.tenantLogoAlt')} className="h-12 w-auto object-contain" />
 				</div>
 			)}
 			<h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
@@ -1100,8 +1100,7 @@ export default function LoginPage() {
 							{/* P1-09: Warm-up warning for consecutive failures */}
 							{rateLimitStep === 0 && localFailureRef.current >= 3 && (
 								<div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-									🟡 安全提示：您已连续{localFailureRef.current} 次登录失败。再失败 1
-									次将启用人机验证
+									{t('login.failureWarmupWarning', { count: localFailureRef.current })}
 								</div>
 							)}
 
@@ -1141,11 +1140,11 @@ export default function LoginPage() {
 												</button>
 											</div>
 										) : captchaStatus === 'fetching' ? (
-											'正在获取安全验证...'
+											t('captcha.fetchingVerification')
 										) : captchaStatus === 'solving' ? (
 											// P0-01: Show progress bar + percentage
 											<div className="flex flex-col items-center gap-2">
-												<span>{captchaProgressText || '正在进行安全检测...'}</span>
+												<span>{captchaProgressText || t('login.captchaRequired')}</span>
 												<progress
 													className="w-full h-1.5 rounded-xs"
 													value={captchaProgressRef.current.current}
@@ -1153,7 +1152,7 @@ export default function LoginPage() {
 												/>
 											</div>
 										) : (
-											'需要安全验证'
+											t('login.error.captchaRequired')
 										)}
 									</div>
 								)}

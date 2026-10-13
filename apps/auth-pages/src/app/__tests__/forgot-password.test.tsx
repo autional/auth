@@ -80,7 +80,7 @@ describe('ForgotPasswordPage', () => {
 		await act(async () => {
 			fireEvent.click(screen.getByRole('button', { name: 'forgot.submit' }));
 		});
-		expect(await screen.findByText(/重新发送（/)).toBeInTheDocument();
+		expect(await screen.findByText(/flat\.common\.resendCountdown/)).toBeInTheDocument();
 	});
 
 	it('resend after countdown re-sends with retained identity (AUTH-52 ④)', async () => {
@@ -109,7 +109,7 @@ describe('ForgotPasswordPage', () => {
 			expect(mockAuthForgotPasswordPost).toHaveBeenCalledTimes(2);
 			expect(mockAuthForgotPasswordPost).toHaveBeenLastCalledWith({ identity: 'test@example.com' });
 			// 重发成功 → 冷却重启
-			expect(screen.getByText(/重新发送（/)).toBeInTheDocument();
+			expect(screen.getByText(/flat\.common\.resendCountdown/)).toBeInTheDocument();
 		} finally {
 			vi.useRealTimers();
 		}

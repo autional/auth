@@ -113,7 +113,7 @@ export default function QRLoginPanel() {
 			{status === 'pending' && (
 				<div className="text-center space-y-4">
 					<div className="rounded-lg border border-brand/30 bg-[var(--color-bg-surface)] p-4">
-						<img src={qrCode} alt="登录二维码" className="mx-auto h-48 w-48" />
+						<img src={qrCode} alt={t('qrLogin.qrCodeAlt')} className="mx-auto h-48 w-48" />
 						<p className="mt-2 text-xs text-[var(--color-text-muted)]">
 							{t('qrLogin.countdown', { countdown: seconds })}
 						</p>

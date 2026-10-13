@@ -69,6 +69,7 @@ function VerifyEmailContent() {
 			.catch((err: any) => {
 				const msg = err.response?.data?.message || t('auth.verifyEmail.failed');
 				setMessage(msg);
+				// i18n-exempt: 服务端响应文案归一匹配（后端可能返回中/英文案），非前端显示文案
 				if (msg.includes('已验证') || msg.includes('already verified')) {
 					setStatus('already-verified');
 				} else {
