@@ -120,7 +120,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
 
 		const strength = useMemo<StrengthResult>(() => {
 			if (externalStrength) return externalStrength;
-			return calculateStrength(value, policy);
+			return calculateStrength(value, policy, t);
 		}, [externalStrength, value, policy, t]);
 
 		const runBreachCheck = useCallback(async (pwd: string) => {

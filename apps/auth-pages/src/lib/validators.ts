@@ -68,96 +68,18 @@ export function createRegisterSchema(t: TFunction, policy?: PasswordPolicy, mode
 	});
 }
 
-export const loginSchema = z.object({
-	identity: z.string().min(1, '请输入用户名、邮箱或手机号').max(128, '身份标识最多128个字符'),
-	password: z.string().min(1, '请输入密码'),
-	tenantId: z.string().optional(),
-});
-
-export const registerSchema = z
-	.object({
-		username: z
-			.string()
-			.min(3, '用户名至少3个字符')
-			.max(32, '用户名最多32个字符')
-			.regex(/^[a-zA-Z0-9_]+$/, '用户名只能包含字母、数字和下划线'),
-		email: z.string().min(1, '请输入邮箱').email('请输入有效的邮箱地址'),
-		password: z.string().min(8, '密码至少8个字符'),
-		confirmPassword: z.string().min(1, '请确认密码'),
-		agreeTerms: z.literal(true, {
-			errorMap: () => ({ message: '请同意服务条款' }),
-		}),
-	})
-	.refine((data) => data.password === data.confirmPassword, {
-		message: '两次输入的密码不一致',
-		path: ['confirmPassword'],
-	});
-
-export const forgotPasswordSchema = z.object({
-	email: z.string().min(1, '请输入邮箱').email('请输入有效的邮箱地址'),
-	identity: z
-		.string()
-		.min(1, '请输入邮箱或手机号')
-		.refine(
-			(v) => v.includes('@') || v.startsWith('+') || /^\d+$/.test(v),
-			'请输入有效的邮箱或手机号（手机号以+开头）',
-		)
-		.optional(),
-});
-
-export const resetPasswordSchema = z
-	.object({
-		password: z.string().min(8, '密码至少8个字符'),
-		confirmPassword: z.string().min(1, '请确认密码'),
-	})
-	.refine((data) => data.password === data.confirmPassword, {
-		message: '两次输入的密码不一致',
-		path: ['confirmPassword'],
-	});
-
-export const verifyPhoneSchema = z.object({
-	phone: z.string().min(1, '请输入手机号'),
-	code: z.string().length(6, '验证码为6位数字'),
-});
-
-export const mfaTOTPSchema = z.object({
-	code: z.string().length(6, '验证码为6位数字'),
-});
-
-export const mfaSMSSchema = z.object({
-	code: z.string().length(6, '验证码为6位数字'),
-});
-
-export type LoginFormData = z.infer<typeof loginSchema>;
-export type RegisterFormData = z.infer<typeof registerSchema>;
-export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
-export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
-export type VerifyPhoneFormData = z.infer<typeof verifyPhoneSchema>;
-export type MFATOTPFormData = z.infer<typeof mfaTOTPSchema>;
-export type MFASMSFormData = z.infer<typeof mfaSMSSchema>;
-
-export const mfaTOTPSetupSchema = z.object({
-	code: z.string().length(6, '验证码为6位数字'),
-});
-
-export const mfaPhoneSetupSchema = z.object({
-	phone: z.string().min(1, '请输入手机号'),
-	code: z.string().length(6, '验证码为6位数字'),
-});
-
-export const mfaEmailSetupSchema = z.object({
-	email: z.string().min(1, '请输入邮箱').email('请输入有效的邮箱地址'),
-	code: z.string().length(6, '验证码为6位数字'),
-});
-
-export const accountDeletionSchema = z.object({
-	password: z.string().min(1, '请输入密码'),
-});
-
-export type MFATOTPSetupFormData = z.infer<typeof mfaTOTPSetupSchema>;
-export type MFAPhoneSetupFormData = z.infer<typeof mfaPhoneSetupSchema>;
-export type MFAEmailSetupFormData = z.infer<typeof mfaEmailSetupSchema>;
-export type AccountDeletionFormData = z.infer<typeof accountDeletionSchema>;
+// 表单类型一律从 factory 推导（create*Schema(t)）；历史上并存的模块级中文 schema 已删。
+export type LoginFormData = z.infer<ReturnType<typeof createLoginSchema>>;
+export type RegisterFormData = z.infer<ReturnType<typeof createRegisterSchema>>;
+export type ForgotPasswordFormData = z.infer<ReturnType<typeof createForgotPasswordSchema>>;
+export type ResetPasswordFormData = z.infer<ReturnType<typeof createResetPasswordSchema>>;
+export type VerifyPhoneFormData = z.infer<ReturnType<typeof createVerifyPhoneSchema>>;
+export type MFATOTPFormData = z.infer<ReturnType<typeof createMfaTOTPSchema>>;
+export type MFASMSFormData = z.infer<ReturnType<typeof createMfaSMSSchema>>;
+export type MFATOTPSetupFormData = z.infer<ReturnType<typeof createMfaTOTPSetupSchema>>;
+export type MFAPhoneSetupFormData = z.infer<ReturnType<typeof createMfaPhoneSetupSchema>>;
+export type MFAEmailSetupFormData = z.infer<ReturnType<typeof createMfaEmailSetupSchema>>;
+export type AccountDeletionFormData = z.infer<ReturnType<typeof createAccountDeletionSchema>>;
 export type ReapplyFormData = z.infer<ReturnType<typeof createReapplySchema>>;
 
 export function createLoginSchema(t: TFunction) {

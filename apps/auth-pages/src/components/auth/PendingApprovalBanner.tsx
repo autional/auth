@@ -32,8 +32,7 @@ export function PendingApprovalBanner({ tenantName, status }: PendingApprovalBan
 						{t('membership.pendingTitle') || '加入申请已提交'}
 					</h4>
 					<p className="mt-1 text-sm text-amber-700">
-						{t('membership.pendingDescription', { tenant: tenantName }) ||
-							`您在「${tenantName}」的加入申请正在等待管理员审批，请耐心等待。`}
+						{t('membership.pendingDescription', { tenant: tenantName })}
 					</p>
 				</div>
 			</div>

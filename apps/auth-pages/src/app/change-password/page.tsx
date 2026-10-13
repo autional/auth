@@ -173,9 +173,7 @@ export default function ChangePasswordPage() {
 		try {
 			const breachCheck = await checkPasswordBreached(data.newPassword);
 			if (breachCheck.breached) {
-				setError(
-					`此密码已在 ${breachCheck.count} 次数据泄露中出现，极易被攻击者破解。请选择其他密码。`,
-				);
+				setError(t('register.passwordBreached', { count: breachCheck.count }));
 				return;
 			}
 		} catch {
@@ -220,7 +218,7 @@ export default function ChangePasswordPage() {
 			const message =
 				errCode === 61000104
 					? t('auth.password.oldPasswordWrong') || '当前密码不正确'
-					: err?.response?.data?.message || '修改密码失败，请稍后重试';
+					: err?.response?.data?.message || t('changePassword.failed');
 			setError(message);
 		} finally {
 			setLoading(false);

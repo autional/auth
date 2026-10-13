@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Button, type ButtonProps } from '@autional/ui';
+import { useI18n } from '@/lib/i18n';
 
 interface CountdownButtonProps extends Omit<ButtonProps, 'onClick'> {
 	/** 冷却时长（秒），默认 60 */
@@ -29,9 +30,10 @@ export function CountdownButton({
 	disabled,
 	...rest
 }: CountdownButtonProps) {
+	const { t } = useI18n();
 	const isCooldown = seconds > 0;
 
-	const defaultCooldownText = (s: number) => `重新发送（${s}秒）`;
+	const defaultCooldownText = (s: number) => t('common.resendCountdown', { seconds: s });
 	const renderCooldown = cooldownText || defaultCooldownText;
 
 	return (
