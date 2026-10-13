@@ -47,7 +47,7 @@ export function Captcha3DWidget({
 
 	const run = useCallback(async () => {
 		setStep('challenge');
-		setMessage('获取挑战...');
+		setMessage(t('captcha.fetchingChallenge'));
 
 		try {
 			// Step 1: Get PoW challenge
@@ -59,7 +59,7 @@ export function Captcha3DWidget({
 
 			// Step 2: Solve PoW
 			setStep('solving');
-			setMessage('解算 PoW...');
+			setMessage(t('captcha.solvingPow'));
 			let nonce = 0;
 			const start = Date.now();
 			while (true) {
@@ -75,7 +75,7 @@ export function Captcha3DWidget({
 
 			// Step 3: Generate captcha
 			setStep('generating');
-			setMessage(`正在生成验证码... (PoW: ${((Date.now() - start) / 1000).toFixed(1)}s)`);
+			setMessage(t('captcha.generating', { seconds: ((Date.now() - start) / 1000).toFixed(1) }));
 			const gr = await fetch(`${apiBase}/generate`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -95,13 +95,13 @@ export function Captcha3DWidget({
 			setCaptchaId(gd.data.captcha_id);
 			setGifSrc(`data:${gd.data.image_type};base64,${gd.data.image}`);
 			setStep('solved');
-			setMessage('请输入验证码中的 4 位字符');
+			setMessage(t('captcha.enterCode'));
 		} catch (e: any) {
 			setStep('error');
 			setMessage(e.message || 'error');
 			onError?.(e.message || 'error');
 		}
-	}, [apiBase, onError]);
+	}, [apiBase, onError, t]);
 
 	useEffect(() => {
 		run();
@@ -171,7 +171,7 @@ export function Captcha3DWidget({
 
 			<div style={{ fontSize: 11, color: step === 'error' ? '#f87171' : '#888', marginTop: 8 }}>
 				{message}
-				{poWAttempts > 0 && step === 'solving' && ` (${poWAttempts} 次尝试)`}
+				{poWAttempts > 0 && step === 'solving' && ` (${t('captcha.attempts', { count: poWAttempts })})`}
 			</div>
 
 			{step === 'error' && (
@@ -189,7 +189,7 @@ export function Captcha3DWidget({
 						fontSize: 11,
 					}}
 				>
-					重试
+					{t('captcha.retry')}
 				</button>
 			)}
 		</div>

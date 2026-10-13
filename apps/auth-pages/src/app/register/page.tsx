@@ -344,7 +344,7 @@ export default function RegisterPage() {
 			const breachCheck = await checkPasswordBreached(data.password);
 			if (breachCheck.breached) {
 				setError(
-					`此密码已在 ${breachCheck.count} 次数据泄露中出现，极易被攻击者破解。请选择其他密码。`,
+					t('register.passwordBreached', { count: breachCheck.count }),
 				);
 				return;
 			}
@@ -370,7 +370,7 @@ export default function RegisterPage() {
 					serverData,
 				);
 			} catch (e) {
-				setError('密码传输预处理失败');
+				setError(t('register.passwordPrepFailed'));
 				setLoading(false);
 				return;
 			}
@@ -476,7 +476,7 @@ export default function RegisterPage() {
 			const status = err?.response?.status;
 			const message = err?.response?.data?.message;
 			// 409 = 账号已存在（ErrCodeUserAlreadyExists 61000102）→ 给「去登录」指路，而非笼统失败
-			setError(status === 409 ? message || t('auth.register.conflict') : message || '注册失败，请稍后重试');
+			setError(status === 409 ? message || t('auth.register.conflict') : message || t('register.genericError'));
 			const step = parseInt(err?.response?.headers?.['x-ratelimit-step'] || '0', 10);
 			if (step >= 1) {
 				setRateLimitStep(step);
@@ -630,7 +630,7 @@ export default function RegisterPage() {
 						<>
 							{slugConfigFailed && (
 								<div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-									{t('login.tenantNotFound') || '未找到该组织的配置，请手动选择租户'}
+									{t('login.tenantNotFound')}
 								</div>
 							)}
 							<TenantSelector
@@ -815,7 +815,7 @@ export default function RegisterPage() {
 						disabled={slugConfigFailed && !selectedTenantId}
 					>
 						{slugConfigFailed && !selectedTenantId
-							? t('login.selectTenantFirst') || '请先选择租户'
+							? t('login.selectTenantFirst')
 							: t('register.submit')}
 					</Button>
 				</form>
