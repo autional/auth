@@ -15,7 +15,7 @@ Auth Pages 是 Autional 五大 UI 产品之一，属于**流程轻量型**（单
 |------|------|
 | **目标用户** | P4 最终用户（登录场景的所有终端用户） |
 | **交付形态** | 托管页面 (Hosted SPA) + 未来可嵌入 SDK |
-| **域名方案** | `login.{tenant-domain}.iam.tianv.com`（多租户独立域名） |
+| **域名方案** | `login.{tenant-domain}.autional.com`（多租户独立域名） |
 | **架构层** | Layer 4 之上，直接调用 Gateway Service (port 11080) |
 | **风格特征** | 无导航、居中小卡片、Mobile-first、品牌可定制 |
 
@@ -520,13 +520,13 @@ interface TenantState {
 | **字体** | 字体族（可选，默认 Inter） | 同上 |
 | **文案** | 页面标题、副标题、底部链接文案 | i18n + 租户配置覆盖 |
 | **高级** | 自定义 CSS（沙箱注入） | `branding.custom_css` |
-| **域名** | `login.{tenant-domain}.iam.tianv.com` | DNS + Gateway 路由 |
+| **域名** | `login.{tenant-domain}.autional.com` | DNS + Gateway 路由 |
 
 ### 6.2 Design Token 动态注入流程
 
 ```
 Auth Pages 加载
-  → 从子域名解析 tenant_id（如 login.acme.iam.tianv.com → tenant=acme）
+  → 从子域名解析 tenant_id（如 login.acme.autional.com → tenant=acme）
   → 调用 GET /tenants/{id}/branding（公开/匿名端点）
   → 将品牌配置映射为 CSS 变量注入 :root
   → 若配置了 custom_css，创建 <style> 标签注入（需 CSS Sanitizer）
