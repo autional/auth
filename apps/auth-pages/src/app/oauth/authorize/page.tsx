@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
-import { getAccessToken, apiClient, extractItem, decodeJwtPayload } from '@autional/shared';
+import { getAccessToken, apiClient, extractItem, decodeJwtPayload, useAuthStore } from '@autional/shared';
 import { getOAuthClient } from '@/lib/api.generated';
-import { PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
+import { authMe, PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
 import { buildTenantLoginUrl, fetchTenantSlugByClientId } from '@/lib/oauth-cold-start';
 import { oauthErrorText } from '@/lib/oauth-error-text';
 import { useI18n } from '@/lib/i18n';
@@ -82,12 +82,26 @@ function OAuthAuthorizeContent() {
 			void redirectToLogin();
 			return;
 		}
-		const payload = decodeJwtPayload(token);
-		if (payload) {
-			setUserId((payload.user_id || payload.sub || '') as string);
-			setTenantId((payload.tenant_id || payload.tenantId || '') as string);
-		}
-		setSessionState('ready');
+		// E9 补全：本地存在 token ≠ 会话仍有效（登出/换号后服务端已撤销，localStorage 残留
+		// 会让 consent/check 静默自动同意 → 跳过登录表单，僵尸会话复活）。主动向服务端
+		// 鉴权：401 = 会话已失效 → 清本地残留 + 回登录页（表单重现）；其余错误保守放行。
+		void (async () => {
+			try {
+				await authMe();
+			} catch (err: any) {
+				if (err?.response?.status === 401) {
+					useAuthStore.getState().clearAuth();
+					void redirectToLogin();
+					return;
+				}
+			}
+			const payload = decodeJwtPayload(token);
+			if (payload) {
+				setUserId((payload.user_id || payload.sub || '') as string);
+				setTenantId((payload.tenant_id || payload.tenantId || '') as string);
+			}
+			setSessionState('ready');
+		})();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -191,6 +205,13 @@ function OAuthAuthorizeContent() {
 				// 对象直接进 JSX 会触发 React #31 整页崩溃——先经 pickErrorText 取字符串。
 				// AUTH-46①：已知错误码 → 本地化（Gin binding 原文经码级映射被吸收，不再落屏）。
 				const code = typeof payload?.error === 'string' ? payload.error : '';
+				// E9 补全：会话中途失效（登出/换号）→ 服务端 401/login_required：清残留本地
+				// 会话并回登录页，而不是把授权失败落在死胡同（反复点「授权」只会反复失败）。
+				if (res.status === 401 || code === 'login_required') {
+					useAuthStore.getState().clearAuth();
+					void redirectToLogin();
+					return;
+				}
 				const description = pickErrorText(
 					payload?.error_description,
 					typeof payload?.error === 'object' ? payload.error : null,

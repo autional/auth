@@ -11,13 +11,16 @@ import { Suspense } from 'react';
 //  - 有会话 → 同意提交带 Bearer + Accept: application/json，按 redirect_to 整页跳转
 // ============================================================
 
-const { mockState, mockFetch, mockReplace, mockGetOAuthClient, mockApiGet } = vi.hoisted(() => ({
-	mockState: { token: null as string | null },
-	mockFetch: vi.fn(),
-	mockReplace: vi.fn(),
-	mockGetOAuthClient: vi.fn(),
-	mockApiGet: vi.fn(),
-}));
+const { mockState, mockFetch, mockReplace, mockGetOAuthClient, mockApiGet, mockAuthMe, mockClearAuth } =
+	vi.hoisted(() => ({
+		mockState: { token: null as string | null },
+		mockFetch: vi.fn(),
+		mockReplace: vi.fn(),
+		mockGetOAuthClient: vi.fn(),
+		mockApiGet: vi.fn(),
+		mockAuthMe: vi.fn(),
+		mockClearAuth: vi.fn(),
+	}));
 
 vi.mock('@autional/shared', async () => {
 	// decodeJwtPayload 取真实现（授权页据它解析 claim）：白名单 mock 其余键保持隔离
@@ -27,11 +30,13 @@ vi.mock('@autional/shared', async () => {
 		getAccessToken: () => mockState.token,
 		apiClient: { get: (...args: any[]) => mockApiGet(...args), post: vi.fn() },
 		extractItem: (payload: any) => payload?.data ?? payload,
+		useAuthStore: { getState: () => ({ clearAuth: mockClearAuth }) },
 	};
 });
 
 vi.mock('@autional/shared/generated/api', () => ({
 	PublicAuthConfigByAuthConfig: vi.fn(() => Promise.resolve({ data: {} })),
+	authMe: (...args: any[]) => mockAuthMe(...args),
 }));
 
 vi.mock('@/lib/api.generated', () => ({
@@ -73,6 +78,8 @@ beforeEach(() => {
 	mockState.token = null;
 	mockGetOAuthClient.mockResolvedValue({ data: { clientName: 'Test App', logoUri: '' } });
 	mockApiGet.mockResolvedValue({ data: { hasConsent: false } });
+	// E9：挂载时会话校验默认成功（无效会话另有专项用例）
+	mockAuthMe.mockResolvedValue({});
 
 	vi.stubGlobal('fetch', mockFetch);
 	mockFetch.mockImplementation((url: string) => {
@@ -180,12 +187,20 @@ describe('同意提交（有会话）', () => {
 		expect(mockReplace).not.toHaveBeenCalled();
 	});
 
-	it('服务端拒绝（已知码 login_required）→ 码级本地化，不跳转', async () => {
+	it('服务端拒绝 login_required → 清本地会话 + 回登录页（E9：不再死胡同报错）', async () => {
 		const user = userEvent.setup();
 		mockFetch.mockImplementation((url: string, init?: any) => {
-			if (String(url).includes('/bff/oauth/api/v1/oauth/authorize')) {
+			const u = String(url);
+			if (u.includes('/oauth/client/')) {
+				return Promise.resolve({ ok: true, json: async () => ({ data: { tenantId: 't1' } }) });
+			}
+			if (u.includes('/tenant/public/tenants')) {
+				return Promise.resolve({ ok: true, json: async () => ({ items: [{ id: 't1', name: 'demo' }] }) });
+			}
+			if (u.includes('/bff/oauth/api/v1/oauth/authorize')) {
 				return Promise.resolve({
 					ok: false,
+					status: 401,
 					json: async () => ({ error: 'login_required', error_description: '会话已失效' }),
 				});
 			}
@@ -199,11 +214,30 @@ describe('同意提交（有会话）', () => {
 
 		await user.click(screen.getByRole('button', { name: 'auth.oauth.approve' }));
 
-		// AUTH-46①：已知错误码经 oauthErrorText 映射为本地化键（描述原文不落屏）
+		// E9：login_required = 会话已失效 → 清残留本地会话并回登录页（redirect 指回本页），
+		// 登录表单重现；不再把错误落在死胡同（反复点「授权」只会反复失败）。
 		await waitFor(() => {
-			expect(screen.getByText('oauth.error.loginRequired')).toBeInTheDocument();
+			expect(mockReplace).toHaveBeenCalledWith(
+				'/demo/login?redirect=' + encodeURIComponent(AUTHORIZE_URL),
+			);
 		});
-		expect(screen.queryByText('会话已失效')).toBeNull();
-		expect(locationMock.href).toBe('');
+		expect(mockClearAuth).toHaveBeenCalled();
+		expect(screen.queryByText('oauth.error.loginRequired')).toBeNull();
+	});
+
+	it('E9：挂载时会话已被撤销（authMe 401）→ clearAuth + 回登录页，同意表单不渲染', async () => {
+		// 僵尸会话场景：本地 token 残留但服务端已撤销（登出/换号）——不得静默自动同意。
+		mockAuthMe.mockRejectedValue({ response: { status: 401 } });
+
+		renderPage();
+
+		await waitFor(() => {
+			expect(mockReplace).toHaveBeenCalledWith(
+				'/demo/login?redirect=' + encodeURIComponent(AUTHORIZE_URL),
+			);
+		});
+		expect(mockClearAuth).toHaveBeenCalled();
+		expect(screen.queryByRole('button', { name: 'auth.oauth.approve' })).toBeNull();
+		expect(screen.getByText('common.loading')).toBeInTheDocument();
 	});
 });

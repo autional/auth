@@ -39,6 +39,7 @@ vi.mock('@autional/shared', async () => {
 		loginWithTokens: vi.fn(),
 		apiClient: { get: vi.fn(), post: vi.fn() },
 		generatePKCE: () => mockGeneratePKCE(),
+		useAuthStore: { getState: () => ({ clearAuth: vi.fn() }) },
 	};
 });
 
@@ -47,6 +48,8 @@ vi.mock('@autional/shared/generated/api', async (importOriginal) => {
 	return {
 		...actual,
 		PublicAuthConfigByAuthConfig: vi.fn(() => Promise.resolve({ data: {} })),
+		// E9：授权页挂载时主动鉴权（会话校验）——mock 成功路径，避免真 XHR
+		authMe: vi.fn(() => Promise.resolve({})),
 	};
 });
 
