@@ -37,7 +37,7 @@ export default function QRLoginPanel() {
 
 			setSessionToken(token);
 			setNumberMatching(nm);
-			const url = `authms://login?token=${encodeURIComponent(token)}&nm=${encodeURIComponent(nm)}`;
+			const url = `autional://login?token=${encodeURIComponent(token)}&nm=${encodeURIComponent(nm)}`;
 			setQrCode(await QRCode.toDataURL(url, { width: 200, margin: 1 }));
 			setStatus('pending');
 			startCountdown(); // 300s QR code validity
