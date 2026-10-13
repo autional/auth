@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+import { useI18n } from '@/lib/i18n';
+
 interface Captcha3DWidgetProps {
 	apiBase?: string;
 	onToken?: (token: string) => void;
@@ -34,6 +36,7 @@ export function Captcha3DWidget({
 	onToken,
 	onError,
 }: Captcha3DWidgetProps) {
+	const { t } = useI18n();
 	const [step, setStep] = useState<Step>('challenge');
 	const [gifSrc, setGifSrc] = useState<string>('');
 	const [input, setInput] = useState('');
@@ -134,7 +137,7 @@ export function Captcha3DWidget({
 						value={input}
 						onChange={(e) => setInput(e.target.value.toUpperCase())}
 						onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-						placeholder="输入验证码"
+						placeholder={t('captcha.inputPlaceholder')}
 						style={{
 							width: 120,
 							textAlign: 'center',

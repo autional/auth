@@ -2,6 +2,8 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 
+import { useI18n } from '@/lib/i18n';
+
 interface VerificationCodeProps {
 	/** 验证码长度，默认 6 */
 	length?: number;
@@ -17,6 +19,7 @@ interface VerificationCodeProps {
  * 用于手机验证、MFA 等场景
  */
 export function VerificationCode({ length = 6, onComplete, disabled }: VerificationCodeProps) {
+	const { t } = useI18n();
 	const [values, setValues] = useState<string[]>(Array(length).fill(''));
 	const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -124,7 +127,7 @@ export function VerificationCode({ length = 6, onComplete, disabled }: Verificat
 					onKeyDown={(e) => handleKeyDown(idx, e)}
 					onPaste={handlePaste}
 					className="h-12 w-12 rounded-lg border border-[var(--color-border)] text-center text-xl font-semibold text-[var(--color-text-primary)] outline-none transition-all focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-bg-surface)]"
-					aria-label={`验证码第 ${idx + 1} 位`}
+					aria-label={t('common.verificationCodeDigit', { index: idx + 1 })}
 				/>
 			))}
 		</div>

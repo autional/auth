@@ -1124,20 +1124,20 @@ export default function LoginPage() {
 										}`}
 									>
 										{captchaStatus === 'solved' ? (
-											'安全检测通过'
+											t('captcha.solved')
 										) : captchaStatus === 'expired' ? (
 											// P1-01: Improved expired message
-											'安全验证已过期，正在重新获取...'
+											t('captcha.expired')
 										) : captchaStatus === 'error' ? (
 											// P1-02: Error state with retry button
 											<div className="flex flex-col items-center gap-2">
-												<span>验证服务暂不可用</span>
+												<span>{t('captcha.unavailable')}</span>
 												<button
 													type="button"
 													onClick={() => setCaptchaRefreshKey((k) => k + 1)}
 													className="text-xs underline hover:no-underline"
 												>
-													重试安全验证
+													{t('captcha.retry')}
 												</button>
 											</div>
 										) : captchaStatus === 'fetching' ? (

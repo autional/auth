@@ -500,11 +500,11 @@ export default function RegisterPage() {
 		if (errors.username) return null;
 		switch (usernameStatus) {
 			case 'checking':
-				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">检查中...</p>;
+				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t('register.hintChecking')}</p>;
 			case 'available':
-				return <p className="mt-1 text-xs text-success-text">✅ 该用户名可用</p>;
+				return <p className="mt-1 text-xs text-success-text">{t('register.hintUsernameAvailable')}</p>;
 			case 'taken':
-				return <p className="mt-1 text-xs text-danger-text">❌ 该用户名已被占用</p>;
+				return <p className="mt-1 text-xs text-danger-text">{t('register.hintUsernameTaken')}</p>;
 			default:
 				return null;
 		}
@@ -514,11 +514,11 @@ export default function RegisterPage() {
 		if (errors.email) return null;
 		switch (emailStatus) {
 			case 'checking':
-				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">检查中...</p>;
+				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t('register.hintChecking')}</p>;
 			case 'available':
-				return <p className="mt-1 text-xs text-success-text">该邮箱可用</p>;
+				return <p className="mt-1 text-xs text-success-text">{t('register.hintEmailAvailable')}</p>;
 			case 'taken':
-				return <p className="mt-1 text-xs text-danger-text">该邮箱已被注册</p>;
+				return <p className="mt-1 text-xs text-danger-text">{t('register.hintEmailTaken')}</p>;
 			default:
 				return null;
 		}
@@ -680,7 +680,7 @@ export default function RegisterPage() {
 							<textarea
 								id="reason"
 								rows={3}
-								placeholder="请说明注册原因（选填）"
+								placeholder={t('register.reasonPlaceholder')}
 								className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 								{...register('reason' as any)}
 							/>
@@ -694,7 +694,7 @@ export default function RegisterPage() {
 						<Label htmlFor="username">{t('register.username')}</Label>
 						<Input
 							id="username"
-							placeholder="请输入用户名"
+							placeholder={t('register.usernamePlaceholder')}
 							{...register('username')}
 							error={errors.username?.message}
 						/>
@@ -706,7 +706,7 @@ export default function RegisterPage() {
 						<Input
 							id="email"
 							type="email"
-							placeholder="请输入邮箱地址"
+							placeholder={t('register.emailPlaceholder')}
 							{...register('email')}
 							error={errors.email?.message}
 						/>
@@ -718,7 +718,7 @@ export default function RegisterPage() {
 						<PasswordInput
 							id="password"
 							autoComplete="new-password"
-							placeholder="至少8个字符"
+							placeholder={t('register.passwordPlaceholder')}
 							showStrength
 							showBreachCheck={authConfig?.breachCheckEnabled ?? false}
 							policy={authConfig?.passwordPolicy}
@@ -733,7 +733,7 @@ export default function RegisterPage() {
 						<PasswordInput
 							id="confirmPassword"
 							autoComplete="new-password"
-							placeholder="再次输入密码"
+							placeholder={t('register.confirmPasswordPlaceholder')}
 							{...register('confirmPassword')}
 							error={errors.confirmPassword?.message}
 						/>
