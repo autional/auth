@@ -23,7 +23,6 @@ const BANNED_TERMS = [
 	'ISO 27001',
 	'渗透测试',
 	'penetration test',
-	'AuthMS',
 	'已认证',
 	'certified',
 	'certification',
