@@ -371,6 +371,18 @@ describe('AccountDeletionPage - API Error Handling', () => {
 		});
 	});
 
+	it('非凭据类 400（form_error，如 40000301）**不得**显示「旧密码不正确」', async () => {
+		// 契约：只有 credential_mismatch（61000104）才提示「旧密码不正确」；其他 form_error 走服务端文案。
+		mockReAuthenticate.mockRejectedValue({ response: { data: { code: 40000301, message: 'bad request' } } });
+
+		renderAccountDeletion();
+		await openModalAndConfirm('Whatever1');
+
+		await waitFor(() => {
+			expect(screen.queryByText('auth.password.oldPasswordWrong')).not.toBeInTheDocument();
+		});
+	});
+
 	it('shows fallback error message when API response has no message or code', async () => {
 		mockDeleteAccount.mockRejectedValue({ response: {} });
 

@@ -214,10 +214,11 @@ export default function ChangePasswordPage() {
 
 			setSuccess(true);
 		} catch (err: any) {
-			// 契约驱动：61000104（旧密码不匹配）在契约里是 ui_observation='form_error'；
-			// 同为 401 的「令牌无效」是 'session_expired' ⇒ 不再混用（比按码字面量更稳）。
+			// 契约驱动：61000104（旧密码不匹配）= ui_observation='credential_mismatch'（**只此一码**）；
+			// 同为 401 的「令牌无效」是 'session_expired'、通用 401（40000502）也是 session_expired
+			// ⇒ 不会把会话失效说成「当前密码不正确」。
 			const message =
-				semanticsOfError(err)?.uiObservation === 'form_error'
+				semanticsOfError(err)?.uiObservation === 'credential_mismatch'
 					? t('auth.password.oldPasswordWrong') || '当前密码不正确'
 					: err?.response?.data?.message || t('changePassword.failed');
 			setError(message);

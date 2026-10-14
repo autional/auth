@@ -26,7 +26,7 @@ const STEP_UP_HEADER = 'X-StepUp-Token';
 
 // 错误分流改由契约驱动（@/lib/error-semantics ← service-core 契约）：
 //   40800251（需 step-up） → ui_observation='reauth_required'
-//   61000104 / 40000502（密码不匹配 / 兜底校验失败） → ui_observation='form_error'
+//   61000104（密码不匹配） → ui_observation='credential_mismatch'（40000502 是通用 401，主语义 = 会话失效，不在此列）
 // ⇒ 页面不再手写错误码字面量。
 
 export default function AccountDeletionPage() {
@@ -98,7 +98,7 @@ export default function AccountDeletionPage() {
 			const ui = semanticsOfError(err)?.uiObservation;
 			if (ui === 'reauth_required') {
 				setError(t('deletion.reauthExpired'));
-			} else if (ui === 'form_error') {
+			} else if (ui === 'credential_mismatch') {
 				setError(t('auth.password.oldPasswordWrong'));
 			} else {
 				setError(err?.response?.data?.message || t('deletion.deleteGeneric'));

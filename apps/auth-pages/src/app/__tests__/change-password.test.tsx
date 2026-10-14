@@ -313,4 +313,37 @@ describe('ChangePasswordPage', () => {
 		});
 		expect(screen.queryByText('password mismatch')).not.toBeInTheDocument();
 	});
+
+	it('通用 401（40000502 = 会话失效/未认证）**不得**显示「当前密码不正确」（契约：session_expired ≠ credential_mismatch）', async () => {
+		// 契约里 40000502 = ErrCodeDomainUnauthorized（refresh token 失效/中间件未认证/API key 无效共用），
+		// 主语义是会话失效 ⇒ 不能像 61000104 那样提示「当前密码不正确」。
+		mockAuthMePasswordPut.mockRejectedValue({
+			response: { data: { code: 40000502, message: 'unauthorized' } },
+		});
+
+		searchParams = new URLSearchParams();
+		mockUseSearchParams.mockReturnValue([searchParams, vi.fn()]);
+
+		const user = userEvent.setup();
+		renderPage();
+
+		await user.type(
+			screen.getByPlaceholderText('auth.password.oldPasswordPlaceholder'),
+			'OldPass1',
+		);
+		await user.type(
+			screen.getByPlaceholderText('auth.password.newPasswordPlaceholder'),
+			'NewStr0ng!',
+		);
+		await user.type(
+			screen.getByPlaceholderText('auth.password.confirmPasswordPlaceholder'),
+			'NewStr0ng!',
+		);
+		await user.click(screen.getByRole('button', { name: 'auth.password.changeBtn' }));
+
+		await waitFor(() => {
+			expect(screen.getByText('unauthorized')).toBeInTheDocument();
+		});
+		expect(screen.queryByText('auth.password.oldPasswordWrong')).not.toBeInTheDocument();
+	});
 });

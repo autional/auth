@@ -1269,7 +1269,7 @@
     "code": 40000502,
     "http_status": 401,
     "class": "unauthorized",
-    "ui_observation": "form_error",
+    "ui_observation": "session_expired",
     "retryable": false,
     "docs_path": "/errors/40000502"
   },
@@ -2486,7 +2486,7 @@
     "code": 61000104,
     "http_status": 401,
     "class": "unauthorized",
-    "ui_observation": "form_error",
+    "ui_observation": "credential_mismatch",
     "retryable": false,
     "docs_path": "/errors/61000104"
   },
@@ -3102,7 +3102,7 @@
     "http_status": 503,
     "class": "unavailable",
     "ui_observation": "action_required",
-    "retryable": true,
+    "retryable": false,
     "docs_path": "/errors/61001801"
   },
   {
@@ -3239,7 +3239,7 @@
     "code": 61002201,
     "http_status": 403,
     "class": "forbidden",
-    "ui_observation": "forbidden",
+    "ui_observation": "reauth_required",
     "retryable": false,
     "docs_path": "/errors/61002201"
   },

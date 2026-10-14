@@ -1,7 +1,7 @@
 // GENERATED FILE — DO NOT EDIT.
 // Source: contracts/errors.semantics.json（镜像自 service-core base/error/testdata/errors.semantics.json）
 // Regenerate: pnpm gen:errors · Verify: pnpm gen:errors:check
-// rows: 784 · source sha256: ed0c734a058aa609233bd79650634fb9794bb1b49428686e575d34be639593cc
+// rows: 784 · source sha256: f9506a792f037348dbcdf3f7edde957faa66c832b0c5be934615c1519b808150
 //
 // 单一真源链：service-core/base/error/semantics.go（Go）→ errors.semantics.json → 本文件。
 // ⚠️ 禁止在本文件或页面里手抄错误码分支：请消费 ERROR_SEMANTICS / UNPROVISIONED_CODES。
@@ -29,6 +29,7 @@ export type UIObservation =
 	| 'rate_limited'
 	| 'transient'
 	| 'unexpected'
+	| 'credential_mismatch'
 	| 'expired'
 	| 'reauth_required'
 	| 'action_required';
@@ -203,7 +204,7 @@ export const ERROR_SEMANTICS: Readonly<Record<number, ErrorSemantics>> = {
 	40000204: { code: 40000204, httpStatus: 403, class: 'forbidden', absence: '', uiObservation: 'forbidden', retryable: false, docsPath: '/errors/40000204' },
 	40000301: { code: 40000301, httpStatus: 400, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/40000301' },
 	40000501: { code: 40000501, httpStatus: 403, class: 'forbidden', absence: '', uiObservation: 'forbidden', retryable: false, docsPath: '/errors/40000501' },
-	40000502: { code: 40000502, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/40000502' },
+	40000502: { code: 40000502, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/40000502' },
 	40000503: { code: 40000503, httpStatus: 403, class: 'forbidden', absence: '', uiObservation: 'forbidden', retryable: false, docsPath: '/errors/40000503' },
 	40000603: { code: 40000603, httpStatus: 429, class: 'limit', absence: '', uiObservation: 'rate_limited', retryable: true, docsPath: '/errors/40000603' },
 	40000604: { code: 40000604, httpStatus: 409, class: 'conflict', absence: '', uiObservation: 'conflict', retryable: false, docsPath: '/errors/40000604' },
@@ -351,7 +352,7 @@ export const ERROR_SEMANTICS: Readonly<Record<number, ErrorSemantics>> = {
 	61000101: { code: 61000101, httpStatus: 404, class: 'not_found', absence: 'entity', uiObservation: 'not_found_page', retryable: false, docsPath: '/errors/61000101' },
 	61000102: { code: 61000102, httpStatus: 409, class: 'conflict', absence: '', uiObservation: 'conflict', retryable: false, docsPath: '/errors/61000102' },
 	61000103: { code: 61000103, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/61000103' },
-	61000104: { code: 61000104, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/61000104' },
+	61000104: { code: 61000104, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'credential_mismatch', retryable: false, docsPath: '/errors/61000104' },
 	61000111: { code: 61000111, httpStatus: 400, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/61000111' },
 	61000201: { code: 61000201, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/61000201' },
 	61000202: { code: 61000202, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/61000202' },
@@ -426,7 +427,7 @@ export const ERROR_SEMANTICS: Readonly<Record<number, ErrorSemantics>> = {
 	61001701: { code: 61001701, httpStatus: 422, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/61001701' },
 	61001702: { code: 61001702, httpStatus: 422, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/61001702' },
 	61001703: { code: 61001703, httpStatus: 422, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/61001703' },
-	61001801: { code: 61001801, httpStatus: 503, class: 'unavailable', absence: '', uiObservation: 'action_required', retryable: true, docsPath: '/errors/61001801' },
+	61001801: { code: 61001801, httpStatus: 503, class: 'unavailable', absence: '', uiObservation: 'action_required', retryable: false, docsPath: '/errors/61001801' },
 	61001802: { code: 61001802, httpStatus: 502, class: 'unavailable', absence: '', uiObservation: 'transient', retryable: true, docsPath: '/errors/61001802' },
 	61001803: { code: 61001803, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/61001803' },
 	61001804: { code: 61001804, httpStatus: 404, class: 'not_found', absence: 'entity', uiObservation: 'not_found_page', retryable: false, docsPath: '/errors/61001804' },
@@ -443,7 +444,7 @@ export const ERROR_SEMANTICS: Readonly<Record<number, ErrorSemantics>> = {
 	61002003: { code: 61002003, httpStatus: 404, class: 'not_found', absence: 'entity', uiObservation: 'not_found_page', retryable: false, docsPath: '/errors/61002003' },
 	61002004: { code: 61002004, httpStatus: 500, class: 'internal', absence: '', uiObservation: 'unexpected', retryable: false, docsPath: '/errors/61002004' },
 	61002005: { code: 61002005, httpStatus: 500, class: 'internal', absence: '', uiObservation: 'unexpected', retryable: false, docsPath: '/errors/61002005' },
-	61002201: { code: 61002201, httpStatus: 403, class: 'forbidden', absence: '', uiObservation: 'forbidden', retryable: false, docsPath: '/errors/61002201' },
+	61002201: { code: 61002201, httpStatus: 403, class: 'forbidden', absence: '', uiObservation: 'reauth_required', retryable: false, docsPath: '/errors/61002201' },
 	61002202: { code: 61002202, httpStatus: 429, class: 'limit', absence: '', uiObservation: 'rate_limited', retryable: true, docsPath: '/errors/61002202' },
 	61002203: { code: 61002203, httpStatus: 400, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/61002203' },
 	61002204: { code: 61002204, httpStatus: 404, class: 'not_found', absence: 'entity', uiObservation: 'not_found_page', retryable: false, docsPath: '/errors/61002204' },
@@ -843,5 +844,5 @@ export const EMPTY_STATE_CODES: ReadonlySet<number> = new Set([]);
 
 export const ERROR_SEMANTICS_META = {
 	rowCount: 784,
-	sourceSha256: 'ed0c734a058aa609233bd79650634fb9794bb1b49428686e575d34be639593cc',
+	sourceSha256: 'f9506a792f037348dbcdf3f7edde957faa66c832b0c5be934615c1519b808150',
 } as const;

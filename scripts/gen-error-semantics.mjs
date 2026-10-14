@@ -52,6 +52,7 @@ const UI = [
   'rate_limited',
   'transient',
   'unexpected',
+  'credential_mismatch',
   'expired',
   'reauth_required',
   'action_required',
