@@ -48,7 +48,6 @@ export default function PrivacyPage() {
 		queryFn: () => compliancePublicLegalDocuments({ doc_type: 'privacy', lang }),
 		staleTime: 5 * 60 * 1000,
 		// 法律页宁可尽快给出错误态 + 重试，也不让用户对着转圈等默认的 3 次退避重试
-		retry: 1,
 	});
 
 	// content 为 JSON string → [{title, body}]；非法 JSON / 非数组 → undefined（按不可用处理）

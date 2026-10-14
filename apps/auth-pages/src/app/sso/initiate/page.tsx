@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Button, Input, Label } from '@autional/ui';
 import { extractApiError } from '@autional/shared';
 import { initiateSSO } from '@/lib/api.generated';
@@ -26,14 +25,9 @@ const PROVIDER_ICONS: Record<string, string> = {
 	google_workspace: '🔴',
 };
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-
 export default function SSOInitiatePage() {
-	return (
-		<QueryClientProvider client={queryClient}>
-			<SSOInitiateContent />
-		</QueryClientProvider>
-	);
+	// 使用应用级 QueryClient：重试策略单一真源 = main.tsx 默认（原页面级 retry:false 属策略分叉，已删）。
+	return <SSOInitiateContent />;
 }
 
 function SSOInitiateContent() {

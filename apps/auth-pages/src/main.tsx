@@ -2,14 +2,15 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ROUTER_BASENAME } from '@autional/shared';
+import { ROUTER_BASENAME, isRetryableError } from '@autional/shared';
 import App from './App';
 import './non-tenant-segments';
 import './app/globals.css';
 
 const queryClient = new QueryClient({
 	defaultOptions: {
-		queries: { retry: 1, staleTime: 30000 },
+		// 重试策略唯一实现（@autional/shared/utils/query-state 的 isRetryableError）：4xx 不重试。
+		queries: { retry: (failureCount, error) => isRetryableError(error) && failureCount < 1, staleTime: 30000 },
 	},
 });
 

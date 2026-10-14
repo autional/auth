@@ -64,7 +64,6 @@ export default function TermsPage() {
 		queryFn: () => compliancePublicLegalDocuments({ doc_type: 'terms', lang }),
 		staleTime: 5 * 60 * 1000,
 		// 法律页宁可尽快给出错误态 + 重试，也不让用户对着转圈等默认的 3 次退避重试
-		retry: 1,
 	});
 
 	const serverSections = useMemo(() => parseLegalDocumentSections(doc?.content), [doc]);
