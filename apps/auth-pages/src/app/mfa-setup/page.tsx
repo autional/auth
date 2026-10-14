@@ -33,6 +33,7 @@ import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { userPortalUrl } from '@/lib/portal-links';
 import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
+import { semanticsOfError } from '@/lib/error-semantics';
 
 type MFAMethod = 'totp' | 'sms' | 'email';
 type Step = 1 | 2 | 3;
@@ -41,9 +42,9 @@ const COOLDOWN_SECONDS = 60;
 // 注册设备名（otpauth label 后缀；请求键 device_name 由 client 层 camel→snake 承担）
 const TOTP_DEVICE_NAME = 'Autional Auth';
 
-// mfa-service 错误码（errors.go 6104xxxx）
-const MFA_ERR_ALREADY_ENABLED = 61040010;
-const MFA_ERR_INVALID_CODE = 61040013;
+// 分流由契约驱动（@/lib/error-semantics）：
+//   61040010（已启用）   → ui_observation='conflict'
+//   61040013（验证码错） → ui_observation='form_error'
 
 interface MFAStatusData {
 	totpEnabled: boolean;
@@ -143,10 +144,10 @@ export default function MFASetupPage() {
 
 	// 错误按服务端 code 分流（AUTH-33：禁用/验证失败不再笼统归因于密码）
 	const mfaErrorText = (err: unknown, fallback: string): string => {
-		const { code, message } = extractApiError(err, fallback);
-		const numeric = Number(code);
-		if (numeric === MFA_ERR_INVALID_CODE) return t('auth.mfa.errorInvalidCode');
-		if (numeric === MFA_ERR_ALREADY_ENABLED) return t('auth.mfa.errorAlreadyEnabled');
+		const { message } = extractApiError(err, fallback);
+		const ui = semanticsOfError(err)?.uiObservation;
+		if (ui === 'form_error') return t('auth.mfa.errorInvalidCode');
+		if (ui === 'conflict') return t('auth.mfa.errorAlreadyEnabled');
 		if ((err as any)?.response?.status === 429) return t('auth.mfa.errorRateLimited');
 		return message;
 	};
@@ -164,7 +165,7 @@ export default function MFASetupPage() {
 			setStep(2);
 		} catch (err) {
 			// 409 已启用（状态不同步/并发注册）：刷新状态切回禁用面
-			if (Number(extractApiError(err, '').code) === MFA_ERR_ALREADY_ENABLED && user?.id) {
+			if (semanticsOfError(err)?.uiObservation === 'conflict' && user?.id) {
 				await loadStatus(user.id);
 			}
 			setError(mfaErrorText(err, t('auth.mfa.errorGetSetupFailed')));

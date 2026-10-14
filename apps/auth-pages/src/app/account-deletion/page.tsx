@@ -19,15 +19,15 @@ import {
 	processPasswordForTransmission,
 } from '@/lib/password-transmission';
 import { deleteAccount, reAuthenticate } from '@/lib/api.generated';
+import { semanticsOfError } from '@/lib/error-semantics';
 
 // 头名单点对齐后端 constant_cross.HeaderStepUpToken = "X-StepUp-Token"
 const STEP_UP_HEADER = 'X-StepUp-Token';
 
-// 业务错误码（identity）：61000104 = ErrPasswordMismatch（密码内容不匹配）；
-// 40000502 = ErrInvalidPassword（兜底密码校验失败）；40800251 = ErrCodeStepUpRequired（HTTP 401）。
-const ERR_PASSWORD_MISMATCH = 61000104;
-const ERR_INVALID_PASSWORD = 40000502;
-const ERR_STEP_UP_REQUIRED = 40800251;
+// 错误分流改由契约驱动（@/lib/error-semantics ← service-core 契约）：
+//   40800251（需 step-up） → ui_observation='reauth_required'
+//   61000104 / 40000502（密码不匹配 / 兜底校验失败） → ui_observation='form_error'
+// ⇒ 页面不再手写错误码字面量。
 
 export default function AccountDeletionPage() {
 	const { t } = useI18n();
@@ -95,10 +95,10 @@ export default function AccountDeletionPage() {
 			setShowModal(false);
 			logout(tenantSlug ? `/${tenantSlug}/login?account_deleted=true` : '/login?account_deleted=true');
 		} catch (err: any) {
-			const errCode = Number(err?.response?.data?.code);
-			if (errCode === ERR_STEP_UP_REQUIRED) {
+			const ui = semanticsOfError(err)?.uiObservation;
+			if (ui === 'reauth_required') {
 				setError(t('deletion.reauthExpired'));
-			} else if (errCode === ERR_PASSWORD_MISMATCH || errCode === ERR_INVALID_PASSWORD) {
+			} else if (ui === 'form_error') {
 				setError(t('auth.password.oldPasswordWrong'));
 			} else {
 				setError(err?.response?.data?.message || t('deletion.deleteGeneric'));

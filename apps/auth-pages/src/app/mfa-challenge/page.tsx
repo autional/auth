@@ -19,6 +19,7 @@ import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
+import { semanticsOfError } from '@/lib/error-semantics';
 
 type CodeMethod = 'totp' | 'sms' | 'email' | 'backup';
 
@@ -34,9 +35,9 @@ interface PreAuthData {
 
 const CODE_METHOD_ORDER: CodeMethod[] = ['totp', 'sms', 'email', 'backup'];
 
-// identity 挑战错误码（610004xx）：403 无效/过期挑战令牌 → 回登录；400 验证码错误 → 留本页
-const IDENTITY_ERR_MFA_CHALLENGE_REQUIRED = 61000403;
-const IDENTITY_ERR_INVALID_MFA_CODE = 61000402;
+// 分流由契约驱动（@/lib/error-semantics）：
+//   61000403（挑战令牌无效/过期） → ui_observation='reauth_required' ⇒ 回登录
+//   61000402（验证码错误）       → ui_observation='form_error'      ⇒ 留本页
 
 // 展示用脱敏（仅渲染，不参与鉴权）
 function maskContact(value: string): string {
@@ -147,15 +148,16 @@ export default function MFAChallengePage() {
 			navigate(dashboardPath);
 		} catch (err) {
 			const status = (err as any)?.response?.status;
-			const numeric = Number((err as any)?.response?.data?.code);
-			// 挑战令牌已失效（服务端复验口径）→ 清会话，引导重新登录
-			if (status === 403 || numeric === IDENTITY_ERR_MFA_CHALLENGE_REQUIRED) {
+			const ui = semanticsOfError(err)?.uiObservation;
+			// 挑战令牌已失效（服务端复验口径）→ 清会话，引导重新登录。
+			// 契约优先；未收录码回落「403」状态判定（保持原行为，不漏判）。
+			if (ui === 'reauth_required' || (ui === undefined && status === 403)) {
 				sessionStorage.removeItem('mfa_pre_auth');
 				setPreAuth(null);
 				setFatal('expired');
 				return;
 			}
-			if (numeric === IDENTITY_ERR_INVALID_MFA_CODE) {
+			if (ui === 'form_error') {
 				setError(t('mfa.challenge.verifyFailed'));
 				return;
 			}

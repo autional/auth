@@ -22,6 +22,7 @@ import { type PasswordPolicy, useTenantAuthConfigBySlug } from '@/hooks/use-tena
 import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
 import { userPortalUrl } from '@/lib/portal-links';
 import RedirectCountdown from '@/components/ui/RedirectCountdown';
+import { semanticsOfError } from '@/lib/error-semantics';
 
 function createPasswordSchema(
 	policy: PasswordPolicy | undefined,
@@ -213,10 +214,10 @@ export default function ChangePasswordPage() {
 
 			setSuccess(true);
 		} catch (err: any) {
-			// 61000104 = ErrCodePasswordMismatch（identity errors.go:37）；401 另外涵盖令牌无效，不能混用。
-			const errCode = Number(err?.response?.data?.code);
+			// 契约驱动：61000104（旧密码不匹配）在契约里是 ui_observation='form_error'；
+			// 同为 401 的「令牌无效」是 'session_expired' ⇒ 不再混用（比按码字面量更稳）。
 			const message =
-				errCode === 61000104
+				semanticsOfError(err)?.uiObservation === 'form_error'
 					? t('auth.password.oldPasswordWrong') || '当前密码不正确'
 					: err?.response?.data?.message || t('changePassword.failed');
 			setError(message);

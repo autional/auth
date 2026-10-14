@@ -29,6 +29,7 @@ import {
 } from '@autional/shared/generated/api';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
 import { AuthCard } from '@/components/auth/AuthCard';
+import { semanticsOfError } from '@/lib/error-semantics';
 
 type Step = 'upload' | 'confirm' | 'consent' | 'verify' | 'result';
 
@@ -290,9 +291,10 @@ function VerifyIdentityContent() {
 
 			setStep('confirm');
 		} catch (err: any) {
-			const { code, i18nKey } = extractApiError(err, '');
-			// AUTH-29：终态已存在（61180002）分流——与图片无关，不再归因 OCR 失败
-			if (Number(code) === 61180002 || i18nKey === 'error.verification.real_name_exists') {
+			const { i18nKey } = extractApiError(err, '');
+			// AUTH-29：终态已存在分流——契约中 ui_observation='conflict'（现为 61180002），
+			// 不再手写码字面量；i18nKey 作为服务端文案兜底。
+			if (semanticsOfError(err)?.uiObservation === 'conflict' || i18nKey === 'error.verification.real_name_exists') {
 				await showExistingOrFallback();
 			} else {
 				const msg = resolveErrorMessage(err, 'auth.verifyIdentity.uploadErrorOcr');

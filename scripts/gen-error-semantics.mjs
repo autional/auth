@@ -52,6 +52,9 @@ const UI = [
   'rate_limited',
   'transient',
   'unexpected',
+  'expired',
+  'reauth_required',
+  'action_required',
 ];
 const sorted = [...rows].sort((a, b) => a.code - b.code);
 const seen = new Set();
