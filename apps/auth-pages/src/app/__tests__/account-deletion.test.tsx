@@ -378,9 +378,11 @@ describe('AccountDeletionPage - API Error Handling', () => {
 		renderAccountDeletion();
 		await openModalAndConfirm('Whatever1');
 
+		// 先等**正向**锚点（服务端文案）上屏 —— 否则负向断言会因「元素尚未渲染」而恒真（无牙）。
 		await waitFor(() => {
-			expect(screen.queryByText('auth.password.oldPasswordWrong')).not.toBeInTheDocument();
+			expect(screen.getByText('bad request')).toBeInTheDocument();
 		});
+		expect(screen.queryByText('auth.password.oldPasswordWrong')).not.toBeInTheDocument();
 	});
 
 	it('shows fallback error message when API response has no message or code', async () => {
