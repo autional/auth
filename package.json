@@ -9,7 +9,9 @@
     "preview": "pnpm --filter @autional/auth-pages preview",
     "typecheck": "pnpm --filter @autional/auth-pages typecheck",
     "lint": "pnpm --filter @autional/auth-pages lint",
-    "test": "pnpm --filter @autional/auth-pages test"
+    "test": "node scripts/gen-error-semantics.mjs --check && pnpm --filter @autional/auth-pages test",
+    "gen:errors": "node scripts/gen-error-semantics.mjs",
+    "gen:errors:check": "node scripts/gen-error-semantics.mjs --check"
   },
   "packageManager": "pnpm@11.0.8",
   "engines": {
