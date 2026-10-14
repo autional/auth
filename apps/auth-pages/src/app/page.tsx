@@ -40,6 +40,7 @@ import { PasskeyLoginButton } from '@/components/auth/PasskeyLoginButton';
 import { MagicLinkForm } from '@/components/auth/MagicLinkForm';
 import { PasswordInput } from '@/components/form/PasswordInput';
 import { useTenantBrandingStore } from '@autional/shared/branding';
+import { semanticsOfError } from '@/lib/error-semantics';
 
 const ERROR_CODE_MAP: Record<string, string> = {
 	'40000001': 'login.error.credentials',
@@ -752,9 +753,10 @@ export default function LoginPage() {
 			if (typeof errCode === 'string' && errCode.startsWith('400')) {
 				localFailureRef.current += 1;
 			}
-			// 错误横幅只显示登录错误（密码错、账号锁定等）
-			// captcha 相关错误(40800505/40800506)由 captcha 区域自己展示
-			if (errCode !== 40800505 && errCode !== 40800506) {
+			// 错误横幅只显示登录错误（密码错、账号锁定等）。
+			// 验证码相关错误由 captcha 区域自己展示 —— **契约驱动**：ui_observation='captcha_required'
+			// （40800505 需完成人机验证 / 40800506 验证码未通过）。不再手写码字面量。
+			if (semanticsOfError(err)?.uiObservation !== 'captcha_required') {
 				setError(getErrorMessage(err, t));
 			}
 			setRateLimitStep(step >= 1 ? step : 0);

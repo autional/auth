@@ -1,7 +1,7 @@
 // GENERATED FILE — DO NOT EDIT.
 // Source: contracts/errors.semantics.json（镜像自 service-core base/error/testdata/errors.semantics.json）
 // Regenerate: pnpm gen:errors · Verify: pnpm gen:errors:check
-// rows: 784 · source sha256: f9506a792f037348dbcdf3f7edde957faa66c832b0c5be934615c1519b808150
+// rows: 787 · source sha256: f846240c034effe8725e853eb67ab31bf8bcad2595e4ff815ab132c85dfb08aa
 //
 // 单一真源链：service-core/base/error/semantics.go（Go）→ errors.semantics.json → 本文件。
 // ⚠️ 禁止在本文件或页面里手抄错误码分支：请消费 ERROR_SEMANTICS / UNPROVISIONED_CODES。
@@ -29,6 +29,7 @@ export type UIObservation =
 	| 'rate_limited'
 	| 'transient'
 	| 'unexpected'
+	| 'captcha_required'
 	| 'credential_mismatch'
 	| 'expired'
 	| 'reauth_required'
@@ -289,8 +290,11 @@ export const ERROR_SEMANTICS: Readonly<Record<number, ErrorSemantics>> = {
 	40800305: { code: 40800305, httpStatus: 409, class: 'conflict', absence: '', uiObservation: 'conflict', retryable: false, docsPath: '/errors/40800305' },
 	40800401: { code: 40800401, httpStatus: 404, class: 'not_found', absence: 'entity', uiObservation: 'not_found_page', retryable: false, docsPath: '/errors/40800401' },
 	40800501: { code: 40800501, httpStatus: 429, class: 'limit', absence: '', uiObservation: 'rate_limited', retryable: true, docsPath: '/errors/40800501' },
-	40800503: { code: 40800503, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/40800503' },
-	40800505: { code: 40800505, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/40800505' },
+	40800502: { code: 40800502, httpStatus: 403, class: 'forbidden', absence: '', uiObservation: 'forbidden', retryable: false, docsPath: '/errors/40800502' },
+	40800503: { code: 40800503, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'action_required', retryable: false, docsPath: '/errors/40800503' },
+	40800504: { code: 40800504, httpStatus: 400, class: 'invalid', absence: '', uiObservation: 'form_error', retryable: false, docsPath: '/errors/40800504' },
+	40800505: { code: 40800505, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'captcha_required', retryable: false, docsPath: '/errors/40800505' },
+	40800506: { code: 40800506, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'captcha_required', retryable: false, docsPath: '/errors/40800506' },
 	40800702: { code: 40800702, httpStatus: 401, class: 'unauthorized', absence: '', uiObservation: 'session_expired', retryable: false, docsPath: '/errors/40800702' },
 	40800703: { code: 40800703, httpStatus: 404, class: 'not_found', absence: 'entity', uiObservation: 'not_found_page', retryable: false, docsPath: '/errors/40800703' },
 	40800704: { code: 40800704, httpStatus: 409, class: 'conflict', absence: '', uiObservation: 'conflict', retryable: false, docsPath: '/errors/40800704' },
@@ -843,6 +847,6 @@ export const UNPROVISIONED_CODES: ReadonlySet<number> = new Set([]);
 export const EMPTY_STATE_CODES: ReadonlySet<number> = new Set([]);
 
 export const ERROR_SEMANTICS_META = {
-	rowCount: 784,
-	sourceSha256: 'f9506a792f037348dbcdf3f7edde957faa66c832b0c5be934615c1519b808150',
+	rowCount: 787,
+	sourceSha256: 'f846240c034effe8725e853eb67ab31bf8bcad2595e4ff815ab132c85dfb08aa',
 } as const;

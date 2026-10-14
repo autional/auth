@@ -1962,20 +1962,44 @@
     "docs_path": "/errors/40800501"
   },
   {
+    "code": 40800502,
+    "http_status": 403,
+    "class": "forbidden",
+    "ui_observation": "forbidden",
+    "retryable": false,
+    "docs_path": "/errors/40800502"
+  },
+  {
     "code": 40800503,
     "http_status": 401,
     "class": "unauthorized",
-    "ui_observation": "session_expired",
+    "ui_observation": "action_required",
     "retryable": false,
     "docs_path": "/errors/40800503"
+  },
+  {
+    "code": 40800504,
+    "http_status": 400,
+    "class": "invalid",
+    "ui_observation": "form_error",
+    "retryable": false,
+    "docs_path": "/errors/40800504"
   },
   {
     "code": 40800505,
     "http_status": 401,
     "class": "unauthorized",
-    "ui_observation": "session_expired",
+    "ui_observation": "captcha_required",
     "retryable": false,
     "docs_path": "/errors/40800505"
+  },
+  {
+    "code": 40800506,
+    "http_status": 401,
+    "class": "unauthorized",
+    "ui_observation": "captcha_required",
+    "retryable": false,
+    "docs_path": "/errors/40800506"
   },
   {
     "code": 40800702,
