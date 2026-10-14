@@ -22,7 +22,8 @@ vi.mock('react-router', async () => {
 });
 
 let mockUser: { id: string } | null = { id: 'test-user-id' };
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	useAuthStore: (selector?: any) => {
 		const state = { user: mockUser };
 		return selector ? selector(state) : state;

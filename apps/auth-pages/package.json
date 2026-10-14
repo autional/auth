@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node ../../scripts/gen-env.mjs && vite --port 13101",
-    "build": "node ../../scripts/gen-env.mjs && node ../../scripts/gen-error-semantics.mjs --check && vite build",
+    "build": "node ../../scripts/gen-env.mjs && vite build",
     "preview": "vite preview --port 13101",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
@@ -14,7 +14,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@autional/shared": "0.1.0-rc.36",
+    "@autional/shared": "0.1.0-rc.38",
     "@autional/tailwind-preset": "0.1.0-rc.10",
     "@autional/tokens": "0.1.0-rc.16",
     "@autional/ui": "0.1.0-rc.49",

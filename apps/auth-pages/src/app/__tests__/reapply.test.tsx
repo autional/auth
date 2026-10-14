@@ -24,7 +24,8 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	apiClient: {
 		post: (...args: any[]) => mockApiClientPost(...args),
 	},

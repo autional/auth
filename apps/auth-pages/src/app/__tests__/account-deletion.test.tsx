@@ -27,7 +27,8 @@ const mockDeleteAccount = vi.fn();
 const mockFetchMode = vi.fn();
 const mockProcessPassword = vi.fn();
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	logout: (...args: any[]) => mockLogout(...args),
 	useAuthStore: { getState: () => ({ currentTenantId: 'tenant-1' }) },
 	END_USER_PORTAL_URL: () => '/user',

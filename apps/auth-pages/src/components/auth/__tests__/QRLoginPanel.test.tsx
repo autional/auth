@@ -22,7 +22,8 @@ vi.mock('@/lib/post-login-redirect', () => ({
 	getPostLoginTarget: vi.fn(() => '/demo/dashboard'),
 }));
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	loginWithTokens: vi.fn(),
 }));
 

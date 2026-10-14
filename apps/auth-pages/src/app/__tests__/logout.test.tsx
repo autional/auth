@@ -26,7 +26,8 @@ vi.mock('react-router', async () => {
 });
 
 const mockLogout = vi.fn();
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	useAuthStore: (selector?: any) => {
 		const state = {
 			user: mockAccessToken ? { id: '1', username: 'test', email: 'test@example.com' } : null,

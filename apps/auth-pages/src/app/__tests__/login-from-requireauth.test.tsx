@@ -38,7 +38,8 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	loginWithTokens: vi.fn(),
 	getAccessToken: () => mockState.token,
 	initiateOAuthLogin: (clientId: string, target?: string) => {

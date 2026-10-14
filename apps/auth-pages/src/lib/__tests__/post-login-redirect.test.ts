@@ -4,7 +4,8 @@ const mockGetCurrentRole = vi.fn();
 const mockIsValidRedirect = vi.fn();
 const mockCrossAppUrl = vi.fn((path: string) => path);
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	getCurrentRole: () => mockGetCurrentRole(),
 	isValidRedirect: (url: string) => mockIsValidRedirect(url),
 	crossAppUrl: (path: string) => mockCrossAppUrl(path),

@@ -32,7 +32,8 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	apiClient: {
 		put: vi.fn().mockImplementation((...args: any[]) => (mockApiClientPut as any)(...args)),
 		get: vi.fn(() => Promise.resolve({ data: { items: [] } })),

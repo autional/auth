@@ -36,7 +36,8 @@ vi.mock('react-router', async () => {
 	};
 });
 
-vi.mock('@autional/shared', () => ({
+vi.mock('@autional/shared', async (importOriginal) => ({
+	...(await importOriginal<typeof import('@autional/shared')>()),
 	loginWithTokens: (...args: any[]) => mockState.loginWithTokens(...args),
 	decodeJwtPayload: (...args: any[]) => mockState.decodeJwtPayload(...args),
 	getCurrentRole: () => mockState.role,
