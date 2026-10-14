@@ -5,6 +5,7 @@ import { useLocation } from 'react-router';
 import { AuthService, extractItem, getAccessToken, traceEvent, traceRedirect } from '@autional/shared';
 import { Button } from '@autional/ui';
 import { useI18n } from '@/lib/i18n';
+import { fetchTenantSlugByClientId } from '@/lib/oauth-cold-start';
 import { AuthCard } from '@/components/auth/AuthCard';
 
 /**
@@ -18,8 +19,9 @@ import { AuthCard } from '@/components/auth/AuthCard';
  * - 零副作用：渲染阶段只读展示参数，不发起任何 XHR、不清除本地会话（防探测/防误触发）。
  * - 开放重定向闭合：页面唯一的出站导航目标是**服务端响应里的 location**（仅命中客户端
  *   注册白名单才出）；URL 上的 post_logout_redirect_uri 参数只做展示，绝不直接导航。
- *   服务端无 location（401 / 200 无 location / 网络失败）→ 落 auth 域根兜底（EntryRouter
- *   登出闸门 → 品牌裸根），不出站。
+ *   服务端无 location（401 / 200 无 location / 网络失败）→ 兜底不出站：能由 client_id
+ *   反查出租户 slug 时落同源 `/<slug>/login`（保租户上下文，镜像 TASK-07 冷启动短路），
+ *   反查失败才落 auth 域根（EntryRouter 登出闸门 → 品牌裸根）。
  *
  * 登出时序（US-1/US-3）：确认 → 同源 XHR（支 2：无 hint + 已认证会话 → 200
  * {logged_out, location?}；Accept: application/json 防落 302 确认页支）→ 本地会话终结
@@ -29,6 +31,17 @@ type Phase = 'idle' | 'submitting' | 'done';
 
 /** 服务端无回跳时的兜底落点：auth 域根（EntryRouter 登出闸门 → 品牌裸根）。 */
 const FALLBACK_LANDING = '/';
+
+/**
+ * 服务端无 location 时的保租户兜底：client_id → 租户 slug → `/<slug>/login`。
+ * 反查失败返回 null，调用方回落 FALLBACK_LANDING。落点为同源相对路径，
+ * 不采用 URL 上的 post_logout_redirect_uri（未受信参数），开放重定向闭合不变。
+ */
+async function resolveTenantLoginFallback(clientId: string): Promise<string | null> {
+	if (!clientId) return null;
+	const slug = await fetchTenantSlugByClientId(clientId);
+	return slug ? `/${slug}/login` : null;
+}
 
 /** 服务端 location 可导航性判定（http/https 才整页跳转；非法目标落兜底，防卡死完成态）。 */
 function isNavigableUrl(raw: string): boolean {
@@ -84,6 +97,12 @@ export default function LogoutConfirmPage() {
 			}
 		} catch {
 			/* 网络失败/非 JSON 响应：落兜底（仍完成本地会话终结） */
+		}
+		if (!fromServer) {
+			// 服务端未给回跳（401 / 200 无 location / 网络失败）：保租户兜底 →
+			// client_id 反查 slug 落 /<slug>/login；反查失败保持 auth 域根。
+			const slugLanding = await resolveTenantLoginFallback(clientId);
+			if (slugLanding) next = slugLanding;
 		}
 
 		// 本地会话终结（唯一实现；best-effort 吊销 + 清 localStorage/BFF cookie）。

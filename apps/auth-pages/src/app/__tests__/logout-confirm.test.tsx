@@ -8,7 +8,8 @@ import { MemoryRouter } from 'react-router';
 //  - 零副作用：渲染仅只读展示参数，无 XHR、无本地会话清除、无导航
 //  - 导航闭合：唯一出站目标是**服务端响应里的 location**；URL 上的
 //    post_logout_redirect_uri 参数只做展示，绝不直接导航；无 location
-//    （401 / 200 无 location / 网络失败）→ 落 auth 域根兜底（不出站）
+//    （401 / 200 无 location / 网络失败）→ 保租户兜底：
+//    client_id 反查 slug → 落同源 /<slug>/login；反查失败才落 auth 域根
 // ============================================================
 
 const { mockFetch, mockLogout, mockGetAccessToken, mockTraceEvent } = vi.hoisted(() => ({
@@ -47,6 +48,39 @@ const SERVER_LOCATION = 'https://user.autional.cn/demo/?state=st-1';
 /** URL 参数面上的未注册地址（越权面）：页面绝不得导航到它 */
 const UNREGISTERED = 'https://evil.example/after-logout';
 const CONFIRM_QUERY = `?client_id=client-1&post_logout_redirect_uri=${encodeURIComponent(UNREGISTERED)}&state=st-1`;
+
+/** 兜底分支的 client_id 反查面：client-1 → 租户 t1 → slug demo（与冷启动链同源两步） */
+function resolveFetchToTenant(url: string): Promise<unknown> | null {
+	if (url.includes('/oauth/api/v1/oauth/client/')) {
+		return Promise.resolve({ ok: true, json: async () => ({ data: { tenantId: 't1' } }) });
+	}
+	if (url.includes('/tenant/api/v1/tenant/public/tenants')) {
+		return Promise.resolve({ ok: true, json: async () => ({ items: [{ id: 't1', name: 'demo' }] }) });
+	}
+	return null;
+}
+
+/** 登出 XHR 响应 + 兜底反查可解析：401 / 200 无 location / 网络失败共用 */
+function logoutThenResolvable(init: { ok: boolean; status?: number; json?: () => Promise<unknown> } | 'reject') {
+	mockFetch.mockImplementation((url: string) => {
+		if (String(url).includes('/oauth/api/v1/oauth/logout')) {
+			if (init === 'reject') return Promise.reject(new Error('network down'));
+			return Promise.resolve(init as object);
+		}
+		return resolveFetchToTenant(String(url)) ?? Promise.resolve({ ok: false, json: async () => ({}) });
+	});
+}
+
+/** 登出 XHR 响应 + 兜底反查失败（网络不可用）：应回落 auth 域根 */
+function logoutThenUnresolvable(init: { ok: boolean; status?: number; json?: () => Promise<unknown> } | 'reject') {
+	mockFetch.mockImplementation((url: string) => {
+		if (String(url).includes('/oauth/api/v1/oauth/logout')) {
+			if (init === 'reject') return Promise.reject(new Error('network down'));
+			return Promise.resolve(init as object);
+		}
+		return Promise.reject(new Error('network down'));
+	});
+}
 
 let locationMock: Record<string, any>;
 let hrefValue: string;
@@ -153,29 +187,24 @@ describe('登出确认页 — 确认后导航闭合（仅服务端 location 出�
 		expect((call[1] as any)?.headers?.Authorization).toBeUndefined();
 	});
 
-	it('401（无会话）→ 本地终结 + 落 auth 域根兜底，未注册参数不出站', async () => {
+	it('401（无会话）→ client_id 反查 slug，保租户落 /<slug>/login，未注册参数不出站', async () => {
 		const user = userEvent.setup();
-		mockFetch.mockResolvedValue({
-			ok: false,
-			status: 401,
-			json: async () => ({ error: 'invalid_request' }),
-		});
+		logoutThenResolvable({ ok: false, status: 401, json: async () => ({ error: 'invalid_request' }) });
 
 		renderPage();
 		await user.click(screen.getByRole('button', { name: 'logoutConfirm.confirm' }));
 
 		await waitFor(() => {
-			expect(hrefValue).toContain('auth.autional.cn');
+			expect(hrefValue).toContain('auth.autional.cn/demo/login');
 		});
-		expect(hrefValue.startsWith('https://auth.autional.cn/')).toBe(true);
 		expect(hrefValue).not.toContain('evil.example');
 		expect(hrefValue).not.toContain('user.autional.cn');
 		expect(mockLogout).toHaveBeenCalledTimes(1);
 	});
 
-	it('200 但无 location（未命中注册白名单）→ 同样不出站，落 auth 域根兜底', async () => {
+	it('200 但无 location（未命中注册白名单）→ 同样保租户落 /<slug>/login', async () => {
 		const user = userEvent.setup();
-		mockFetch.mockResolvedValue({
+		logoutThenResolvable({
 			ok: true,
 			json: async () => ({ code: 200, message: 'ok', data: { logged_out: true, location: '' } }),
 		});
@@ -184,36 +213,53 @@ describe('登出确认页 — 确认后导航闭合（仅服务端 location 出�
 		await user.click(screen.getByRole('button', { name: 'logoutConfirm.confirm' }));
 
 		await waitFor(() => {
-			expect(hrefValue).toContain('auth.autional.cn');
+			expect(hrefValue).toContain('auth.autional.cn/demo/login');
 		});
 		expect(hrefValue).not.toContain('evil.example');
 		expect(mockLogout).toHaveBeenCalledTimes(1);
 	});
 
-	it('网络失败 → 本地终结 + 兜底不出站（不白屏不卡死）', async () => {
+	it('网络失败 → 本地终结 + 保租户兜底（不白屏不卡死）', async () => {
 		const user = userEvent.setup();
-		mockFetch.mockRejectedValue(new Error('network down'));
+		logoutThenResolvable('reject');
 
 		renderPage();
 		await user.click(screen.getByRole('button', { name: 'logoutConfirm.confirm' }));
 
 		await waitFor(() => {
-			expect(hrefValue).toContain('auth.autional.cn');
+			expect(hrefValue).toContain('auth.autional.cn/demo/login');
 		});
 		expect(hrefValue).not.toContain('evil.example');
 		expect(mockLogout).toHaveBeenCalledTimes(1);
 	});
 
-	it('有本地令牌 → XHR 补 Bearer；提交中按钮禁用，重复点击不重发', async () => {
+	it('反查失败（租户不可达）→ 回落 auth 域根兜底，不出站', async () => {
+		const user = userEvent.setup();
+		logoutThenUnresolvable({ ok: false, status: 401, json: async () => ({ error: 'invalid_request' }) });
+
+		renderPage();
+		await user.click(screen.getByRole('button', { name: 'logoutConfirm.confirm' }));
+
+		await waitFor(() => {
+			expect(hrefValue.startsWith('https://auth.autional.cn/')).toBe(true);
+		});
+		expect(hrefValue).not.toContain('/demo/login');
+		expect(hrefValue).not.toContain('evil.example');
+		expect(mockLogout).toHaveBeenCalledTimes(1);
+	});
+
+	it('有本地令牌 → XHR 补 Bearer；提交中按钮禁用', async () => {
 		const user = userEvent.setup();
 		mockGetAccessToken.mockReturnValue('token-abc');
 		let resolveFetch: ((v: unknown) => void) | undefined;
-		mockFetch.mockImplementation(
-			() =>
-				new Promise((resolve) => {
+		mockFetch.mockImplementation((url: string) => {
+			if (String(url).includes('/oauth/api/v1/oauth/logout')) {
+				return new Promise((resolve) => {
 					resolveFetch = resolve;
-				}),
-		);
+				});
+			}
+			return resolveFetchToTenant(String(url)) ?? Promise.resolve({ ok: false, json: async () => ({}) });
+		});
 
 		renderPage();
 		await user.click(screen.getByRole('button', { name: 'logoutConfirm.confirm' }));
@@ -222,10 +268,34 @@ describe('登出确认页 — 确认后导航闭合（仅服务端 location 出�
 		await waitFor(() => {
 			expect(submitting).toBeDisabled();
 		});
+		expect((mockFetch.mock.calls[0][1] as any)?.headers?.Authorization).toBe('Bearer token-abc');
+
+		resolveFetch?.({ ok: false, status: 401, json: async () => ({}) });
+		await waitFor(() => {
+			expect(mockLogout).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it('提交中重复点击不重发（登出 XHR 仅一次）', async () => {
+		const user = userEvent.setup();
+		let resolveFetch: ((v: unknown) => void) | undefined;
+		mockFetch.mockImplementation((url: string) => {
+			if (String(url).includes('/oauth/api/v1/oauth/logout')) {
+				return new Promise((resolve) => {
+					resolveFetch = resolve;
+				});
+			}
+			return resolveFetchToTenant(String(url)) ?? Promise.resolve({ ok: false, json: async () => ({}) });
+		});
+
+		renderPage();
+		await user.click(screen.getByRole('button', { name: 'logoutConfirm.confirm' }));
+
+		const submitting = await screen.findByRole('button', { name: 'logoutConfirm.confirming' });
 		await user.click(submitting);
 
-		expect(mockFetch).toHaveBeenCalledTimes(1);
-		expect((mockFetch.mock.calls[0][1] as any)?.headers?.Authorization).toBe('Bearer token-abc');
+		const logoutCalls = mockFetch.mock.calls.filter((c) => String(c[0]).includes('/oauth/api/v1/oauth/logout'));
+		expect(logoutCalls).toHaveLength(1);
 
 		resolveFetch?.({ ok: false, status: 401, json: async () => ({}) });
 		await waitFor(() => {

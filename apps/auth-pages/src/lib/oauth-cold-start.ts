@@ -17,12 +17,14 @@ export function buildTenantLoginUrl(slug: string, authorizeUrl: string): string 
  * client_id → 租户 slug。
  *
  * 两步走：`/oauth/client/{id}`（公开端点，含 tenantId）→ 公开租户名单
- * （`name` 即 slug，见 tenant-service `GetByName`）。任一步失败返回 null。
+ * （`name` 即 slug，见 tenant-service `GetByName`）。任一步失败/超时（2s）返回 null。
  */
 export async function fetchTenantSlugByClientId(clientId: string): Promise<string | null> {
+	const signal = AbortSignal.timeout(2000);
 	try {
 		const clientRes = await fetch(
 			`/bff/oauth/api/v1/oauth/client/${encodeURIComponent(clientId)}`,
+			{ signal },
 		);
 		if (!clientRes.ok) return null;
 		const clientJson: any = await clientRes.json();
@@ -30,7 +32,7 @@ export async function fetchTenantSlugByClientId(clientId: string): Promise<strin
 		const tenantId = client?.tenantId || client?.tenant_id;
 		if (!tenantId) return null;
 
-		const tenantsRes = await fetch('/bff/tenant/api/v1/tenant/public/tenants');
+		const tenantsRes = await fetch('/bff/tenant/api/v1/tenant/public/tenants', { signal });
 		if (!tenantsRes.ok) return null;
 		const tenantsJson: any = await tenantsRes.json();
 		// 响应契约与 usePublicTenantSlugs 同源：items → data → 原始
