@@ -5,12 +5,17 @@ import { join, resolve } from 'node:path';
 // 语言回归锁（W4 系，同 region-guard 口径）：① 源码（注释除外）不得出现中文字面量 —— 文案一律 t() + 双 bundle；
 // 默认值形态放行：单行 t('键','含中文默认值')（或 t('键') || '含中文'）且键在双 bundle 齐备
 // —— 默认值 = 防失键兜底，运行时文案仍取 bundle（键存在性由 ② 锁死，键集合一致性由 ③ 锁死）。
-// ② t() 字面量键必须同时存在于 zh-CN / en-US（keySeparator:false 平铺键）；
-// ③ 双 bundle 键集合一致（防单边新增/漏译）。
+// ② t() 字面量键必须同时存在于 zh-CN / en-US。键存在性按**运行时语义**判定：
+//    keySeparator:false 下 t('a.b.c') 仅命中字面根键 —— 只有根级标量键可解析，
+//    嵌套对象绝不拍平成键（E3N 根因：旧实现拍平嵌套制造“存在”假象，放过裸键渲染）。
+// ③ 双 bundle 根级键集合一致（防单边新增/漏译）。
+// ④ bundle 禁止嵌套对象（keySeparator:false 下不可达，UI 会渲染裸键；应为平铺点分键）。
 // 豁免机制：行尾或上一行的 `i18n-exempt: <原因>`；文件任意处的 `i18n-exempt-file: <原因>`。
 // 扫描面排除：__tests__ / test / harness / locales（语料本体）。
 // 建锁时存量（2026-10-14）：单行默认值 73 处（EmailCode/PhoneCode/IdentifierFirst 等表单族，键均双 bundle 齐备）；
 // i18n-exempt 1 处（verify-email/page.tsx 服务端响应文案归一匹配）。
+// 2026-10-15（E3N）：31 个 LEGACY 嵌套块全量清除（约 700 行/包，镜像键保留在平铺侧），
+// logoutConfirm.* / common.resendCountdown 提升为根级平铺键；④ 锁新增防复发。
 const APP_ROOT = process.cwd();
 const SRC_ROOT = resolve(APP_ROOT, 'src');
 const CJK = /[一-鿿]/;
@@ -55,23 +60,23 @@ function stripComments(src: string): string {
 	return out;
 }
 
-function flatKeys(obj: unknown, prefix = ''): Set<string> {
+// 运行时键集合（keySeparator:false 语义）：仅根级标量键可被 t('a.b.c') 命中。
+// 嵌套对象不参与 —— 旧实现把嵌套拍平成点分路径当键，制造“键存在”假象（E3N 漏网根因）。
+function rootKeys(obj: unknown): Set<string> {
 	const out = new Set<string>();
 	if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return out;
 	for (const [k, v] of Object.entries(obj)) {
-		const key = prefix ? `${prefix}.${k}` : k;
-		if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-			for (const f of flatKeys(v, key)) out.add(f);
-		} else {
-			out.add(key);
-		}
+		if (v !== null && typeof v === 'object') continue; // 嵌套对象：运行时不可达（由 ④ 锁点名）
+		out.add(k);
 	}
 	return out;
 }
 
 const FILES = collectSourceFiles(SRC_ROOT);
-const ZH_KEYS = flatKeys(JSON.parse(readFileSync(resolve(SRC_ROOT, 'i18n/locales/zh-CN.json'), 'utf8')));
-const EN_KEYS = flatKeys(JSON.parse(readFileSync(resolve(SRC_ROOT, 'i18n/locales/en-US.json'), 'utf8')));
+const ZH_RAW = JSON.parse(readFileSync(resolve(SRC_ROOT, 'i18n/locales/zh-CN.json'), 'utf8'));
+const EN_RAW = JSON.parse(readFileSync(resolve(SRC_ROOT, 'i18n/locales/en-US.json'), 'utf8'));
+const ZH_KEYS = rootKeys(ZH_RAW);
+const EN_KEYS = rootKeys(EN_RAW);
 
 function rel(file: string): string {
 	return file.slice(SRC_ROOT.length + 1).split('\\').join('/');
@@ -123,5 +128,22 @@ describe('语言字面量回归锁', () => {
 		const zhOnly = [...ZH_KEYS].filter((k) => !EN_KEYS.has(k));
 		const enOnly = [...EN_KEYS].filter((k) => !ZH_KEYS.has(k));
 		expect({ zhOnly, enOnly }).toEqual({ zhOnly: [], enOnly: [] });
+	});
+
+	it('bundle 为平铺格式：禁止嵌套对象（keySeparator:false 下不可解析，渲染裸键）', () => {
+		const violations: string[] = [];
+		const walk = (node: unknown, prefix: string, bundle: string) => {
+			if (node === null || typeof node !== 'object' || Array.isArray(node)) return;
+			for (const [k, v] of Object.entries(node)) {
+				const key = prefix ? `${prefix}.${k}` : k;
+				if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+					violations.push(`${bundle}: "${key}" 是嵌套对象 —— 改平铺点分键（如 "${key}.<字段>"）`);
+					walk(v, key, bundle);
+				}
+			}
+		};
+		walk(ZH_RAW, '', 'zh-CN');
+		walk(EN_RAW, '', 'en-US');
+		expect(violations).toEqual([]);
 	});
 });
