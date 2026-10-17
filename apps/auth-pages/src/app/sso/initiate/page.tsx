@@ -100,7 +100,7 @@ function SSOInitiateContent() {
 						type="button"
 						onClick={() => handleProviderClick(p.key)}
 						disabled={loading}
-						className="flex flex-col items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] p-4 transition-colors hover:bg-[var(--color-bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)] disabled:opacity-50"
+						className="flex flex-col items-center gap-2 rounded-lg border border-[var(--color-border-strong)] p-4 transition-colors hover:bg-[var(--color-bg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)] disabled:opacity-50"
 					>
 						<span className="text-2xl">{p.icon}</span>
 						<span className="text-xs font-medium">{p.name}</span>

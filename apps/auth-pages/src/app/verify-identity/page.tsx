@@ -492,7 +492,7 @@ function VerifyIdentityContent() {
 						className={`group relative flex aspect-[3/2] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
 							frontPreview
 								? 'border-transparent'
-								: 'border-[var(--color-border-subtle)] hover:border-[var(--color-brand)]'
+								: 'border-[var(--color-border-strong)] hover:border-[var(--color-brand)]'
 						}`}
 					>
 						{frontPreview ? (
@@ -547,7 +547,7 @@ function VerifyIdentityContent() {
 						className={`group relative flex aspect-[3/2] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
 							backPreview
 								? 'border-transparent'
-								: 'border-[var(--color-border-subtle)] hover:border-[var(--color-brand)]'
+								: 'border-[var(--color-border-strong)] hover:border-[var(--color-brand)]'
 						}`}
 					>
 						{backPreview ? (
@@ -690,7 +690,7 @@ function VerifyIdentityContent() {
 							type="checkbox"
 							checked={consents[key]}
 							onChange={() => toggleConsent(key)}
-							className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-subtle)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
+							className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-strong)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
 						/>
 						<div>
 							<p className="text-sm font-medium text-[var(--color-text-primary)]">

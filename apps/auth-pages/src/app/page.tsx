@@ -1079,7 +1079,7 @@ export default function LoginPage() {
 								<label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
 									<input
 										type="checkbox"
-										className="h-4 w-4 rounded-xs border-[var(--color-border-subtle)] text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
+										className="h-4 w-4 rounded-xs border-[var(--color-border-strong)] text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
 										{...register('rememberMe')}
 										checked={rememberMe}
 									/>

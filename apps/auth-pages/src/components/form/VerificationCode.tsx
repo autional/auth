@@ -126,7 +126,7 @@ export function VerificationCode({ length = 6, onComplete, disabled }: Verificat
 					onChange={(e) => handleChange(idx, e.target.value)}
 					onKeyDown={(e) => handleKeyDown(idx, e)}
 					onPaste={handlePaste}
-					className="h-12 w-12 rounded-lg border border-[var(--color-border)] text-center text-xl font-semibold text-[var(--color-text-primary)] outline-none transition-all focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-bg-surface)]"
+					className="h-12 w-12 rounded-lg border border-[var(--color-border-strong)] text-center text-xl font-semibold text-[var(--color-text-primary)] outline-none transition-all focus:border-[var(--color-brand)] focus:ring-2 focus:ring-[var(--color-brand)] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-bg-surface)]"
 					aria-label={t('common.verificationCodeDigit', { index: idx + 1 })}
 				/>
 			))}

@@ -129,7 +129,7 @@ export function TenantSelector({
 							handleChange(selected.id, selected.slug || selected.name);
 						}
 					}}
-					className="w-full h-10 appearance-none rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 pr-8 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+					className="w-full h-10 appearance-none rounded-md border border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] px-3 pr-8 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 				>
 					<option value="">{t('tenant.selectTenant')}</option>
 					{tenants.map((t) => (

@@ -77,7 +77,7 @@ export default function ReapplyPage() {
 						id="reason"
 						rows={4}
 						placeholder={t('auth.reapply.reasonPlaceholder')}
-						className="w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+						className="w-full rounded-md border border-[var(--color-border-strong)] bg-[var(--color-bg-surface)] px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 						{...register('reason')}
 					/>
 					{errors.reason?.message && <p className="text-xs text-danger-text">{errors.reason.message}</p>}

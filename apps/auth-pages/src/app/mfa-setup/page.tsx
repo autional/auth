@@ -312,7 +312,7 @@ export default function MFASetupPage() {
 					type="button"
 					onClick={() => handleMethodSelect('totp')}
 					disabled={loading}
-					className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] p-4 text-left transition-colors hover:bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+					className="flex items-center gap-3 rounded-lg border border-[var(--color-border-strong)] p-4 text-left transition-colors hover:bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 				>
 					<span className="text-2xl">📱</span>
 					<div>
@@ -328,7 +328,7 @@ export default function MFASetupPage() {
 					type="button"
 					onClick={() => handleMethodSelect('sms')}
 					disabled={loading}
-					className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] p-4 text-left transition-colors hover:bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+					className="flex items-center gap-3 rounded-lg border border-[var(--color-border-strong)] p-4 text-left transition-colors hover:bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 				>
 					<span className="text-2xl">💬</span>
 					<div>
@@ -342,7 +342,7 @@ export default function MFASetupPage() {
 					type="button"
 					onClick={() => handleMethodSelect('email')}
 					disabled={loading}
-					className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] p-4 text-left transition-colors hover:bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+					className="flex items-center gap-3 rounded-lg border border-[var(--color-border-strong)] p-4 text-left transition-colors hover:bg-[var(--color-bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 				>
 					<span className="text-2xl">📧</span>
 					<div>
@@ -544,7 +544,7 @@ export default function MFASetupPage() {
 							<input
 								type="checkbox"
 								id="saved-check"
-								className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-subtle)]"
+								className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-strong)]"
 								checked={saved}
 								onChange={(e) => setSaved(e.target.checked)}
 							/>

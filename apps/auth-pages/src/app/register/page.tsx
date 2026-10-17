@@ -681,7 +681,7 @@ export default function RegisterPage() {
 								id="reason"
 								rows={3}
 								placeholder={t('register.reasonPlaceholder')}
-								className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
+								className="w-full rounded-md border border-[var(--color-border-strong)] bg-white px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]"
 								{...register('reason' as any)}
 							/>
 							{(errors as any).reason?.message && (
@@ -745,7 +745,7 @@ export default function RegisterPage() {
 								id="agreeTerms"
 								name="agreeTerms"
 								type="checkbox"
-								className="mt-0.5 h-4 w-4 rounded-xs border-neutral-300 text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
+								className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-strong)] text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
 								checked={watchedAgreeTerms || false}
 								onChange={(e) =>
 									setValue('agreeTerms' as any, e.target.checked as true, { shouldValidate: true })

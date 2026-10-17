@@ -140,7 +140,7 @@ export default function IdentifierFirstInput({ onBack }: { onBack: () => void })
 					key={match.tenant_id}
 					type="button"
 					onClick={() => handleSelectTenant(match)}
-					className="w-full rounded-lg border border-[var(--color-border-subtle)] p-3 text-left hover:border-[var(--color-brand)] hover:bg-brand/10 transition-colors"
+					className="w-full rounded-lg border border-[var(--color-border-strong)] p-3 text-left hover:border-[var(--color-brand)] hover:bg-brand/10 transition-colors"
 				>
 					<p className="font-medium text-[var(--color-text-primary)]">
 						{match.display_name || match.tenant_name}
