@@ -17,7 +17,7 @@
     "@autional/shared": "0.1.0-rc.38",
     "@autional/tailwind-preset": "0.1.0-rc.10",
     "@autional/tokens": "0.1.0-rc.16",
-    "@autional/ui": "0.1.0-rc.49",
+    "@autional/ui": "0.1.0-rc.51",
     "@hookform/resolvers": "3.10.0",
     "@tanstack/react-query": "5.100.9",
     "@zxcvbn-ts/core": "3.0.4",
