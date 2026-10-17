@@ -110,7 +110,7 @@ function SkipLink() {
 function AppHeader() {
 	const { lang, setLang } = useI18n();
 	const chromeButtonClass =
-		'rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700';
+		'rounded-md border border-[var(--color-border-strong)] bg-white dark:bg-neutral-800 px-2 py-1 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-700';
 	return (
 		<>
 			{/* AUTH-11：SkipLink 须为 DOM 首停点（fixed 浮层按钮此前排在它前面） */}
