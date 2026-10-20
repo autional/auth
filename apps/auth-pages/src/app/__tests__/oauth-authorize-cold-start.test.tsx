@@ -55,7 +55,7 @@ import OAuthAuthorizePage from '../oauth/authorize/page';
 
 const AUTHORIZE_PATH = '/oauth/api/v1/oauth/authorize';
 const AUTHORIZE_QUERY =
-	'?client_id=client-1&redirect_uri=https%3A%2F%2Fuser.autional.cn%2Fdemo%2F&scope=openid&state=st-1';
+	'?client_id=client-1&redirect_uri=https%3A%2F%2Fuser.autional.cn%2Fdemo%2F&scope=openid&state=st-1&nonce=n-1';
 const AUTHORIZE_URL = AUTHORIZE_PATH + AUTHORIZE_QUERY;
 
 /** 三段式 JWT（仅需可被 atob 解析出 payload，不校验签名） */
@@ -184,6 +184,8 @@ describe('同意提交（有会话）', () => {
 		expect((postCall![1] as any).headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`);
 		expect((postCall![1] as any).headers.Accept).toBe('application/json');
 		expect(String((postCall![1] as any).body)).toContain('approved=true');
+		// OIDC nonce 必须从授权 URL 透传到同意提交（否则授权码丢失 nonce → id_token 不回显 → RP 校验失败）
+		expect(String((postCall![1] as any).body)).toContain('nonce=n-1');
 		expect(mockReplace).not.toHaveBeenCalled();
 	});
 

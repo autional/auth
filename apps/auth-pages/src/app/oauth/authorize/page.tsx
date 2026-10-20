@@ -49,6 +49,9 @@ function OAuthAuthorizeContent() {
 	const redirectUri = searchParams.get('redirect_uri') || '';
 	const scope = searchParams.get('scope') || '';
 	const state = searchParams.get('state') || '';
+	// OIDC nonce 必须原样带回授权码：后端据码绑定，id_token 会回显；丢弃会让 RP 的
+	// id_token nonce 校验失败（ops-console 2026-10-20 生产联调实证）。
+	const nonce = searchParams.get('nonce') || '';
 	const codeChallenge = searchParams.get('code_challenge') || '';
 	const codeChallengeMethod = searchParams.get('code_challenge_method') || 'S256';
 
@@ -161,6 +164,7 @@ function OAuthAuthorizeContent() {
 				redirect_uri: redirectUri,
 				scope,
 				state,
+				nonce,
 				approved: 'true',
 				response_type: 'code',
 				code_challenge: codeChallenge,
@@ -352,6 +356,7 @@ function OAuthAuthorizeContent() {
 				<input type="hidden" name="redirect_uri" value={redirectUri} />
 				<input type="hidden" name="scope" value={scope} />
 				<input type="hidden" name="state" value={state} />
+				<input type="hidden" name="nonce" value={nonce} />
 				<input type="hidden" name="approved" value="true" />
 				<input type="hidden" name="response_type" value="code" />
 				<input type="hidden" name="code_challenge" value={codeChallenge} />
