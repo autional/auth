@@ -102,6 +102,9 @@ importers:
       react-router:
         specifier: 7.15.0
         version: 7.15.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      workbox-core:
+        specifier: 7.4.1
+        version: 7.4.1
       zod:
         specifier: 3.23.8
         version: 3.23.8

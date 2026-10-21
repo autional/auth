@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { NetworkOnly } from 'workbox-strategies';
@@ -48,4 +49,6 @@ registerRoute(
 );
 
 self.skipWaiting();
-self.clients.claim();
+// 直接调 self.clients.claim() 在安装期执行会被丢弃（激活前无控制器资格）；
+// workbox-core 的 clientsClaim() 把 claim 挂到 activate 事件，首访页面才会被接管。
+clientsClaim();
