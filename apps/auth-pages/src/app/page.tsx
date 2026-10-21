@@ -1171,6 +1171,10 @@ export default function LoginPage() {
 									: t('login.submit')}
 							</Button>
 						</form>
+						{/* 条件式 passkey 自动填充：仅在密码表单内且租户启用 passkey 时挂载，切 tab/卸载时 abort 请求 */}
+						{loginMethods.includes('passkey') && (
+							<PasskeyLoginButton mode="conditional" tenantId={watch('tenantId')} />
+						)}
 					</>
 				)}
 
@@ -1234,11 +1238,6 @@ export default function LoginPage() {
 							</div>
 						)}
 					</>
-				)}
-
-				{/* Passkey login — 仅在租户配置未禁用 passkey 时显示（loginMethods 已消化 passkeyEnabled=false） */}
-				{loginMethods.includes('passkey') && (
-					<PasskeyLoginButton tenantId={watch('tenantId')} />
 				)}
 
 				<div className="text-center text-sm">

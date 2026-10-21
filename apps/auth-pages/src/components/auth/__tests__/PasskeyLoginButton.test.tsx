@@ -85,6 +85,24 @@ function renderButton() {
 	);
 }
 
+function renderConditional() {
+	return render(
+		<MemoryRouter initialEntries={['/demo/login']}>
+			<Routes>
+				<Route
+					path=":tenantSlug/login"
+					element={
+						<>
+							<input autoComplete="username webauthn" />
+							<PasskeyLoginButton mode="conditional" tenantId="tenant-1" />
+						</>
+					}
+				/>
+			</Routes>
+		</MemoryRouter>,
+	);
+}
+
 beforeEach(() => {
 	vi.clearAllMocks();
 
@@ -129,7 +147,7 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 			async () => true,
 		);
 
-		renderButton();
+		renderConditional();
 
 		await waitFor(() => {
 			expect(vi.mocked(anchorSessionFromToken)).toHaveBeenCalledWith('at-1', {
@@ -137,5 +155,109 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 				tenantId: 'tenant-1',
 			});
 		});
+	});
+});
+
+describe('PasskeyLoginButton - 条件式请求生命周期', () => {
+	it('button 模式挂载时不发起任何 WebAuthn 请求', async () => {
+		renderButton();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(vi.mocked(authWebauthnAuthenticateBeginPost)).not.toHaveBeenCalled();
+		expect(navigator.credentials.get).not.toHaveBeenCalled();
+	});
+
+	it('conditional 模式不渲染按钮，且只启动一次条件式请求', async () => {
+		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
+			async () => true,
+		);
+
+		renderConditional();
+
+		await waitFor(() => {
+			expect(vi.mocked(authWebauthnAuthenticateBeginPost)).toHaveBeenCalledTimes(1);
+		});
+		expect(screen.queryByTestId('passkey-submit-button')).not.toBeInTheDocument();
+
+		const getCalls = vi.mocked(navigator.credentials.get).mock.calls;
+		expect(getCalls[0][0]).toMatchObject({ mediation: 'conditional' });
+		expect((getCalls[0][0] as any).signal).toBeInstanceOf(AbortSignal);
+	});
+
+	it('没有 username webauthn 输入框时不启动条件式请求', async () => {
+		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
+			async () => true,
+		);
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<PasskeyLoginButton mode="conditional" tenantId="tenant-1" />
+			</MemoryRouter>,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(vi.mocked(authWebauthnAuthenticateBeginPost)).not.toHaveBeenCalled();
+	});
+
+	it('卸载时 abort 条件式请求，避免阻塞后续登录', async () => {
+		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
+			async () => true,
+		);
+		let captured: any;
+		vi.mocked(navigator.credentials.get).mockImplementationOnce((opts: any) => {
+			captured = opts;
+			return new Promise((_resolve, reject) => {
+				opts.signal?.addEventListener('abort', () =>
+					reject(new DOMException('aborted', 'AbortError')),
+				);
+			}) as any;
+		});
+
+		const { unmount } = renderConditional();
+		await waitFor(() => expect(captured).toBeTruthy());
+
+		unmount();
+
+		expect(captured.signal.aborted).toBe(true);
+	});
+
+	it('显式点击登录前中止挂起的条件式请求', async () => {
+		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
+			async () => true,
+		);
+		let conditionalOpts: any;
+		vi.mocked(navigator.credentials.get).mockImplementation((opts: any) => {
+			if (opts.mediation === 'conditional') {
+				conditionalOpts = opts;
+				return new Promise((_resolve, reject) => {
+					opts.signal?.addEventListener('abort', () =>
+						reject(new DOMException('aborted', 'AbortError')),
+					);
+				}) as any;
+			}
+			return Promise.resolve(makeCredential()) as any;
+		});
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route
+						path=":tenantSlug/login"
+						element={
+							<>
+								<input autoComplete="username webauthn" />
+								<PasskeyLoginButton mode="conditional" tenantId="tenant-1" />
+								<PasskeyLoginButton tenantId="tenant-1" />
+							</>
+						}
+					/>
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => expect(conditionalOpts).toBeTruthy());
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));
 	});
 });

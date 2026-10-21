@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
@@ -53,6 +53,8 @@ vi.mock('@autional/shared', async (importOriginal) => ({
 
 const mockAuthLoginPost = vi.fn();
 const mockAuthOauthProviders = vi.fn((_opts?: any) => Promise.resolve({ providers: [] }));
+const mockWebauthnBegin = vi.fn();
+const mockWebauthnComplete = vi.fn();
 
 vi.mock('@autional/shared/generated/api', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@autional/shared/generated/api')>();
@@ -60,6 +62,8 @@ vi.mock('@autional/shared/generated/api', async (importOriginal) => {
 		...actual,
 		authLoginPost: (...args: any[]) => mockAuthLoginPost(...args),
 		authOauthProviders: (...args: any[]) => mockAuthOauthProviders(...args),
+		authWebauthnAuthenticateBeginPost: (...args: any[]) => mockWebauthnBegin(...args),
+		authWebauthnAuthenticateCompletePost: (...args: any[]) => mockWebauthnComplete(...args),
 	};
 });
 
@@ -79,9 +83,15 @@ vi.mock('@/lib/api', () => ({
 	loadAuthExtras: vi.fn(() => Promise.resolve()),
 }));
 
+let mockLoginMethods: string[] | undefined;
+
 vi.mock('@/hooks/use-auth-page-init', () => ({
 	useAuthPageInit: () => ({
-		authConfig: { data: { tenantId: 't-test' }, isLoading: false, isError: false },
+		authConfig: {
+			data: { tenantId: 't-test', loginMethods: mockLoginMethods },
+			isLoading: false,
+			isError: false,
+		},
 		publicTenants: { data: [], isLoading: false, isError: false },
 		oauthProviders: { data: [], isLoading: false, isError: false },
 		branding: { data: null, isLoading: false, isError: false },
@@ -97,6 +107,12 @@ vi.mock('@/hooks/use-tenant-auth-config', () => ({
 beforeEach(() => {
 	vi.clearAllMocks();
 	mockGetAccessToken.mockReturnValue(null);
+	mockLoginMethods = undefined;
+});
+
+afterEach(() => {
+	delete (window as any).PublicKeyCredential;
+	delete (navigator as any).credentials;
 });
 
 describe('LoginPage', () => {
@@ -147,5 +163,66 @@ describe('LoginPage', () => {
 			expect(mockLoginWithTokens).toHaveBeenCalled();
 		});
 		expect(screen.queryByText('login.error.credentials')).toBeNull();
+	});
+});
+
+describe('LoginPage - passkey 入口', () => {
+	function enablePasskeySupport(conditional: boolean) {
+		Object.defineProperty(window, 'PublicKeyCredential', {
+			value: Object.assign(function () {}, {
+				isConditionalMediationAvailable: vi.fn(async () => conditional),
+			}),
+			configurable: true,
+		});
+		Object.defineProperty(navigator, 'credentials', {
+			value: { get: vi.fn(async () => null) },
+			configurable: true,
+		});
+	}
+
+	it('密码页不渲染可见 passkey 按钮；切到 passkey 标签后仅一个', async () => {
+		mockLoginMethods = ['password', 'passkey'];
+		enablePasskeySupport(false);
+		mockWebauthnBegin.mockResolvedValue({
+			publicKey: { challenge: 'Y2hhbGxlbmdl', allowCredentials: [] },
+		});
+
+		renderLogin();
+
+		expect(screen.queryByTestId('passkey-submit-button')).not.toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'passkey.submitLogin' }));
+
+		await waitFor(() => {
+			expect(screen.getAllByTestId('passkey-submit-button')).toHaveLength(1);
+		});
+	});
+
+	it('切到 passkey 标签时 abort 密码页的条件式请求', async () => {
+		mockLoginMethods = ['password', 'passkey'];
+		enablePasskeySupport(true);
+		mockWebauthnBegin.mockResolvedValue({
+			publicKey: { challenge: 'Y2hhbGxlbmdl', allowCredentials: [] },
+		});
+
+		let conditionalOpts: any;
+		(navigator.credentials.get as any).mockImplementation((opts: any) => {
+			if (opts.mediation === 'conditional') {
+				conditionalOpts = opts;
+				return new Promise((_resolve, reject) => {
+					opts.signal?.addEventListener('abort', () =>
+						reject(new DOMException('aborted', 'AbortError')),
+					);
+				});
+			}
+			return Promise.resolve(null);
+		});
+
+		renderLogin();
+		await waitFor(() => expect(conditionalOpts).toBeTruthy());
+
+		fireEvent.click(screen.getByRole('button', { name: 'passkey.submitLogin' }));
+
+		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));
 	});
 });

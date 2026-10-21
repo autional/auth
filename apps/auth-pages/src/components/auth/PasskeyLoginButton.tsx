@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
 import { Fingerprint } from 'lucide-react';
@@ -31,25 +31,38 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
 interface PasskeyLoginButtonProps {
 	email?: string;
 	tenantId?: string;
+	/**
+	 * button（默认）：只渲染显式按钮，不发条件式请求。
+	 * conditional：在密码表单内静默启动 WebAuthn 条件式自动填充，不渲染按钮。
+	 * 两种模式互斥挂载，避免同一页面同时存在多个 WebAuthn 请求。
+	 */
+	mode?: 'button' | 'conditional';
+}
+
+// 全页共享的条件式请求控制器：显式登录或切换标签时先中止旧请求，
+// 否则浏览器会以 "A request is already pending." 拒绝后续 get()。
+let activeConditionalController: AbortController | null = null;
+
+function abortActiveConditional() {
+	if (activeConditionalController) {
+		activeConditionalController.abort();
+		activeConditionalController = null;
+	}
 }
 
 /**
  * PasskeyLoginButton — WebAuthn Conditional UI + Credential Management integration.
  *
- * On mount, this component starts two parallel credential auto-fill mechanisms:
- *   1. WebAuthn Conditional Mediation — `PublicKeyCredential.isConditionalMediationAvailable()`
- *      followed by `navigator.credentials.get({publicKey, mediation:'conditional'})`.
- *      When a passkey is available, the browser shows a native selector.
+ * 条件式 UI 只在 mode="conditional"（密码表单内）启动：
+ *   1. WebAuthn Conditional Mediation — 绑定 `autocomplete="username webauthn"` 输入框，
+ *      浏览器在自动填充列表里提供 passkey，不弹登录框。
  *   2. Credential Management API — `navigator.credentials.get({password:true, mediation:'optional'})`
- *      for standard password autofill. The `CredentialManagementGate` component handles this.
+ *      由 CredentialManagementGate 处理。
  *
- * Both run silently (no UI visible unless credentials are found) via mediation:'conditional'/'optional'.
- * NotAllowedError/AbortError on both paths are silently ignored — the user can use the regular
- * login button as fallback.
- * Note: the identity input must have name="username" and autoComplete="username webauthn"
- * for the browser to show passkey autofill options alongside saved passwords.
+ * mode="button" 只响应用户点击，不在挂载时发起任何 WebAuthn 请求。
+ * 条件式请求用 AbortController 管理，卸载/切标签/显式登录时立即 abort。
  */
-export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps) {
+export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: PasskeyLoginButtonProps) {
 	const { t } = useI18n();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
@@ -61,26 +74,33 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 	const isSupported =
 		typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
 
-	// === 条件UI (Conditional Mediation): 页面加载时自动启动Passkey自动填充 ===
-	const conditionalStarted = useRef(false);
+	// === 条件UI (Conditional Mediation)：仅在密码表单内启动 ===
 	useEffect(() => {
-		if (!isSupported) return;
-		if (conditionalStarted.current) return;
-		conditionalStarted.current = true;
+		if (mode !== 'conditional' || !isSupported) return;
+		// 条件式 UI 必须绑定到用户名输入框，否则浏览器无自动填充载体
+		if (!document.querySelector('input[autocomplete~="webauthn"]')) return;
+		if (
+			typeof (window.PublicKeyCredential as any)?.isConditionalMediationAvailable !== 'function'
+		) {
+			return;
+		}
 
-		let cancelled = false;
+		const controller = new AbortController();
+		abortActiveConditional();
+		activeConditionalController = controller;
 
 		(async () => {
 			try {
 				// 检查浏览器是否支持条件UI
-				const available = await PublicKeyCredential.isConditionalMediationAvailable();
-				if (!available || cancelled) return;
+				const available = await (window.PublicKeyCredential as any).isConditionalMediationAvailable();
+				if (!available || controller.signal.aborted) return;
 
-				// 1. 从服务端获取认证挑战(空email表示条件UI模式)
+				// 1. 从服务端获取认证挑战（空 email + mediation 表示 discoverable 挑战）
 				const beginData = await authWebauthnAuthenticateBeginPost({
 					mediation: 'conditional',
 					tenantId: tenantId || undefined,
 				});
+				if (controller.signal.aborted) return;
 				// 后端返回 go-webauthn CredentialAssertion（{publicKey:{...}}，经 NewDataResponse 解包后亦然）
 				const options = (beginData as any)?.publicKey ?? (beginData as any)?.response ?? beginData;
 
@@ -99,12 +119,13 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 						})) || [],
 				};
 
-				// 3. 启动条件UI (非阻塞 — 浏览器在有可用Passkey时自动弹出选择器)
+				// 3. 启动条件UI（非阻塞 — 浏览器在有可用Passkey时提供自动填充）
 				const credential = await navigator.credentials.get({
 					publicKey,
 					mediation: 'conditional',
+					signal: controller.signal,
 				});
-				if (cancelled || !credential) return;
+				if (controller.signal.aborted || !credential) return;
 
 				// 4. 用户选择了Passkey → 自动完成认证
 				const cred = credential as PublicKeyCredential;
@@ -137,16 +158,23 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 					user: completeData.user,
 				});
 			} catch (err: any) {
-				// NotAllowedError/AbortError = 用户取消 — 静默忽略, 常规登录按钮仍然可用
-				if (err.name === 'NotAllowedError' || err.name === 'AbortError') return;
+				// NotAllowedError/AbortError = 用户取消或主动中止 — 静默忽略
+				if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return;
 				// 其他错误静默失败, 不阻塞用户通过常规方式登录
+			} finally {
+				if (activeConditionalController === controller) {
+					activeConditionalController = null;
+				}
 			}
 		})();
 
 		return () => {
-			cancelled = true;
+			controller.abort();
+			if (activeConditionalController === controller) {
+				activeConditionalController = null;
+			}
 		};
-	}, [isSupported, tenantId]);
+	}, [mode, isSupported, tenantId]);
 
 	const handleCredentialAutoFill = (filledEmail: string) => {
 		setAutoFillEmail(filledEmail);
@@ -161,11 +189,16 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 
 	const handlePasskeyLogin = async () => {
 		if (!isSupported) return;
+		// 先中止条件式请求：同一时刻浏览器只允许一个 WebAuthn get()，
+		// 否则会报 "A request is already pending."。
+		abortActiveConditional();
 		setLoading(true);
 		setError('');
 
 		try {
 			// 1. Request authentication options from server
+			// 无邮箱时仍传 mediation=conditional：后端用该字段允许空邮箱、返回
+			// discoverable 挑战（空 allowCredentials）。浏览器侧不启用条件式 mediation。
 			const beginData = await authWebauthnAuthenticateBeginPost({
 				email: email || undefined,
 				tenantId: tenantId || undefined,
@@ -230,6 +263,10 @@ export function PasskeyLoginButton({ email, tenantId }: PasskeyLoginButtonProps)
 	};
 
 	if (!isSupported) return null;
+
+	if (mode === 'conditional') {
+		return <CredentialManagementGate onAutoFill={handleCredentialAutoFill} />;
+	}
 
 	return (
 		<div data-testid="passkey-login-button">
