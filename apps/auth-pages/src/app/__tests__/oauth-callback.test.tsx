@@ -14,7 +14,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/lib/i18n', () => ({
 	useI18n: () => ({
-		t: (key: string) => key,
+		// 仅 oauth.callback.traceId 带 {id} 插值；其余保持「返回键」以便断言键名
+		t: (key: string, options?: any) =>
+			options && typeof options === 'object' && options.id ? `${key}:${options.id}` : key,
 		lang: 'zh-CN',
 	}),
 }));
@@ -99,6 +101,54 @@ describe('OAuthCallbackPage AUTH-46③（错误用户化）', () => {
 		});
 		renderCallback('/oauth/callback/github?code=auth-code&state=s1');
 		expect(await screen.findByText('problem title from backend')).toBeInTheDocument();
+	});
+
+	it('catch 路径 i18n_key + trace_id → 本地化文案 + 追踪号，英文细节不落屏', async () => {
+		mockExchangeCodeForToken.mockRejectedValue({
+			response: {
+				data: {
+					title: 'oauth callback verification failed',
+					i18n_key: 'error.oauth_callback_failed',
+					trace_id: 'aefa49fd1f0dd34b23e203e095a14165',
+				},
+			},
+		});
+		renderCallback('/oauth/callback/github?code=auth-code&state=s1');
+		expect(await screen.findByText('error.oauth_callback_failed')).toBeInTheDocument();
+		expect(
+			screen.getByText('oauth.callback.traceId:aefa49fd1f0dd34b23e203e095a14165'),
+		).toBeInTheDocument();
+		expect(screen.queryByText('oauth callback verification failed')).toBeNull();
+	});
+});
+
+// ============================================================
+// RFC 9207：iss 由 provider 经 redirect_uri 回传，回调页必须原样转交 identity；
+// 缺失时不注入该字段（保持旧请求形状，不破坏未下发 iss 的 provider）。
+// ============================================================
+
+describe('OAuthCallbackPage RFC 9207（iss 转发）', () => {
+	it('iss 参数原样转交 identity 回调面', async () => {
+		mockExchangeCodeForToken.mockResolvedValue({ data: { linkRequired: true } });
+		renderCallback(
+			'/oauth/callback/github?code=auth-code&state=s1&iss=https%3A%2F%2Fgithub.com%2Flogin%2Foauth',
+		);
+		expect(await screen.findByText('auth.oauth.linkRequiredTitle')).toBeInTheDocument();
+		expect(mockExchangeCodeForToken).toHaveBeenCalledWith('github', {
+			code: 'auth-code',
+			state: 's1',
+			iss: 'https://github.com/login/oauth',
+		});
+	});
+
+	it('缺 iss 时请求不携带该字段', async () => {
+		mockExchangeCodeForToken.mockResolvedValue({ data: { linkRequired: true } });
+		renderCallback('/oauth/callback/github?code=auth-code&state=s1');
+		expect(await screen.findByText('auth.oauth.linkRequiredTitle')).toBeInTheDocument();
+		expect(mockExchangeCodeForToken).toHaveBeenCalledWith('github', {
+			code: 'auth-code',
+			state: 's1',
+		});
 	});
 });
 

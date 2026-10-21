@@ -27,6 +27,8 @@ function OAuthCallbackContent() {
 	const location = useLocation();
 	const code = searchParams.get('code') || '';
 	const state = searchParams.get('state') || '';
+	// RFC 9207：provider 经 redirect_uri 回传 iss，原样转交 identity 做来源校验。
+	const iss = searchParams.get('iss') || '';
 	const errorParam = searchParams.get('error') || '';
 	const errorDescription = searchParams.get('error_description') || '';
 	const { data: knownTenants } = usePublicTenantSlugs();
@@ -39,6 +41,7 @@ function OAuthCallbackContent() {
 
 	const [status, setStatus] = useState<CallbackStatus>('loading');
 	const [message, setMessage] = useState('');
+	const [traceId, setTraceId] = useState('');
 
 	useEffect(() => {
 		const handleCallback = async () => {
@@ -69,7 +72,9 @@ function OAuthCallbackContent() {
 			}
 
 			try {
-				const res = await exchangeCodeForToken(oauthProvider as any, { code, state } as any);
+				const params: Record<string, string> = { code, state };
+				if (iss) params.iss = iss;
+				const res = await exchangeCodeForToken(oauthProvider as any, params as any);
 				const data = (res as any)?.data || res;
 				if (data.requiresMfa) {
 					// 挑战页数据面：riskLevel/requiredMfaMethods 驱动可见验证方式与风险横幅
@@ -127,11 +132,14 @@ function OAuthCallbackContent() {
 				// AUTH-46③：错误体带 i18n_key 时按本地化键渲染；无键回落归一化消息
 				const e = extractApiError(err, t('oauth.callback.failed'));
 				setMessage(e.i18nKey ? t(e.i18nKey, e.message) : e.message);
+				// 内部细节只进服务端日志；用户面只给可回传的追踪号
+				const tid = (err as any)?.response?.data?.trace_id;
+				setTraceId(typeof tid === 'string' ? tid : '');
 			}
 		};
 
 		handleCallback();
-	}, [code, state, pathProvider, errorParam, errorDescription, navigate]);
+	}, [code, state, iss, pathProvider, errorParam, errorDescription, navigate]);
 
 	const handleRetry = () => {
 		window.location.reload();
@@ -184,6 +192,11 @@ function OAuthCallbackContent() {
 						title={t('oauth.callback.failed')}
 						subtitle={message || t('auth.oauth.loginError')}
 					/>
+					{traceId && (
+						<p className="break-all text-xs text-[var(--color-text-muted)]">
+							{t('oauth.callback.traceId', { id: traceId })}
+						</p>
+					)}
 					<div className="flex gap-3">
 						<Button variant="outline" fullWidth onClick={handleRetry}>
 							{t('auth.oauth.retry')}
