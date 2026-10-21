@@ -18,7 +18,7 @@ import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 
-type CallbackStatus = 'loading' | 'success' | 'error';
+type CallbackStatus = 'loading' | 'success' | 'error' | 'linkRequired';
 
 function OAuthCallbackContent() {
 	const { t } = useI18n();
@@ -80,9 +80,16 @@ function OAuthCallbackContent() {
 							challengeToken: data.challengeToken || '',
 							riskLevel: data.riskLevel || '',
 							requiredMfaMethods: data.requiredMfaMethods || [],
+							enrolledMfaMethods: data.enrolledMfaMethods || [],
 						}),
 					);
 					navigate('/mfa-challenge');
+					return;
+				}
+				if (data.linkRequired) {
+					// S0：第三方已验证邮箱命中已有本地账号，但该第三方身份尚未绑定。
+					// 不签发令牌（防未验证自动关联）→ 引导先登录再主动绑定。
+					setStatus('linkRequired');
 					return;
 				}
 				if (data.accessToken) {
@@ -150,6 +157,21 @@ function OAuthCallbackContent() {
 						continueLabel={t('auth.common.continue')}
 						onContinue={() => navigate('/dashboard')}
 					/>
+				</div>
+			)}
+
+			{status === 'linkRequired' && (
+				<div className="text-center space-y-6">
+					<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-warning-soft text-3xl">
+						🔗
+					</div>
+					<AuthHeader
+						title={t('auth.oauth.linkRequiredTitle')}
+						subtitle={t('auth.oauth.linkRequiredHint')}
+					/>
+					<Button fullWidth onClick={() => navigate('/')}>
+						{t('auth.common.backToLogin')}
+					</Button>
 				</div>
 			)}
 

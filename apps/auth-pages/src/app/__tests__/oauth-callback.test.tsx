@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
+import { loginWithTokens } from '@autional/shared';
 import OAuthCallbackPage from '../oauth/callback/page';
 
 vi.mock('react-i18next', () => ({
@@ -98,5 +99,16 @@ describe('OAuthCallbackPage AUTH-46③（错误用户化）', () => {
 		});
 		renderCallback('/oauth/callback/github?code=auth-code&state=s1');
 		expect(await screen.findByText('problem title from backend')).toBeInTheDocument();
+	});
+});
+
+describe('OAuthCallbackPage S0（第三方身份未绑定不自动登录）', () => {
+	it('linkRequired → 引导先登录再绑定，且不签发/写入令牌', async () => {
+		mockExchangeCodeForToken.mockResolvedValue({ data: { linkRequired: true } });
+		renderCallback('/oauth/callback/github?code=auth-code&state=s1');
+
+		expect(await screen.findByText('auth.oauth.linkRequiredTitle')).toBeInTheDocument();
+		expect(screen.getByText('auth.oauth.linkRequiredHint')).toBeInTheDocument();
+		expect(vi.mocked(loginWithTokens)).not.toHaveBeenCalled();
 	});
 });
