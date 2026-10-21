@@ -22,7 +22,6 @@ const MFAChallengePage = lazy(() => import('./app/mfa-challenge/page'));
 const MFASetupPage = lazy(() => import('./app/mfa-setup/page'));
 const OAuthAuthorizePage = lazy(() => import('./app/oauth/authorize/page'));
 const OAuthCallbackPage = lazy(() => import('./app/oauth/callback/page'));
-const SSOInitiatePage = lazy(() => import('./app/sso/initiate/page'));
 const PasskeyPage = lazy(() => import('./app/passkey/page'));
 const ErrorPage = lazy(() => import('./app/error/page'));
 const AccountDeletionPage = lazy(() => import('./app/account-deletion/page'));
@@ -172,7 +171,6 @@ export default function App() {
 								{/* AUTH-27：无应用内导航入口，定位为外部直链页（账户手机验证场景）；
 								    租户上下文深链走下方 /:tenantSlug/verify-phone（与 verify-email 对称） */}
 								<Route path="/verify-phone" element={<VerifyPhonePage />} />
-								<Route path="/sso/initiate" element={<SSOInitiatePage />} />
 								<Route path="/error" element={<ErrorPage />} />
 								<Route path="/logout" element={<LogoutHandler />} />
 								{/* TASK-LS-06：RP-Initiated Logout 确认页（静态段优先于 /:tenantSlug 贪心路由） */}
@@ -309,8 +307,6 @@ export default function App() {
 								<Route path="/:tenantSlug/verify-email" element={<VerifyEmailPage />} />
 								{/* AUTH-27：租户上下文手机验证深链（与 verify-email 对称，成功/返回落租户登录页） */}
 								<Route path="/:tenantSlug/verify-phone" element={<VerifyPhonePage />} />
-								{/* AUTH-50①：租户化 SSO 入口——useParams 取 slug 不再依赖裸链 */}
-								<Route path="/:tenantSlug/sso/initiate" element={<SSOInitiatePage />} />
 								{/* AUTH-48/49：脏 slug 不得把条款/隐私页租户化（未命中白名单 → 404 兜底） */}
 								<Route
 									path="/:tenantSlug/terms"

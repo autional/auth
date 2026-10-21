@@ -44,7 +44,6 @@ export const authorizeOAuth = (data: Record<string, unknown>) => {
 		return res.json().then((j) => ({ data: j }));
 	});
 };
-export const initiateSSO = Generated.authSsoInitiatePost;
 export const beginPasskeyLogin = Generated.authWebauthnLoginBeginPost;
 export const completePasskeyLogin = Generated.authWebauthnLoginCompletePost;
 export const beginPasskeyRegister = Generated.authWebauthnRegisterBeginPost;
