@@ -155,6 +155,9 @@ export default function App() {
 							<Routes>
 								{/* OAuth callback for dev-mode login on localhost */}
 								<Route path="/oauth/callback" element={<OAuthLoginCallbackPage />} />
+								{/* provider 登录回调：provider 控制台登记的就是 /oauth/callback/<p>
+								    （oauth-service providers.redirect_url 同值）；缺这条会落 404 */}
+								<Route path="/oauth/callback/:provider" element={<OAuthCallbackPage />} />
 								<Route path="/oauth/api/v1/oauth/authorize" element={<OAuthAuthorizePage />} />
 								<Route
 									path="/oauth/api/v1/oauth/callback/:provider"

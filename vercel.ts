@@ -50,6 +50,7 @@ export const config: VercelConfig = {
     routes.rewrite('/api/v1/:path*', `${ORIGIN}/api/v1/:path*`),
     routes.rewrite('/oauth/api/v1/oauth/authorize', '/index.html'),
     routes.rewrite('/oauth/callback', '/index.html'),
+    routes.rewrite('/oauth/callback/:provider', '/index.html'),
     routes.rewrite('/oauth/api/v1/oauth/callback/:provider', '/index.html'),
     routes.rewrite('/oauth/:path*', `${ORIGIN}/oauth/:path*`),
     routes.rewrite('/tenant/:path*', `${ORIGIN}/tenant/:path*`),
