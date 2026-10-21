@@ -1,4 +1,4 @@
-import { routes, type VercelConfig } from '@vercel/config/v1';
+import { routes, type Rewrite, type VercelConfig } from '@vercel/config/v1';
 
 /**
  * 身份认证（auth.autional.com / auth.autional.cn）的**唯一源站**（B3 单源双区）。
@@ -8,7 +8,8 @@ import { routes, type VercelConfig } from '@vercel/config/v1';
  * 未设置时 **故意抛错**（fail-closed），避免静默产出坏路由。
  *
  * rewrites 承接原 vercel.json 全集（/bff、/api/v1、/oauth/authorize 与 /oauth/callback 直通、
- * /oauth、/tenant）；`/(.*)` 兜底保持 SPA 语义（rewrites 在文件系统检查后生效，静态资源不受影响）。
+ * /oauth、/tenant）；SPA 兜底只在 Accept 含 text/html 时生效——缺失的 /assets/*.js 返回 404，
+ * 不会被兜底成 200 的 index.html。
  */
 const rawOrigin = process.env.API_ORIGIN;
 
@@ -20,11 +21,30 @@ if (!rawOrigin) {
 
 const ORIGIN = rawOrigin.replace(/\/+$/, '');
 
+const NO_CACHE = 'public, max-age=0, must-revalidate';
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+
+const spaFallback: Rewrite = {
+  source: '/(.*)',
+  destination: '/index.html',
+  has: [{ type: 'header', key: 'accept', value: { re: 'text/html' } }],
+};
+
 export const config: VercelConfig = {
   framework: 'vite',
   installCommand: 'pnpm install --frozen-lockfile',
   buildCommand: 'pnpm --filter @autional/auth-pages... build',
   outputDirectory: 'apps/auth-pages/dist',
+  headers: [
+    routes.header('/assets/(.*)', [{ key: 'Cache-Control', value: IMMUTABLE }]),
+    routes.header('/workbox-(.*).js', [{ key: 'Cache-Control', value: IMMUTABLE }]),
+    routes.header('/', [{ key: 'Cache-Control', value: NO_CACHE }]),
+    routes.header('/index.html', [{ key: 'Cache-Control', value: NO_CACHE }]),
+    routes.header('/sw.js', [{ key: 'Cache-Control', value: NO_CACHE }]),
+    routes.header('/registerSW.js', [{ key: 'Cache-Control', value: NO_CACHE }]),
+    routes.header('/manifest.webmanifest', [{ key: 'Cache-Control', value: NO_CACHE }]),
+    routes.header('/env.js', [{ key: 'Cache-Control', value: NO_CACHE }]),
+  ],
   rewrites: [
     routes.rewrite('/bff/:path*', `${ORIGIN}/bff/:path*`),
     routes.rewrite('/api/v1/:path*', `${ORIGIN}/api/v1/:path*`),
@@ -33,6 +53,6 @@ export const config: VercelConfig = {
     routes.rewrite('/oauth/api/v1/oauth/callback/:provider', '/index.html'),
     routes.rewrite('/oauth/:path*', `${ORIGIN}/oauth/:path*`),
     routes.rewrite('/tenant/:path*', `${ORIGIN}/tenant/:path*`),
-    routes.rewrite('/(.*)', '/index.html'),
+    spaFallback,
   ],
 };
