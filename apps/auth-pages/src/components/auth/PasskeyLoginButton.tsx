@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
 import { Fingerprint } from 'lucide-react';
-import { apiClient, loginWithTokens } from '@autional/shared';
+import { apiClient, extractApiError, loginWithTokens } from '@autional/shared';
 import {
 	authWebauthnAuthenticateBeginPost,
 	authWebauthnAuthenticateCompletePost,
@@ -246,7 +246,12 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 				// 静默会让「点了没反应」无从排查（2026-10-21 线上实证）。
 				setError(t('passkey.noCredentialHint'));
 			} else {
-				setError(err?.response?.data?.message || err?.message || t('passkey.loginFailed'));
+				// Problem 契约无 message 字段，标题在 title；直接取 err.message 会退化成
+				// axios 的 "Request failed with status code 404"。
+				const { code, message } = extractApiError(err, t('passkey.loginFailed'));
+				// 61000004：服务端无此用户的凭据记录（行已删除/租户不符）。给可操作文案，
+				// 不透出后端英文 title。
+				setError(String(code) === '61000004' ? t('passkey.credentialNotFound') : message);
 			}
 		} finally {
 			setLoading(false);

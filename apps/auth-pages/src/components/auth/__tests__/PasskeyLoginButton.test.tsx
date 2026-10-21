@@ -170,6 +170,41 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 		});
 	});
 
+	// 回归锁（2026-10-21 线上：complete 返回 problem 契约 404/61000004，
+	// 旧实现只读 data.message，退化成 axios 的 "Request failed with status code 404"）。
+	it('服务端无凭据（61000004）时显示本地化提示，而非 axios 状态码文案', async () => {
+		vi.mocked(authWebauthnAuthenticateCompletePost).mockRejectedValueOnce({
+			message: 'Request failed with status code 404',
+			response: {
+				status: 404,
+				data: { code: 61000004, title: 'no credentials found for user', status: 404 },
+			},
+		});
+
+		renderButton();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-error')).toHaveTextContent(
+				'passkey.credentialNotFound',
+			);
+		});
+	});
+
+	it('其他服务端错误透出 problem title，而不是 axios 泛化文案', async () => {
+		vi.mocked(authWebauthnAuthenticateCompletePost).mockRejectedValueOnce({
+			message: 'Request failed with status code 400',
+			response: { status: 400, data: { code: 40000502, title: 'invalid tenant', status: 400 } },
+		});
+
+		renderButton();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-error')).toHaveTextContent('invalid tenant');
+		});
+	});
+
 	it('条件 UI 自动填充路径：登录成功后同样锚定租户', async () => {
 		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
 			async () => true,
