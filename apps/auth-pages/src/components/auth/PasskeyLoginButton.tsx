@@ -131,7 +131,7 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 
 				const completeData = await authWebauthnAuthenticateCompletePost({
 					// 公开路由无租户 ctx：子租户登录页必须显式带上租户，否则凭据按默认租户查
-					tenant_id: tenantId || undefined,
+					tenantId: tenantId || undefined,
 					credential: {
 						id: cred.id,
 						rawId: bufferToBase64url(cred.rawId),
@@ -143,7 +143,7 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 							userHandle: assertion.userHandle ? bufferToBase64url(assertion.userHandle) : null,
 						},
 					},
-				} as any);
+				});
 
 				loginWithTokens(completeData.accessToken, completeData.refreshToken, completeData.user);
 				// AUTH-53⑤：会话建立即锚定（slug 取路由上下文；tenantId 尽 prop、JWT claim 兜底）
@@ -218,7 +218,7 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 			// 4. Send signed assertion to server (后端契约: 顶层 credential 包裹)
 			const data = await authWebauthnAuthenticateCompletePost({
 				// 公开路由无租户 ctx：子租户登录页必须显式带上租户，否则凭据按默认租户查
-				tenant_id: tenantId || undefined,
+				tenantId: tenantId || undefined,
 				credential: {
 					id: cred.id,
 					rawId: bufferToBase64url(cred.rawId),
@@ -230,7 +230,7 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 						userHandle: assertion.userHandle ? bufferToBase64url(assertion.userHandle) : null,
 					},
 				},
-			} as any);
+			});
 
 			// 5. Complete login
 			loginWithTokens(data.accessToken, data.refreshToken, data.user);
