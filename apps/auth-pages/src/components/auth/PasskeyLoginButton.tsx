@@ -130,6 +130,8 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 				const assertion = cred.response as AuthenticatorAssertionResponse;
 
 				const completeData = await authWebauthnAuthenticateCompletePost({
+					// 公开路由无租户 ctx：子租户登录页必须显式带上租户，否则凭据按默认租户查
+					tenant_id: tenantId || undefined,
 					credential: {
 						id: cred.id,
 						rawId: bufferToBase64url(cred.rawId),
@@ -215,6 +217,8 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 
 			// 4. Send signed assertion to server (后端契约: 顶层 credential 包裹)
 			const data = await authWebauthnAuthenticateCompletePost({
+				// 公开路由无租户 ctx：子租户登录页必须显式带上租户，否则凭据按默认租户查
+				tenant_id: tenantId || undefined,
 				credential: {
 					id: cred.id,
 					rawId: bufferToBase64url(cred.rawId),

@@ -136,6 +136,10 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 			});
 		});
 		expect(vi.mocked(loginWithTokens)).toHaveBeenCalledWith('at-1', 'rt-1', { id: 'u-1' });
+		// 子租户缺口回归锁：complete 必须显式带 tenant_id（公开路由 ctx 无租户）
+		expect(vi.mocked(authWebauthnAuthenticateCompletePost)).toHaveBeenCalledWith(
+			expect.objectContaining({ tenant_id: 'tenant-1' }),
+		);
 	});
 
 	// 回归锁（2026-10-21 线上：页面一打开连弹密码选择框、点按钮又弹第二个框）：
@@ -218,6 +222,10 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 				tenantId: 'tenant-1',
 			});
 		});
+		// 子租户缺口回归锁：条件 UI 的 complete 同样必须显式带 tenant_id
+		expect(vi.mocked(authWebauthnAuthenticateCompletePost)).toHaveBeenCalledWith(
+			expect.objectContaining({ tenant_id: 'tenant-1' }),
+		);
 	});
 });
 
