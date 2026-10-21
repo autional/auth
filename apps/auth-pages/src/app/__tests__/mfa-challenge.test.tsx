@@ -59,8 +59,10 @@ vi.mock('@/lib/i18n', () => ({
 }));
 
 const mockVerifyMFAChallenge = vi.fn();
+const mockSendMFAChallengeCode = vi.fn();
 vi.mock('@/lib/api.generated', () => ({
 	verifyMFAChallenge: (...args: any[]) => mockVerifyMFAChallenge(...args),
+	sendMFAChallengeCode: (...args: any[]) => mockSendMFAChallengeCode(...args),
 }));
 
 import MFAChallengePage from '../mfa-challenge/page';
@@ -159,6 +161,31 @@ describe('MFAChallengePage', () => {
 		});
 		expect(screen.getByRole('button', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+	});
+
+	it('uses enrolledMfaMethods over requiredMfaMethods (only enrolled methods shown)', async () => {
+		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['totp', 'email'] });
+
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
+		});
+		expect(screen.getByRole('button', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
+	});
+
+	it('shows a single enrolled method without a tab strip', async () => {
+		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['email'] });
+
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByText('mfa.challenge.emailLabel')).toBeInTheDocument();
+		});
+		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabTOTP' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
 	});
 
 	it('shows risk banner when riskLevel is present', async () => {
@@ -287,6 +314,85 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByText('mfa.challenge.verifyFailed')).toBeInTheDocument();
 		});
 		expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+	});
+
+	it('sends an SMS code from the challenge page and starts the resend cooldown', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+		mockSendMFAChallengeCode.mockResolvedValue({ sent: true });
+
+		const user = userEvent.setup();
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+		});
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' }));
+		await user.click(await screen.findByRole('button', { name: 'mfa.challenge.sendCode' }));
+
+		await waitFor(() => {
+			expect(mockSendMFAChallengeCode).toHaveBeenCalledWith(
+				expect.objectContaining({ mfaMethod: 'sms' }),
+			);
+		});
+		const call = mockSendMFAChallengeCode.mock.calls[0][0];
+		expect(call.challengeToken.split('.')).toHaveLength(3);
+
+		// 发送成功后按钮切换为倒计时并禁用（与后端 60s 窗口一致）
+		await waitFor(() => {
+			const cooldown = screen.getByRole('button', { name: /common\.resendCountdown/ });
+			expect(cooldown).toBeDisabled();
+		});
+	});
+
+	it('sends an email code from the challenge page', async () => {
+		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['email'] });
+		mockSendMFAChallengeCode.mockResolvedValue({ sent: true });
+
+		const user = userEvent.setup();
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByText('mfa.challenge.emailLabel')).toBeInTheDocument();
+		});
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.sendCode' }));
+
+		await waitFor(() => {
+			expect(mockSendMFAChallengeCode).toHaveBeenCalledWith(
+				expect.objectContaining({ mfaMethod: 'email' }),
+			);
+		});
+	});
+
+	it('does not render a send button for TOTP-only challenges', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp'] });
+
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+		});
+		expect(screen.queryByRole('button', { name: 'mfa.challenge.sendCode' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'mfa.challenge.resend' })).not.toBeInTheDocument();
+	});
+
+	it('shows send failure error when the code delivery request fails', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+		mockSendMFAChallengeCode.mockRejectedValue({
+			response: { status: 500, data: { code: 500, message: 'boom' } },
+		});
+
+		const user = userEvent.setup();
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+		});
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' }));
+		await user.click(await screen.findByRole('button', { name: 'mfa.challenge.sendCode' }));
+
+		await waitFor(() => {
+			expect(screen.getByText('boom')).toBeInTheDocument();
+		});
 	});
 
 	it('shows rate-limited error on 429', async () => {

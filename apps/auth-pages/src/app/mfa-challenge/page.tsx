@@ -14,7 +14,7 @@ import {
 } from '@autional/shared';
 import { createMfaTOTPSchema, createMfaSMSSchema } from '@/lib/validators';
 import type { MFATOTPFormData, MFASMSFormData } from '@/lib/validators';
-import { verifyMFAChallenge } from '@/lib/api.generated';
+import { verifyMFAChallenge, sendMFAChallengeCode } from '@/lib/api.generated';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
@@ -29,6 +29,7 @@ interface PreAuthData {
 	tenantId?: string;
 	riskLevel?: string;
 	requiredMfaMethods?: string[];
+	enrolledMfaMethods?: string[];
 	email?: string;
 	phone?: string;
 }
@@ -50,20 +51,28 @@ function maskContact(value: string): string {
 }
 
 /**
- * 可见验证方式 = requiredMfaMethods 中的可验证码方法（password 是基线、webauthn 无码面）；
- * 交集为空（如 MFAEnabled 用户在 normal/low 风险下 required=["password"]）→ 回落全部码方法。
+ * 可见验证方式 = 用户已开通的码方法（identity 回传 enrolled_mfa_methods）；
+ * 未回传时回落风险策略列表，两者皆空才展示全部码方法（历史兼容）。
+ * password 是基线、webauthn 无码面，均不在标签页展示。
  * 备用码与 TOTP 同腿验证（mfa 侧 ValidateTOTP 内含一次性消费回退），随 TOTP 一并展示。
  */
-function deriveTabs(required?: string[]): CodeMethod[] {
-	const policy = (required || []).filter(
-		(m): m is 'totp' | 'sms' | 'email' => m === 'totp' || m === 'sms' || m === 'email',
-	);
-	const base: CodeMethod[] = policy.length > 0 ? policy : ['totp', 'sms', 'email'];
+function deriveTabs(required?: string[], enrolled?: string[]): CodeMethod[] {
+	const codeOnly = (list?: string[]) =>
+		(list || []).filter(
+			(m): m is 'totp' | 'sms' | 'email' => m === 'totp' || m === 'sms' || m === 'email',
+		);
+	const policy = codeOnly(required);
+	const enrolledCode = codeOnly(enrolled);
+	const base: CodeMethod[] =
+		enrolledCode.length > 0 ? enrolledCode : policy.length > 0 ? policy : ['totp', 'sms', 'email'];
 	const withBackup: CodeMethod[] = base.includes('totp') ? [...base, 'backup'] : base;
 	return CODE_METHOD_ORDER.filter((m) => withBackup.includes(m));
 }
 
 type BackupFormData = { code: string };
+
+// 与服务端发送限流窗口一致（identity: 1 次/60s/用户/方法）
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function MFAChallengePage() {
 	const { t, lang } = useI18n();
@@ -88,6 +97,21 @@ export default function MFAChallengePage() {
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState('');
+	// 验证码发送（仅 sms/email 有"发送"语义；TOTP/备用码不需要）
+	const [sendingMethod, setSendingMethod] = useState<'' | 'sms' | 'email'>('');
+	const [sentMethods, setSentMethods] = useState<Partial<Record<'sms' | 'email', boolean>>>({});
+	const [cooldown, setCooldown] = useState<Record<'sms' | 'email', number>>({ sms: 0, email: 0 });
+
+	useEffect(() => {
+		if (cooldown.sms <= 0 && cooldown.email <= 0) return;
+		const id = setTimeout(() => {
+			setCooldown((c) => ({
+				sms: Math.max(0, c.sms - 1),
+				email: Math.max(0, c.email - 1),
+			}));
+		}, 1000);
+		return () => clearTimeout(id);
+	}, [cooldown]);
 
 	// AUTH-36：挂载即校验挑战会话（存在性 + 签名令牌未过期）；无效不渲染死表单
 	useEffect(() => {
@@ -112,7 +136,10 @@ export default function MFAChallengePage() {
 		setPreAuth(parsed);
 	}, [navigate, loginPath]);
 
-	const tabs = useMemo(() => deriveTabs(preAuth?.requiredMfaMethods), [preAuth]);
+	const tabs = useMemo(
+		() => deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods),
+		[preAuth],
+	);
 
 	useEffect(() => {
 		if (preAuth && !tabs.includes(activeTab)) {
@@ -170,6 +197,55 @@ export default function MFAChallengePage() {
 			setSubmitting(false);
 		}
 	};
+
+	// 挑战页发送/重发验证码：授权依据是 challenge 令牌内的 mfa_methods。
+	const handleSendCode = async (method: 'sms' | 'email') => {
+		if (!preAuth || cooldown[method] > 0 || sendingMethod !== '') return;
+		setSendingMethod(method);
+		setError('');
+		try {
+			await sendMFAChallengeCode({
+				challengeToken: preAuth.challengeToken,
+				mfaMethod: method,
+			});
+			setSentMethods((prev) => ({ ...prev, [method]: true }));
+			setCooldown((c) => ({ ...c, [method]: RESEND_COOLDOWN_SECONDS }));
+		} catch (err) {
+			const status = (err as any)?.response?.status;
+			const ui = semanticsOfError(err)?.uiObservation;
+			// 挑战令牌失效（与验证同口径：契约优先，未收录码回落 403）
+			if (ui === 'reauth_required' || (ui === undefined && status === 403)) {
+				sessionStorage.removeItem('mfa_pre_auth');
+				setPreAuth(null);
+				setFatal('expired');
+				return;
+			}
+			if (status === 429) {
+				setError(t('mfa.challenge.rateLimited'));
+				return;
+			}
+			setError(extractApiError(err, t('mfa.challenge.sendFailed')).message);
+		} finally {
+			setSendingMethod('');
+		}
+	};
+
+	const sendCodeButton = (method: 'sms' | 'email') => (
+		<Button
+			type="button"
+			variant="outline"
+			fullWidth
+			isLoading={sendingMethod === method}
+			disabled={cooldown[method] > 0}
+			onClick={() => handleSendCode(method)}
+		>
+			{cooldown[method] > 0
+				? t('common.resendCountdown', { seconds: cooldown[method] })
+				: sentMethods[method]
+					? t('mfa.challenge.resend')
+					: t('mfa.challenge.sendCode')}
+		</Button>
+	);
 
 	// 验证会话已过期（挂载预检或服务端 403 复验）——引导重新登录
 	if (fatal === 'expired') {
@@ -310,6 +386,7 @@ export default function MFAChallengePage() {
 								: t('mfa.challenge.smsDeliveredGeneric')}
 						</p>
 					</div>
+					{sendCodeButton('sms')}
 					<Button type="submit" fullWidth isLoading={submitting}>
 						{t('mfa.challenge.verify')}
 					</Button>
@@ -339,6 +416,7 @@ export default function MFAChallengePage() {
 								: t('mfa.challenge.emailDeliveredGeneric')}
 						</p>
 					</div>
+					{sendCodeButton('email')}
 					<Button type="submit" fullWidth isLoading={submitting}>
 						{t('mfa.challenge.verify')}
 					</Button>
