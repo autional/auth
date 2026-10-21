@@ -238,9 +238,13 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 			await loadAuthExtras().catch(() => {});
 			window.location.href = getPostLoginTarget({ tenantSlug, redirect, user: data.user });
 		} catch (err: any) {
-			if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
-				// User cancelled the browser prompt — silent handling
+			if (err.name === 'AbortError') {
+				// 主动中止（切标签/显式登录抢占）不打扰用户
 				setError('');
+			} else if (err.name === 'NotAllowedError') {
+				// 无可用可发现凭据与用户取消同为 NotAllowedError，不能静默：
+				// 静默会让「点了没反应」无从排查（2026-10-21 线上实证）。
+				setError(t('passkey.noCredentialHint'));
 			} else {
 				setError(err?.response?.data?.message || err?.message || t('passkey.loginFailed'));
 			}

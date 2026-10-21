@@ -330,6 +330,7 @@
   "passkey.noCredentialReceived": "未获取到认证凭证",
   "passkey.noCredentialCreated": "未创建凭证",
   "passkey.loginFailed": "Passkey 登录失败，请重试",
+  "passkey.noCredentialHint": "未找到可用的 Passkey（或操作已取消）。请确认当前设备已添加 Passkey；也可先用密码登录，再到账户中心添加 Passkey。",
   "passkey.registerFailed": "Passkey 注册失败，请重试",
   "passkey.available": "此账号已设置 Passkey",
   "passkey.optIn": "使用 Passkey 快速登录？",

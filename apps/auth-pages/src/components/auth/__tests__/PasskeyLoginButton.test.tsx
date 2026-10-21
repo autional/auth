@@ -155,6 +155,21 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 		}
 	});
 
+	// 回归锁（2026-10-21 线上：本机无可发现凭据时浏览器返回 NotAllowedError，
+	// 旧实现当作用户取消静默吞掉，表现为「点按钮没反应」）。
+	it('无可用可发现凭据（NotAllowedError）时显示提示而非静默', async () => {
+		vi.mocked(navigator.credentials.get).mockRejectedValueOnce(
+			new DOMException('no credentials available', 'NotAllowedError'),
+		);
+
+		renderButton();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-error')).toHaveTextContent('passkey.noCredentialHint');
+		});
+	});
+
 	it('条件 UI 自动填充路径：登录成功后同样锚定租户', async () => {
 		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
 			async () => true,

@@ -325,6 +325,7 @@
   "passkey.noCredentialReceived": "No authentication credential received",
   "passkey.noCredentialCreated": "No credential created",
   "passkey.loginFailed": "Passkey sign in failed. Please try again",
+  "passkey.noCredentialHint": "No passkey found on this device (or the prompt was cancelled). Make sure a passkey is set up here, or sign in with a password and add one in Account Center.",
   "passkey.registerFailed": "Passkey registration failed. Please try again",
   "passkey.available": "Passkey is available for this account",
   "passkey.optIn": "Use Passkey for quick login?",
