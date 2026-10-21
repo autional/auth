@@ -13,7 +13,6 @@ import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
-import { CredentialManagementGate } from './CredentialManagementGate';
 
 function base64urlToBuffer(base64url: string): ArrayBuffer {
 	const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
@@ -51,22 +50,21 @@ function abortActiveConditional() {
 }
 
 /**
- * PasskeyLoginButton — WebAuthn Conditional UI + Credential Management integration.
+ * PasskeyLoginButton — WebAuthn Conditional UI integration.
  *
  * 条件式 UI 只在 mode="conditional"（密码表单内）启动：
- *   1. WebAuthn Conditional Mediation — 绑定 `autocomplete="username webauthn"` 输入框，
- *      浏览器在自动填充列表里提供 passkey，不弹登录框。
- *   2. Credential Management API — `navigator.credentials.get({password:true, mediation:'optional'})`
- *      由 CredentialManagementGate 处理。
+ *   WebAuthn Conditional Mediation — 绑定 `autocomplete="username webauthn"` 输入框，
+ *   浏览器在自动填充列表里提供 passkey，不弹登录框。
  *
  * mode="button" 只响应用户点击，不在挂载时发起任何 WebAuthn 请求。
  * 条件式请求用 AbortController 管理，卸载/切标签/显式登录时立即 abort。
+ * 密码自动填充交给浏览器原生 autocomplete，不发起 Credential Management 请求
+ * （那会在页面打开时弹出非 passkey 的密码选择框）。
  */
 export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: PasskeyLoginButtonProps) {
 	const { t } = useI18n();
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
-	const [autoFillEmail, setAutoFillEmail] = useState('');
 	const { tenantSlug } = useParams();
 	const [searchParams] = useSearchParams();
 	const redirect = searchParams.get('redirect');
@@ -176,17 +174,6 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 		};
 	}, [mode, isSupported, tenantId]);
 
-	const handleCredentialAutoFill = (filledEmail: string) => {
-		setAutoFillEmail(filledEmail);
-		const input = document.querySelector<HTMLInputElement>(
-			'input[type="email"], input[aria-label="email"]',
-		);
-		if (input && !input.value) {
-			(input as HTMLInputElement).value = filledEmail;
-			input.dispatchEvent(new Event('input', { bubbles: true }));
-		}
-	};
-
 	const handlePasskeyLogin = async () => {
 		if (!isSupported) return;
 		// 先中止条件式请求：同一时刻浏览器只允许一个 WebAuthn get()，
@@ -265,12 +252,11 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 	if (!isSupported) return null;
 
 	if (mode === 'conditional') {
-		return <CredentialManagementGate onAutoFill={handleCredentialAutoFill} />;
+		return null;
 	}
 
 	return (
 		<div data-testid="passkey-login-button">
-			<CredentialManagementGate onAutoFill={handleCredentialAutoFill} />
 			<Button
 				variant="outline"
 				fullWidth

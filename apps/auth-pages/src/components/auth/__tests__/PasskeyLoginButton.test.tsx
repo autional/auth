@@ -44,10 +44,6 @@ vi.mock('@autional/ui', async () => {
 
 vi.mock('lucide-react', () => ({ Fingerprint: () => null }));
 
-vi.mock('@/components/auth/CredentialManagementGate', () => ({
-	CredentialManagementGate: () => null,
-}));
-
 import { PasskeyLoginButton } from '@/components/auth/PasskeyLoginButton';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { loginWithTokens } from '@autional/shared';
@@ -140,6 +136,23 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 			});
 		});
 		expect(vi.mocked(loginWithTokens)).toHaveBeenCalledWith('at-1', 'rt-1', { id: 'u-1' });
+	});
+
+	// 回归锁（2026-10-21 线上：页面一打开连弹密码选择框、点按钮又弹第二个框）：
+	// Credential Management 的 password 请求已移除，点按钮只允许发起一个 passkey 请求。
+	it('点击登录只发起一次 passkey 请求，不发起 password 凭据请求', async () => {
+		renderButton();
+
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(vi.mocked(navigator.credentials.get)).toHaveBeenCalledTimes(1);
+		});
+		const calls = vi.mocked(navigator.credentials.get).mock.calls;
+		expect(calls[0][0]).toHaveProperty('publicKey');
+		for (const [opts] of calls) {
+			expect(opts).not.toHaveProperty('password');
+		}
 	});
 
 	it('条件 UI 自动填充路径：登录成功后同样锚定租户', async () => {
