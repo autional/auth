@@ -84,6 +84,7 @@ vi.mock('@/lib/api', () => ({
 }));
 
 let mockLoginMethods: string[] | undefined;
+let mockOAuthProviders: any[] = [];
 
 vi.mock('@/hooks/use-auth-page-init', () => ({
 	useAuthPageInit: () => ({
@@ -93,7 +94,7 @@ vi.mock('@/hooks/use-auth-page-init', () => ({
 			isError: false,
 		},
 		publicTenants: { data: [], isLoading: false, isError: false },
-		oauthProviders: { data: [], isLoading: false, isError: false },
+		oauthProviders: { data: mockOAuthProviders, isLoading: false, isError: false },
 		branding: { data: null, isLoading: false, isError: false },
 		isLoading: false,
 		isError: false,
@@ -108,6 +109,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	mockGetAccessToken.mockReturnValue(null);
 	mockLoginMethods = undefined;
+	mockOAuthProviders = [];
 });
 
 afterEach(() => {
@@ -121,6 +123,33 @@ describe('LoginPage', () => {
 		expect(screen.getByPlaceholderText('auth.login.identityPlaceholder')).toBeInTheDocument();
 		expect(screen.getByPlaceholderText('auth.login.passwordPlaceholder')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'login.submit' })).toBeInTheDocument();
+	});
+
+	// 多域回调：发起页 Origin 必须随跳转携带，后端据此选择同站已登记回调（RFC 9700 §4.1.3）。
+	it('starts OAuth with callback_origin of the current site', async () => {
+		mockOAuthProviders = [{ id: 'prov-github', type: 'github', name: 'GitHub' }];
+		const assignMock = vi.fn();
+		const originalLocation = window.location;
+		delete (window as any).location;
+		(window as any).location = Object.defineProperties(
+			{},
+			{
+				...Object.getOwnPropertyDescriptors(originalLocation),
+				origin: { get: () => 'https://auth.autional.com', configurable: true },
+				assign: { value: assignMock, configurable: true },
+			},
+		);
+		try {
+			const user = userEvent.setup();
+			renderLogin();
+			await user.click(await screen.findByRole('button', { name: 'GitHub' }));
+
+			expect(assignMock).toHaveBeenCalledWith(
+				expect.stringContaining('callback_origin=https%3A%2F%2Fauth.autional.com'),
+			);
+		} finally {
+			Object.defineProperty(window, 'location', { value: originalLocation, writable: true });
+		}
 	});
 
 	it('shows validation error when submitting empty form', async () => {

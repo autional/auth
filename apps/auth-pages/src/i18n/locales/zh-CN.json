@@ -202,6 +202,7 @@
   "error.oauth_callback_failed": "第三方登录校验失败，请重新发起登录",
   "error.oauth_issuer_mismatch": "第三方登录来源校验失败，请重新发起登录",
   "error.oauth_login_disabled": "第三方登录暂未开通",
+  "error.oauth_callback_origin_invalid": "当前站点未登记第三方登录回调，请从主站重新发起登录",
   "error.oauth_no_verified_email": "第三方账号未提供已验证邮箱，无法完成登录或绑定",
   "error.oauth_bind_legacy": "旧版绑定入口已停用，请在账户安全页重新发起绑定",
   "error.sso_provider_not_configured": "该企业尚未配置 SSO 登录方式",

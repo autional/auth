@@ -458,7 +458,11 @@ export default function LoginPage() {
 		// 社交登录必须整页导航：identity 端点对本请求 302 到第三方授权页，
 		// XHR/axios 会因跨域重定向被 CORS 拦死（历史必败根因）；整页导航由浏览器原生跟随。
 		// 未配置凭据的 provider 已由服务端列表门禁过滤，按钮不会渲染（AUTH-01）。
-		window.location.assign(`${API_BASE_URL}/identity/api/v1/auth/oauth/${encodeURIComponent(provider)}`);
+		// callback_origin 让后端在本站已登记的回调中选择同站地址（.cn / .com 多域）。
+		const callbackOrigin = encodeURIComponent(window.location.origin);
+		window.location.assign(
+			`${API_BASE_URL}/identity/api/v1/auth/oauth/${encodeURIComponent(provider)}?callback_origin=${callbackOrigin}`
+		);
 	}, []);
 
 	const onSubmit = async (data: FormData) => {
