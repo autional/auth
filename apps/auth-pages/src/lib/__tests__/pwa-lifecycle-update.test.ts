@@ -14,14 +14,31 @@ function installServiceWorker(controller: object | null) {
   return { emitControllerChange: () => events.dispatchEvent(new Event('controllerchange')) };
 }
 
+// window 监听器跨用例复用：回收 preloadError 监听，否则旧用例占掉 60 秒防循环键。
+let preloadErrorListeners: EventListenerOrEventListenerObject[] = [];
+const nativeAddEventListener = window.addEventListener.bind(window);
+
 beforeEach(() => {
   vi.useFakeTimers();
+  preloadErrorListeners = [];
+  vi.spyOn(window, 'addEventListener').mockImplementation(((
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ) => {
+    if (type === 'vite:preloadError') preloadErrorListeners.push(listener);
+    nativeAddEventListener(type, listener, options);
+  }) as typeof window.addEventListener);
   sessionStorage.clear();
   window.history.replaceState({}, '', '/');
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  for (const listener of preloadErrorListeners) {
+    window.removeEventListener('vite:preloadError', listener);
+  }
+  preloadErrorListeners = [];
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, 'serviceWorker');
   document.body.innerHTML = '';
@@ -107,4 +124,41 @@ describe('PWA 更新接管后的刷新', () => {
   it('不支持 Service Worker 时安全退出', () => {
     expect(() => setupPwaLifecycle()).not.toThrow();
   });
+});
+
+describe('PWA 懒加载 chunk 失败恢复', () => {
+  const emitPreloadError = () =>
+    window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }));
+
+  it('chunk 加载失败时整页重载一次', () => {
+    const reload = vi.fn();
+    setupPwaLifecycle(reload);
+
+    emitPreloadError();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('60 秒内不重复重载', () => {
+    const reload = vi.fn();
+    setupPwaLifecycle(reload);
+
+    emitPreloadError();
+    emitPreloadError();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['/oauth/callback', '/acme/magic-link/confirm', '/acme/verify-email', '/acme/sso/initiate'])(
+    '一次性凭据页 %s 不自动重载',
+    (path) => {
+      const reload = vi.fn();
+      window.history.replaceState({}, '', path);
+      setupPwaLifecycle(reload);
+
+      emitPreloadError();
+
+      expect(reload).not.toHaveBeenCalled();
+    },
+  );
 });

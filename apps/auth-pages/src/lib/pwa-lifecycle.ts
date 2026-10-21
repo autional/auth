@@ -86,6 +86,8 @@ function setupPreloadRecovery(reload: () => void): void {
   const storageKey = 'autional:pwa-preload-reload-at';
   window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault();
+    // 凭据页重载会重放 OAuth code / 一次性链接：宁可停留错误页。
+    if (ONE_TIME_TOKEN_PATH.test(window.location.pathname)) return;
     try {
       const lastReloadAt = Number(window.sessionStorage.getItem(storageKey) ?? 0);
       if (Number.isFinite(lastReloadAt) && Date.now() - lastReloadAt < RELOAD_GUARD_MS) return;
