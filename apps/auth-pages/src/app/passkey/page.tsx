@@ -2,6 +2,7 @@
 
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { userPortalUrl } from '@/lib/portal-links';
@@ -15,6 +16,7 @@ import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
  */
 export default function PasskeyPage() {
 	const { t } = useI18n();
+	usePageTitle('passkey.titleLogin');
 	const navigate = useNavigate();
 	// AUTH-41：跨门户深链（登录页/账户中心）必须带生效租户 slug，裸链会错位
 	const slug = useEffectiveTenantSlug();

@@ -135,6 +135,11 @@ export default function ChangePasswordPage() {
 	const [loading, setLoading] = useState(false);
 	const [success, setSuccess] = useState(false);
 
+	// 密码管理器的账号锚点：无隐藏 username 时浏览器只认「当前密码」框，
+	// 保存/更新条目会丢账号绑定（Chromium 密码表单告警）
+	const storeUser = useAuthStore.getState().user;
+	const accountName = storeUser?.username || storeUser?.email || '';
+
 	// Extract policy from query param or store (JSON encoded)
 	const policyParam = searchParams.get('policy');
 	const policy: PasswordPolicy | undefined = useMemo(() => {
@@ -270,6 +275,14 @@ export default function ChangePasswordPage() {
 			/>
 
 			<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+				<input
+					type="text"
+					name="username"
+					autoComplete="username"
+					value={accountName}
+					readOnly
+					hidden
+				/>
 				{/* Old password */}
 				<div className="space-y-2">
 					<Label htmlFor="oldPassword">{t('auth.password.oldPassword')}</Label>

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { Button, Input, Label } from '@autional/ui';
 import { authVerifyEmailPost, authResendVerificationEmailPost } from '@autional/shared/generated/api';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 
@@ -192,6 +193,7 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
 	const { t } = useI18n();
+	usePageTitle('auth.verifyEmail.title');
 	return (
 		<Suspense
 			fallback={

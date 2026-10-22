@@ -72,11 +72,15 @@ vi.mock('@/lib/i18n', () => ({
 
 vi.mock('@autional/ui', () => ({
 	Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-	ErrorState: ({ title, description, onRetry }: any) => (
+	ErrorState: ({ title, description, action, onRetry }: any) => (
 		<div>
 			<div data-testid="error-title">{title}</div>
 			<div data-testid="error-desc">{description}</div>
-			{onRetry && <button onClick={onRetry}>retry</button>}
+			{action ? (
+				<button onClick={action.onClick}>{action.label}</button>
+			) : (
+				onRetry && <button onClick={onRetry}>retry</button>
+			)}
 		</div>
 	),
 }));
@@ -201,6 +205,8 @@ describe('MagicLinkConfirmPage（AUTH-26 落点重设计）', () => {
 			expect(screen.getByTestId('error-title').textContent).toBe('magicLink.confirmError'),
 		);
 		expect(screen.getByTestId('error-desc').textContent).toBe('magicLink.confirmErrorDesc');
+		// AUTH2-04：重试文案走 t('common.retry')，不再由 ErrorState 内置中文兜底
+		expect(screen.getByRole('button', { name: 'common.retry' })).toBeTruthy();
 		expect(mockState.loginWithTokens).not.toHaveBeenCalled();
 	});
 });

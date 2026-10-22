@@ -1107,6 +1107,8 @@
   "mfa.challenge.sendCode": "Send code",
   "mfa.challenge.resend": "Resend code",
   "mfa.challenge.sendFailed": "Failed to send the code. Please try again later.",
+  "mfa.challenge.methodLabel": "Verification method",
+  "mfa.challenge.codeSentLive": "Verification code sent",
   "mfa.challenge.smsDelivered": "A code was sent to {{target}} — enter it below",
   "mfa.challenge.smsDeliveredGeneric": "A login code was sent to your phone — enter it below",
   "mfa.challenge.emailDelivered": "A code was sent to {{target}} — enter it below",

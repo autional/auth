@@ -67,6 +67,8 @@ describe('ResetPasswordPage', () => {
 			expect(screen.getByText('auth.resetPassword.invalidToken')).toBeInTheDocument();
 		});
 		expect(screen.getByText('auth.resetPassword.invalidTokenDesc')).toBeInTheDocument();
+		// AUTH2-04：重试文案经 t('common.retry')，英文面不再混入 ErrorState 内置「重试」
+		expect(screen.getByRole('button', { name: 'common.retry' })).toBeInTheDocument();
 	});
 
 	it('shows verifying loading state when token present', () => {

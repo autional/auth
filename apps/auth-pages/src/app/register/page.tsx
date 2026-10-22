@@ -694,6 +694,7 @@ export default function RegisterPage() {
 						<Label htmlFor="username">{t('register.username')}</Label>
 						<Input
 							id="username"
+							autoComplete="username"
 							placeholder={t('register.usernamePlaceholder')}
 							{...register('username')}
 							error={errors.username?.message}
@@ -706,6 +707,7 @@ export default function RegisterPage() {
 						<Input
 							id="email"
 							type="email"
+							autoComplete="email"
 							placeholder={t('register.emailPlaceholder')}
 							{...register('email')}
 							error={errors.email?.message}

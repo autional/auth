@@ -1107,6 +1107,8 @@
   "mfa.challenge.sendCode": "发送验证码",
   "mfa.challenge.resend": "重新发送",
   "mfa.challenge.sendFailed": "验证码发送失败，请稍后重试",
+  "mfa.challenge.methodLabel": "验证方式",
+  "mfa.challenge.codeSentLive": "验证码已发送，请查收",
   "mfa.challenge.smsDelivered": "验证码已发送至 {{target}}，请在下方输入",
   "mfa.challenge.smsDeliveredGeneric": "登录验证码已通过短信发送至您绑定的手机号，请查收后输入",
   "mfa.challenge.emailDelivered": "验证码已发送至 {{target}}，请在下方输入",

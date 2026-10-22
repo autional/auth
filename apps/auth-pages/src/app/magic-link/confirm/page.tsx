@@ -21,6 +21,7 @@ import { getDashboardSlug } from '@/lib/dashboard-slug';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 type ConfirmStatus = 'verifying' | 'success' | 'error';
 
@@ -167,7 +168,7 @@ function MagicLinkConfirmContent() {
 				<ErrorState
 					title={message || t('magicLink.confirmError')}
 					description={t('magicLink.confirmErrorDesc')}
-					onRetry={() => navigate('/')}
+					action={{ label: t('common.retry'), onClick: () => navigate('/') }}
 				/>
 			</div>
 		</AuthCard>
@@ -176,6 +177,7 @@ function MagicLinkConfirmContent() {
 
 export default function MagicLinkConfirmPage() {
 	const { t } = useI18n();
+	usePageTitle('magicLink.confirmTitle');
 
 	return (
 		<Suspense

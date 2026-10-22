@@ -18,9 +18,11 @@ import { LoadingScreen } from '@autional/ui';
 import { ErrorState } from '@autional/ui';
 import RedirectCountdown from '@/components/ui/RedirectCountdown';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 function ResetPasswordContent() {
 	const { t } = useI18n();
+	usePageTitle('auth.resetPassword.title');
 	const navigate = useNavigate();
 	const schema = createResetPasswordSchema(t);
 	const [searchParams] = useSearchParams();
@@ -142,7 +144,7 @@ function ResetPasswordContent() {
 				<ErrorState
 					title={tokenError || t('auth.resetPassword.expiredToken')}
 					description={t('auth.resetPassword.invalidTokenDesc')}
-					onRetry={() => navigate('/')}
+					action={{ label: t('common.retry'), onClick: () => navigate('/') }}
 				/>
 			</AuthCard>
 		);

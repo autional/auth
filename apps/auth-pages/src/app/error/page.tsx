@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { traceEvent } from '@autional/shared';
 import { useResolvedTenantSlug } from '@/hooks/use-tenant-slug';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 
 type ErrorType =
@@ -49,6 +50,8 @@ export default function ErrorPage() {
 		rawType === 'oauth_failed'
 			? rawType
 			: 'generic';
+
+	usePageTitle(ERROR_TITLE[type]);
 
 	const [seconds, setSeconds] = useState(AUTO_REDIRECT_SECONDS);
 

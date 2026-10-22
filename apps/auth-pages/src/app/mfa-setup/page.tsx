@@ -29,6 +29,7 @@ import type {
 	MFAEmailSetupFormData,
 } from '@/lib/validators';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { userPortalUrl } from '@/lib/portal-links';
@@ -56,6 +57,7 @@ interface MFAStatusData {
 
 export default function MFASetupPage() {
 	const { t } = useI18n();
+	usePageTitle('auth.mfa.setupTitle');
 	const navigate = useNavigate();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
 	// AUTH-41：跨门户深链（账户中心 /security）必须带生效租户 slug，裸链会 404

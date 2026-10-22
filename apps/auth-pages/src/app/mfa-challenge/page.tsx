@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,7 @@ import type { MFATOTPFormData, MFASMSFormData } from '@/lib/validators';
 import { verifyMFAChallenge, sendMFAChallengeCode } from '@/lib/api.generated';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { semanticsOfError } from '@/lib/error-semantics';
@@ -76,6 +77,7 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function MFAChallengePage() {
 	const { t, lang } = useI18n();
+	usePageTitle('mfa.challenge.title');
 	const navigate = useNavigate();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
 	const loginPath = tenantSlug ? `/${tenantSlug}/login` : '/';
@@ -97,6 +99,7 @@ export default function MFAChallengePage() {
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState('');
+	const [announcement, setAnnouncement] = useState('');
 	// 验证码发送（仅 sms/email 有"发送"语义；TOTP/备用码不需要）
 	const [sendingMethod, setSendingMethod] = useState<'' | 'sms' | 'email'>('');
 	const [sentMethods, setSentMethods] = useState<Partial<Record<'sms' | 'email', boolean>>>({});
@@ -203,6 +206,7 @@ export default function MFAChallengePage() {
 		if (!preAuth || cooldown[method] > 0 || sendingMethod !== '') return;
 		setSendingMethod(method);
 		setError('');
+		setAnnouncement('');
 		try {
 			await sendMFAChallengeCode({
 				challengeToken: preAuth.challengeToken,
@@ -210,6 +214,7 @@ export default function MFAChallengePage() {
 			});
 			setSentMethods((prev) => ({ ...prev, [method]: true }));
 			setCooldown((c) => ({ ...c, [method]: RESEND_COOLDOWN_SECONDS }));
+			setAnnouncement(t('mfa.challenge.codeSentLive'));
 		} catch (err) {
 			const status = (err as any)?.response?.status;
 			const ui = semanticsOfError(err)?.uiObservation;
@@ -229,6 +234,33 @@ export default function MFAChallengePage() {
 			setSendingMethod('');
 		}
 	};
+
+	// 标准 tabs 键盘模型：左右方向键循环切换，Home/End 跳首尾
+	const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+		const last = tabs.length - 1;
+		let next = -1;
+		if (event.key === 'ArrowRight') next = index === last ? 0 : index + 1;
+		else if (event.key === 'ArrowLeft') next = index === 0 ? last : index - 1;
+		else if (event.key === 'Home') next = 0;
+		else if (event.key === 'End') next = last;
+		if (next < 0) return;
+		event.preventDefault();
+		const nextKey = tabs[next];
+		setActiveTab(nextKey);
+		setError('');
+		document.getElementById(`mfa-tab-${nextKey}`)?.focus();
+	};
+
+	// 单方法时无标签条，不声明 tabpanel 语义
+	const tabPanelProps = (key: CodeMethod) =>
+		tabs.length > 1
+			? {
+					role: 'tabpanel' as const,
+					id: `mfa-panel-${key}`,
+					'aria-labelledby': `mfa-tab-${key}`,
+					tabIndex: 0,
+				}
+			: {};
 
 	const sendCodeButton = (method: 'sms' | 'email') => (
 		<Button
@@ -292,15 +324,25 @@ export default function MFAChallengePage() {
 			<AuthHeader title={t('mfa.challenge.title')} subtitle={t('mfa.challenge.subtitle')} />
 
 			{tabs.length > 1 && (
-				<div className="flex rounded-md bg-[var(--color-bg-muted)] p-1">
-					{tabs.map((key) => (
+				<div
+					role="tablist"
+					aria-label={t('mfa.challenge.methodLabel')}
+					className="flex rounded-md bg-[var(--color-bg-muted)] p-1"
+				>
+					{tabs.map((key, index) => (
 						<button
 							key={key}
+							id={`mfa-tab-${key}`}
 							type="button"
+							role="tab"
+							aria-selected={activeTab === key}
+							aria-controls={`mfa-panel-${key}`}
+							tabIndex={activeTab === key ? 0 : -1}
 							onClick={() => {
 								setActiveTab(key);
 								setError('');
 							}}
+							onKeyDown={(event) => handleTabKeyDown(event, index)}
 							className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
 								activeTab === key
 									? 'bg-[var(--color-bg-surface)] text-[var(--color-text-primary)] shadow-card'
@@ -313,8 +355,12 @@ export default function MFAChallengePage() {
 				</div>
 			)}
 
+			<div className="sr-only" role="status" aria-live="polite">
+				{announcement}
+			</div>
+
 			{error && (
-				<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
+				<div role="alert" className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 					{error}
 				</div>
 			)}
@@ -338,6 +384,7 @@ export default function MFAChallengePage() {
 
 			{activeTab === 'totp' && (
 				<form
+					{...tabPanelProps('totp')}
 					onSubmit={totpForm.handleSubmit((data) => handleSubmit(data.code, 'totp'))}
 					className="space-y-4"
 				>
@@ -365,6 +412,7 @@ export default function MFAChallengePage() {
 
 			{activeTab === 'sms' && (
 				<form
+					{...tabPanelProps('sms')}
 					onSubmit={smsForm.handleSubmit((data) => handleSubmit(data.code, 'sms'))}
 					className="space-y-4"
 				>
@@ -395,6 +443,7 @@ export default function MFAChallengePage() {
 
 			{activeTab === 'email' && (
 				<form
+					{...tabPanelProps('email')}
 					onSubmit={emailForm.handleSubmit((data) => handleSubmit(data.code, 'email'))}
 					className="space-y-4"
 				>
@@ -425,6 +474,7 @@ export default function MFAChallengePage() {
 
 			{activeTab === 'backup' && (
 				<form
+					{...tabPanelProps('backup')}
 					onSubmit={backupForm.handleSubmit((data) => handleSubmit(data.code, 'backup'))}
 					className="space-y-4"
 				>

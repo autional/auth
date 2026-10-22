@@ -15,6 +15,7 @@ import { exchangeCodeForToken } from '@/lib/api.generated';
 import { oauthErrorText } from '@/lib/oauth-error-text';
 import RedirectCountdown from '@/components/ui/RedirectCountdown';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 
@@ -22,6 +23,7 @@ type CallbackStatus = 'loading' | 'success' | 'error' | 'linkRequired';
 
 function OAuthCallbackContent() {
 	const { t } = useI18n();
+	usePageTitle('auth.oauth.processingLogin');
 	const [searchParams] = useSearchParams();
 	const navigate = useNavigate();
 	const location = useLocation();

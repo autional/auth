@@ -144,11 +144,21 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
 		});
-		expect(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
+
+		// AUTH2-01：标签条具备完整 tab 语义，当前面板与选中标签关联
+		expect(
+			screen.getByRole('tablist', { name: 'mfa.challenge.methodLabel' }),
+		).toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toHaveAttribute(
+			'aria-selected',
+			'true',
+		);
+		expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'mfa-tab-totp');
 	});
 
 	it('falls back to all code methods when requiredMfaMethods has no code method', async () => {
@@ -157,10 +167,10 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		});
-		expect(screen.getByRole('button', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
 	});
 
 	it('uses enrolledMfaMethods over requiredMfaMethods (only enrolled methods shown)', async () => {
@@ -169,11 +179,11 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
 		});
-		expect(screen.getByRole('button', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
+		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
 	});
 
 	it('shows a single enrolled method without a tab strip', async () => {
@@ -184,8 +194,8 @@ describe('MFAChallengePage', () => {
 		await waitFor(() => {
 			expect(screen.getByText('mfa.challenge.emailLabel')).toBeInTheDocument();
 		});
-		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabTOTP' })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabTOTP' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
 	});
 
 	it('shows risk banner when riskLevel is present', async () => {
@@ -240,10 +250,10 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
 		});
 
-		await user.click(screen.getByRole('button', { name: 'mfa.challenge.tabBackup' }));
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' }));
 		await user.type(screen.getByPlaceholderText('mfa.challenge.backupPlaceholder'), 'ABCDEFGH');
 		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
 
@@ -261,10 +271,10 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
 		});
 
-		await user.click(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' }));
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' }));
 
 		const hint = await screen.findByText((content) =>
 			content.startsWith('mfa.challenge.smsDelivered'),
@@ -313,6 +323,8 @@ describe('MFAChallengePage', () => {
 		await waitFor(() => {
 			expect(screen.getByText('mfa.challenge.verifyFailed')).toBeInTheDocument();
 		});
+		// AUTH2-02：错误条是 live region（读屏可播报）
+		expect(screen.getByRole('alert')).toHaveTextContent('mfa.challenge.verifyFailed');
 		expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 	});
 
@@ -324,9 +336,9 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
 		});
-		await user.click(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' }));
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' }));
 		await user.click(await screen.findByRole('button', { name: 'mfa.challenge.sendCode' }));
 
 		await waitFor(() => {
@@ -342,6 +354,8 @@ describe('MFAChallengePage', () => {
 			const cooldown = screen.getByRole('button', { name: /common\.resendCountdown/ });
 			expect(cooldown).toBeDisabled();
 		});
+		// AUTH2-02：发送结果经 polite live region 播报
+		expect(screen.getByRole('status')).toHaveTextContent('mfa.challenge.codeSentLive');
 	});
 
 	it('sends an email code from the challenge page', async () => {
@@ -385,9 +399,9 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
 		});
-		await user.click(screen.getByRole('button', { name: 'mfa.challenge.tabSMS' }));
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' }));
 		await user.click(await screen.findByRole('button', { name: 'mfa.challenge.sendCode' }));
 
 		await waitFor(() => {

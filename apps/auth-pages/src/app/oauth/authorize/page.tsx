@@ -9,6 +9,7 @@ import { authMe, PublicAuthConfigByAuthConfig } from '@autional/shared/generated
 import { buildTenantLoginUrl, fetchTenantSlugByClientId } from '@/lib/oauth-cold-start';
 import { oauthErrorText } from '@/lib/oauth-error-text';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 
@@ -44,6 +45,7 @@ function flattenError(value: unknown, depth: number): string | null {
 
 function OAuthAuthorizeContent() {
 	const { t } = useI18n();
+	usePageTitle('auth.oauth.authorizeTitle');
 	const [searchParams] = useSearchParams();
 	const clientId = searchParams.get('client_id') || '';
 	const redirectUri = searchParams.get('redirect_uri') || '';

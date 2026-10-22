@@ -9,6 +9,7 @@ import { logout, useAuthStore } from '@autional/shared';
 import { createAccountDeletionSchema } from '@/lib/validators';
 import type { AccountDeletionFormData } from '@/lib/validators';
 import { useI18n } from '@/lib/i18n';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
@@ -31,6 +32,7 @@ const STEP_UP_HEADER = 'X-StepUp-Token';
 
 export default function AccountDeletionPage() {
 	const { t } = useI18n();
+	usePageTitle('deletion.title');
 	const navigate = useNavigate();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
 	const slug = useEffectiveTenantSlug();
@@ -41,6 +43,11 @@ export default function AccountDeletionPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const [success, setSuccess] = useState(false);
+
+	// 密码管理器的账号锚点（同 change-password）：表单需隐藏 username 域，
+	// 否则确认密码无法与账号关联，浏览器可能丢弃保存/更新
+	const storeUser = useAuthStore.getState().user;
+	const accountName = storeUser?.username || storeUser?.email || '';
 
 	const {
 		register,
@@ -152,6 +159,14 @@ export default function AccountDeletionPage() {
 				)}
 
 				<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+					<input
+						type="text"
+						name="username"
+						autoComplete="username"
+						value={accountName}
+						readOnly
+						hidden
+					/>
 					<div className="space-y-2">
 						<Label htmlFor="password">{t('deletion.password')}</Label>
 						<Input
