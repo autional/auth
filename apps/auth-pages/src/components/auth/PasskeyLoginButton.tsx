@@ -253,9 +253,15 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 				// Problem 契约无 message 字段，标题在 title；直接取 err.message 会退化成
 				// axios 的 "Request failed with status code 404"。
 				const { code, message } = extractApiError(err, t('passkey.loginFailed'));
-				// 61000004：服务端无此用户的凭据记录（行已删除/租户不符）。给可操作文案，
-				// 不透出后端英文 title。
-				setError(String(code) === '61000004' ? t('passkey.credentialNotFound') : message);
+				// 61000004：无凭据记录；61000101：该租户下查无此用户（地址栏租户与残留租户
+				// 不一致的典型表现）。两者都给可操作文案，不透出后端英文 title。
+				setError(
+					String(code) === '61000004'
+						? t('passkey.credentialNotFound')
+						: String(code) === '61000101'
+							? t('passkey.userNotFound')
+							: message,
+				);
 			}
 		} finally {
 			setLoading(false);

@@ -9,6 +9,7 @@ import { authRegisterReapplyPost } from '@autional/shared/generated/api';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
+import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
 import { createReapplySchema } from '@/lib/validators';
 import type { ReapplyFormData } from '@/lib/validators';
 
@@ -20,6 +21,15 @@ export default function ReapplyPage() {
 	const emailParam = searchParams.get('email') || '';
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(false);
+
+	// 地址栏租户优先：slug 解析出的租户随请求体提交；解析不出来时禁止提交，
+	// 绝不回退 X-Tenant-ID（本地残留租户会把申请写到错误租户）。
+	const { data: slugAuthConfig, isLoading: slugConfigLoading } = useTenantAuthConfigBySlug(
+		tenantSlug || null,
+	);
+	const tenantId = slugAuthConfig?.tenantId || '';
+	const tenantResolved = !tenantSlug || !!tenantId;
+	const tenantUnavailable = !!tenantSlug && !slugConfigLoading && !tenantId;
 
 	const schema = useMemo(() => createReapplySchema(t), [lang, t]);
 
@@ -33,10 +43,14 @@ export default function ReapplyPage() {
 	});
 
 	const onSubmit = async (data: ReapplyFormData) => {
+		if (!tenantResolved) {
+			setError(t('auth.reapply.tenantUnavailable'));
+			return;
+		}
 		setLoading(true);
 		setError('');
 		try {
-			await authRegisterReapplyPost(data as any);
+			await authRegisterReapplyPost({ ...data, tenantId: tenantId || undefined });
 			window.location.href = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard';
 		} catch (err: any) {
 			setError(err.response?.data?.message || t('auth.reapply.error'));
@@ -83,7 +97,10 @@ export default function ReapplyPage() {
 					{errors.reason?.message && <p className="text-xs text-danger-text">{errors.reason.message}</p>}
 				</div>
 
-				<Button type="submit" fullWidth isLoading={loading}>
+				{tenantUnavailable && (
+					<p className="text-xs text-danger-text">{t('auth.reapply.tenantUnavailable')}</p>
+				)}
+				<Button type="submit" fullWidth isLoading={loading} disabled={!tenantResolved}>
 					{t('auth.reapply.submit')}
 				</Button>
 			</form>

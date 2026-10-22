@@ -277,6 +277,11 @@ describe('LoginPage - passkey 入口', () => {
 		renderLogin();
 		await waitFor(() => expect(conditionalOpts).toBeTruthy());
 
+		// 条件式 begin 必须携带 slug（地址栏）租户，而非 localStorage 残留租户
+		expect(mockWebauthnBegin).toHaveBeenCalledWith(
+			expect.objectContaining({ tenantId: 't-test', mediation: 'conditional' }),
+		);
+
 		fireEvent.click(screen.getByRole('button', { name: 'passkey.submitLogin' }));
 
 		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));

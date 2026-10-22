@@ -254,17 +254,24 @@ export default function RegisterPage() {
 		}
 	}, [slugAuthConfig]);
 
+	// 地址栏租户优先：查重必须带当前租户，不能吃 localStorage 残留租户。
+	const checkTenantId = selectedTenantId || slugAuthConfig?.tenantId || undefined;
+
 	useEffect(() => {
 		if (usernameTimer.current) clearTimeout(usernameTimer.current);
+		// 切租户后旧结果失效
+		setUsernameStatus('idle');
 		if (!watchedUsername || watchedUsername.length < 3) {
-			setUsernameStatus('idle');
 			return;
 		}
 		setUsernameStatus('checking');
 		usernameTimer.current = setTimeout(async () => {
 			try {
 				// POST 变体：GET 变体只读第二参 params，传 data 会被忽略 → 后端 400（AUTH-14）
-				const res = await authRegisterCheckUsernamePost({ username: watchedUsername });
+				const res = await authRegisterCheckUsernamePost({
+					username: watchedUsername,
+					tenantId: checkTenantId,
+				});
 				setUsernameStatus(res.available ? 'available' : 'taken');
 			} catch {
 				setUsernameStatus('idle');
@@ -273,7 +280,7 @@ export default function RegisterPage() {
 		return () => {
 			if (usernameTimer.current) clearTimeout(usernameTimer.current);
 		};
-	}, [watchedUsername]);
+	}, [watchedUsername, checkTenantId]);
 
 	useEffect(() => {
 		if (emailTimer.current) clearTimeout(emailTimer.current);

@@ -195,6 +195,25 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 		});
 	});
 
+	// 回归锁（2026-10-23 线上 61000101 user not found）：残留租户 A + 地址栏 platform
+	// 时旧实现透出后端英文 title；必须本地化为可操作提示。
+	it('该租户查无此用户（61000101）时显示本地化提示', async () => {
+		vi.mocked(authWebauthnAuthenticateCompletePost).mockRejectedValueOnce({
+			message: 'Request failed with status code 400',
+			response: {
+				status: 400,
+				data: { code: 61000101, title: 'user not found', status: 400 },
+			},
+		});
+
+		renderButton();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-error')).toHaveTextContent('passkey.userNotFound');
+		});
+	});
+
 	it('其他服务端错误透出 problem title，而不是 axios 泛化文案', async () => {
 		vi.mocked(authWebauthnAuthenticateCompletePost).mockRejectedValueOnce({
 			message: 'Request failed with status code 400',

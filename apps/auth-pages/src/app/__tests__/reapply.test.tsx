@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Routes, Route } from 'react-router';
 import ReapplyPage from '../reapply/page';
 
 const { mockApiClientPost, mockAuthRegisterReapplyPost } = vi.hoisted(() => ({
@@ -49,6 +49,14 @@ vi.mock('@/hooks/use-page-title', () => ({
 	usePageTitle: vi.fn(),
 }));
 
+const { mockUseTenantAuthConfigBySlug } = vi.hoisted(() => ({
+	mockUseTenantAuthConfigBySlug: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-tenant-auth-config', () => ({
+	useTenantAuthConfigBySlug: (...args: any[]) => mockUseTenantAuthConfigBySlug(...args),
+}));
+
 vi.mock('@autional/ui', () => ({
 	Button: ({ children, type, fullWidth, isLoading, ...props }: any) => (
 		<button type={type || 'submit'} data-testid="submit-btn" disabled={isLoading} {...props}>
@@ -87,8 +95,18 @@ const renderPage = (searchParams?: string) =>
 		</MemoryRouter>,
 	);
 
+const renderSlugPage = () =>
+	render(
+		<MemoryRouter initialEntries={['/acme-corp/reapply?email=test@example.com']}>
+			<Routes>
+				<Route path=":tenantSlug/reapply" element={<ReapplyPage />} />
+			</Routes>
+		</MemoryRouter>,
+	);
+
 beforeEach(() => {
 	vi.clearAllMocks();
+	mockUseTenantAuthConfigBySlug.mockReturnValue({ data: null, isLoading: false });
 });
 
 describe('ReapplyPage', () => {
@@ -190,5 +208,36 @@ describe('ReapplyPage', () => {
 
 		expect(screen.getByText('auth.reapply.rejected')).toBeInTheDocument();
 		expect(screen.getByText('auth.reapply.rejectedDesc')).toBeInTheDocument();
+	});
+
+	// 地址栏是唯一权威：slug 解析出的租户必须随请求体提交（后端 req 优先于 X-Tenant-ID）。
+	it('submits the address-bar tenant in the payload under /:tenantSlug/reapply', async () => {
+		mockUseTenantAuthConfigBySlug.mockReturnValue({
+			data: { tenantId: 'tenant-slug-1' },
+			isLoading: false,
+		});
+		mockAuthRegisterReapplyPost.mockRejectedValue({ response: { data: { message: 'boom' } } });
+
+		renderSlugPage();
+
+		fireEvent.change(screen.getByPlaceholderText('auth.reapply.reasonPlaceholder'), {
+			target: { value: 'This is a valid reason for reapplying to the service' },
+		});
+
+		await act(async () => {
+			fireEvent.click(screen.getByTestId('submit-btn'));
+		});
+
+		expect(mockAuthRegisterReapplyPost).toHaveBeenCalledWith(
+			expect.objectContaining({ email: 'test@example.com', tenantId: 'tenant-slug-1' }),
+		);
+	});
+
+	// slug 存在但租户解析失败 → 禁止提交，绝不回退 X-Tenant-ID（残留租户）。
+	it('disables submit when the slug tenant cannot be resolved', () => {
+		renderSlugPage();
+
+		expect(screen.getByTestId('submit-btn')).toBeDisabled();
+		expect(screen.getByText('auth.reapply.tenantUnavailable')).toBeInTheDocument();
 	});
 });

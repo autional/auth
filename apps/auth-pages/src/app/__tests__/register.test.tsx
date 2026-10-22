@@ -88,10 +88,22 @@ vi.mock('@/lib/breach-check', () => ({
 	checkPasswordBreached: vi.fn(() => Promise.resolve({ breached: false })),
 }));
 
+const { mockUseTenantAuthConfig, mockUseTenantAuthConfigBySlug } = vi.hoisted(() => ({
+	mockUseTenantAuthConfig: vi.fn(),
+	mockUseTenantAuthConfigBySlug: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-tenant-auth-config', () => ({
+	useTenantAuthConfig: (...args: any[]) => mockUseTenantAuthConfig(...args),
+	useTenantAuthConfigBySlug: (...args: any[]) => mockUseTenantAuthConfigBySlug(...args),
+}));
+
 beforeEach(() => {
 	vi.clearAllMocks();
 	mockAuthRegisterCheckUsername.mockResolvedValue({ available: true });
 	mockAuthRegisterCheckEmail.mockResolvedValue({ available: true });
+	mockUseTenantAuthConfig.mockReturnValue({ data: null, isLoading: false });
+	mockUseTenantAuthConfigBySlug.mockReturnValue({ data: null, isLoading: false });
 });
 
 describe('RegisterPage', () => {
@@ -217,6 +229,34 @@ describe('RegisterPage', () => {
 		const payload = mockAuthMeConsentPost.mock.calls[0][0];
 		expect(payload.scope).toBe('terms');
 		expect(payload.metadata).toBeUndefined();
+	});
+
+	// 地址栏是唯一权威：查重必须带 slug 解析出的租户（后端 body tenant_id 优先）。
+	it('sends the address-bar tenant when checking username under /:tenantSlug/register', async () => {
+		mockUseTenantAuthConfigBySlug.mockReturnValue({
+			data: { tenantId: 'tenant-slug-1' },
+			isLoading: false,
+		});
+
+		render(
+			<QueryClientProvider client={queryClient}>
+				<MemoryRouter initialEntries={['/acme-corp/register']}>
+					<Routes>
+						<Route path="/:tenantSlug/register" element={<RegisterPage />} />
+					</Routes>
+				</MemoryRouter>
+			</QueryClientProvider>,
+		);
+
+		fireEvent.change(screen.getByPlaceholderText('register.usernamePlaceholder'), {
+			target: { value: 'sluguser' },
+		});
+
+		await waitFor(() => {
+			expect(mockAuthRegisterCheckUsername).toHaveBeenCalledWith(
+				expect.objectContaining({ username: 'sluguser', tenantId: 'tenant-slug-1' }),
+			);
+		});
 	});
 
 	it('keeps tenant slug in login link when accessed under /:tenantSlug/register', () => {

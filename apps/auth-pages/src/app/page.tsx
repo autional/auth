@@ -1179,7 +1179,10 @@ export default function LoginPage() {
 						</form>
 						{/* 条件式 passkey 自动填充：仅在密码表单内且租户启用 passkey 时挂载，切 tab/卸载时 abort 请求 */}
 						{loginMethods.includes('passkey') && (
-							<PasskeyLoginButton mode="conditional" tenantId={watch('tenantId')} />
+							<PasskeyLoginButton
+								mode="conditional"
+								tenantId={slugAuthConfig?.tenantId || watch('tenantId')}
+							/>
 						)}
 					</>
 				)}
