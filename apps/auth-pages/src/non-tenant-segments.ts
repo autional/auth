@@ -31,7 +31,6 @@ export const NON_TENANT_SEGMENTS = [
 	'privacy',
 	'reapply',
 	'reset-password',
-	'sso',
 	'terms',
 	'verify-email',
 	'verify-identity',
