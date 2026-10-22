@@ -138,7 +138,7 @@ describe('MFAChallengePage', () => {
 		});
 	});
 
-	it('renders tabs derived from requiredMfaMethods (backup alongside totp, no email)', async () => {
+	it('renders tabs derived from requiredMfaMethods (backup is a TOTP sub-action, not a tab)', async () => {
 		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
 
 		renderMFAChallenge();
@@ -147,8 +147,9 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
+		expect(screen.getAllByRole('tab')).toHaveLength(2);
+		expect(screen.getByRole('button', { name: 'mfa.challenge.useBackup' })).toBeInTheDocument();
 
 		// AUTH2-01：标签条具备完整 tab 语义，当前面板与选中标签关联
 		expect(
@@ -170,7 +171,7 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+		expect(screen.getAllByRole('tab')).toHaveLength(3);
 	});
 
 	it('uses enrolledMfaMethods over requiredMfaMethods (only enrolled methods shown)', async () => {
@@ -182,8 +183,8 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
+		expect(screen.getAllByRole('tab')).toHaveLength(2);
 	});
 
 	it('shows a single enrolled method without a tab strip', async () => {
@@ -242,7 +243,7 @@ describe('MFAChallengePage', () => {
 		expect(sessionStorage.getItem('mfa_pre_auth')).toBeNull();
 	});
 
-	it('submits backup code with explicit backup method (no totp collapse, AUTH-38)', async () => {
+	it('submits backup code with explicit backup method from the authenticator panel (AUTH-38)', async () => {
 		seedPreAuth({ requiredMfaMethods: ['totp'] });
 		mockVerifyMFAChallenge.mockResolvedValue({ accessToken: 'AT', refreshToken: 'RT', user: { id: 'u1' } });
 
@@ -250,10 +251,10 @@ describe('MFAChallengePage', () => {
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'mfa.challenge.useBackup' })).toBeInTheDocument();
 		});
 
-		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabBackup' }));
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.useBackup' }));
 		await user.type(screen.getByPlaceholderText('mfa.challenge.backupPlaceholder'), 'ABCDEFGH');
 		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
 
@@ -264,8 +265,20 @@ describe('MFAChallengePage', () => {
 		});
 	});
 
-	it('shows masked sms delivery hint on the SMS tab', async () => {
+	it('does not offer backup codes when TOTP is not enrolled', async () => {
+		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['email'] });
+
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByText('mfa.challenge.emailLabel')).toBeInTheDocument();
+		});
+		expect(screen.queryByRole('button', { name: 'mfa.challenge.useBackup' })).not.toBeInTheDocument();
+	});
+
+	it('shows a manual-send hint on the SMS tab until the code is sent', async () => {
 		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'], phone: '13800138000' });
+		mockSendMFAChallengeCode.mockResolvedValue({ sent: true });
 
 		const user = userEvent.setup();
 		renderMFAChallenge();
@@ -276,10 +289,20 @@ describe('MFAChallengePage', () => {
 
 		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' }));
 
-		const hint = await screen.findByText((content) =>
+		const before = await screen.findByText((content) =>
+			content.startsWith('mfa.challenge.smsWillSend'),
+		);
+		expect(before.textContent).toContain('138****8000');
+		expect(
+			screen.queryByText((content) => content.startsWith('mfa.challenge.smsDelivered')),
+		).toBeNull();
+
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.sendCode' }));
+
+		const after = await screen.findByText((content) =>
 			content.startsWith('mfa.challenge.smsDelivered'),
 		);
-		expect(hint.textContent).toContain('138****8000');
+		expect(after.textContent).toContain('138****8000');
 	});
 
 	it('switches to expired screen on 403 challenge-required (server revalidation)', async () => {

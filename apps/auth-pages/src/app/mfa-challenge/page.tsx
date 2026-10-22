@@ -22,7 +22,8 @@ import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { semanticsOfError } from '@/lib/error-semantics';
 
-type CodeMethod = 'totp' | 'sms' | 'email' | 'backup';
+type CodeMethod = 'totp' | 'sms' | 'email';
+type VerifyMethod = CodeMethod | 'backup';
 
 // 登录页/mfa-setup 写入的挑战会话（oauth/callback 写入子集：无 email/phone/riskLevel）
 interface PreAuthData {
@@ -35,7 +36,7 @@ interface PreAuthData {
 	phone?: string;
 }
 
-const CODE_METHOD_ORDER: CodeMethod[] = ['totp', 'sms', 'email', 'backup'];
+const CODE_METHOD_ORDER: CodeMethod[] = ['totp', 'sms', 'email'];
 
 // 分流由契约驱动（@/lib/error-semantics）：
 //   61000403（挑战令牌无效/过期） → ui_observation='reauth_required' ⇒ 回登录
@@ -55,7 +56,8 @@ function maskContact(value: string): string {
  * 可见验证方式 = 用户已开通的码方法（identity 回传 enrolled_mfa_methods）；
  * 未回传时回落风险策略列表，两者皆空才展示全部码方法（历史兼容）。
  * password 是基线、webauthn 无码面，均不在标签页展示。
- * 备用码与 TOTP 同腿验证（mfa 侧 ValidateTOTP 内含一次性消费回退），随 TOTP 一并展示。
+ * 备用恢复码是 TOTP 的恢复手段（mfa 侧 ValidateTOTP 内含一次性消费回退），
+ * 作为身份验证器面板内的次级操作呈现，不是并列标签。
  */
 function deriveTabs(required?: string[], enrolled?: string[]): CodeMethod[] {
 	const codeOnly = (list?: string[]) =>
@@ -66,8 +68,7 @@ function deriveTabs(required?: string[], enrolled?: string[]): CodeMethod[] {
 	const enrolledCode = codeOnly(enrolled);
 	const base: CodeMethod[] =
 		enrolledCode.length > 0 ? enrolledCode : policy.length > 0 ? policy : ['totp', 'sms', 'email'];
-	const withBackup: CodeMethod[] = base.includes('totp') ? [...base, 'backup'] : base;
-	return CODE_METHOD_ORDER.filter((m) => withBackup.includes(m));
+	return CODE_METHOD_ORDER.filter((m) => base.includes(m));
 }
 
 type BackupFormData = { code: string };
@@ -97,6 +98,8 @@ export default function MFAChallengePage() {
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired'>('');
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
+	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
+	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState('');
 	const [announcement, setAnnouncement] = useState('');
@@ -147,6 +150,7 @@ export default function MFAChallengePage() {
 	useEffect(() => {
 		if (preAuth && !tabs.includes(activeTab)) {
 			setActiveTab(tabs[0]);
+			setTotpFallback(false);
 		}
 	}, [preAuth, tabs, activeTab]);
 
@@ -155,7 +159,7 @@ export default function MFAChallengePage() {
 	const emailForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const backupForm = useForm<BackupFormData>({ resolver: zodResolver(backupSchema) });
 
-	const handleSubmit = async (code: string, type: CodeMethod) => {
+	const handleSubmit = async (code: string, type: VerifyMethod) => {
 		if (!preAuth) return;
 		setSubmitting(true);
 		setError('');
@@ -247,6 +251,7 @@ export default function MFAChallengePage() {
 		event.preventDefault();
 		const nextKey = tabs[next];
 		setActiveTab(nextKey);
+		setTotpFallback(false);
 		setError('');
 		document.getElementById(`mfa-tab-${nextKey}`)?.focus();
 	};
@@ -315,9 +320,7 @@ export default function MFAChallengePage() {
 			? t('mfa.challenge.tabTOTP')
 			: key === 'sms'
 				? t('mfa.challenge.tabSMS')
-				: key === 'email'
-					? t('mfa.challenge.tabEmail')
-					: t('mfa.challenge.tabBackup');
+				: t('mfa.challenge.tabEmail');
 
 	return (
 		<AuthCard>
@@ -340,6 +343,7 @@ export default function MFAChallengePage() {
 							tabIndex={activeTab === key ? 0 : -1}
 							onClick={() => {
 								setActiveTab(key);
+								setTotpFallback(false);
 								setError('');
 							}}
 							onKeyDown={(event) => handleTabKeyDown(event, index)}
@@ -382,7 +386,7 @@ export default function MFAChallengePage() {
 				</div>
 			)}
 
-			{activeTab === 'totp' && (
+			{activeTab === 'totp' && !totpFallback && (
 				<form
 					{...tabPanelProps('totp')}
 					onSubmit={totpForm.handleSubmit((data) => handleSubmit(data.code, 'totp'))}
@@ -407,6 +411,16 @@ export default function MFAChallengePage() {
 					<Button type="submit" fullWidth isLoading={submitting}>
 						{t('mfa.challenge.verify')}
 					</Button>
+					<button
+						type="button"
+						onClick={() => {
+							setTotpFallback(true);
+							setError('');
+						}}
+						className="w-full text-center text-sm text-brand-text hover:underline"
+					>
+						{t('mfa.challenge.useBackup')}
+					</button>
 				</form>
 			)}
 
@@ -429,9 +443,13 @@ export default function MFAChallengePage() {
 							error={smsForm.formState.errors.code?.message}
 						/>
 						<p className="text-xs text-[var(--color-text-secondary)]">
-							{preAuth.phone
-								? t('mfa.challenge.smsDelivered', { target: maskContact(preAuth.phone) })
-								: t('mfa.challenge.smsDeliveredGeneric')}
+							{sentMethods.sms
+								? preAuth.phone
+									? t('mfa.challenge.smsDelivered', { target: maskContact(preAuth.phone) })
+									: t('mfa.challenge.smsDeliveredGeneric')
+								: preAuth.phone
+									? t('mfa.challenge.smsWillSend', { target: maskContact(preAuth.phone) })
+									: t('mfa.challenge.smsWillSendGeneric')}
 						</p>
 					</div>
 					{sendCodeButton('sms')}
@@ -460,9 +478,13 @@ export default function MFAChallengePage() {
 							error={emailForm.formState.errors.code?.message}
 						/>
 						<p className="text-xs text-[var(--color-text-secondary)]">
-							{preAuth.email
-								? t('mfa.challenge.emailDelivered', { target: maskContact(preAuth.email) })
-								: t('mfa.challenge.emailDeliveredGeneric')}
+							{sentMethods.email
+								? preAuth.email
+									? t('mfa.challenge.emailDelivered', { target: maskContact(preAuth.email) })
+									: t('mfa.challenge.emailDeliveredGeneric')
+								: preAuth.email
+									? t('mfa.challenge.emailWillSend', { target: maskContact(preAuth.email) })
+									: t('mfa.challenge.emailWillSendGeneric')}
 						</p>
 					</div>
 					{sendCodeButton('email')}
@@ -472,9 +494,9 @@ export default function MFAChallengePage() {
 				</form>
 			)}
 
-			{activeTab === 'backup' && (
+			{activeTab === 'totp' && totpFallback && (
 				<form
-					{...tabPanelProps('backup')}
+					{...tabPanelProps('totp')}
 					onSubmit={backupForm.handleSubmit((data) => handleSubmit(data.code, 'backup'))}
 					className="space-y-4"
 				>
@@ -496,6 +518,16 @@ export default function MFAChallengePage() {
 					<Button type="submit" fullWidth isLoading={submitting}>
 						{t('mfa.challenge.verify')}
 					</Button>
+					<button
+						type="button"
+						onClick={() => {
+							setTotpFallback(false);
+							setError('');
+						}}
+						className="w-full text-center text-sm text-brand-text hover:underline"
+					>
+						{t('mfa.challenge.useTOTP')}
+					</button>
 				</form>
 			)}
 
