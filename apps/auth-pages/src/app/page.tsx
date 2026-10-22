@@ -631,6 +631,8 @@ export default function LoginPage() {
 						riskLevel: loginResult.riskLevel || loginResult.data?.risk_level || '',
 						requiredMfaMethods:
 							loginResult.requiredMfaMethods || loginResult.data?.required_mfa_methods || [],
+						enrolledMfaMethods:
+							loginResult.enrolledMfaMethods || loginResult.data?.enrolled_mfa_methods || [],
 						email: loginResult.user?.email || '',
 						phone: loginResult.user?.phone || '',
 					}),

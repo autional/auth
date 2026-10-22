@@ -193,6 +193,33 @@ describe('LoginPage', () => {
 		});
 		expect(screen.queryByText('login.error.credentials')).toBeNull();
 	});
+
+	// 4247b59 的 enrolled 过滤只在挑战页消费；登录页不转发则派生永远走 required 回落，
+	// 用户会看到未开通的方法。本用例锁 login → mfa_pre_auth 的 wiring。
+	it('MFA 登录把 enrolled_mfa_methods 写进挑战会话', async () => {
+		mockAuthLoginPost.mockResolvedValue({
+			requiresMfa: true,
+			challengeToken: 'ct-abc',
+			requiredMfaMethods: ['totp', 'sms', 'email'],
+			enrolledMfaMethods: ['email'],
+			user: { email: 'u***@example.com' },
+		});
+		const user = userEvent.setup();
+		renderLogin();
+		await user.type(screen.getByPlaceholderText('auth.login.identityPlaceholder'), 'testuser');
+		await user.type(screen.getByPlaceholderText('auth.login.passwordPlaceholder'), 'pass123');
+		await user.click(screen.getByRole('button', { name: 'login.submit' }));
+
+		// 用例在 Route 外直挂组件，useParams 无 slug（渲染为 /null/…），此处只锁落点
+		await waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/mfa-challenge'));
+		});
+		const preAuth = JSON.parse(sessionStorage.getItem('mfa_pre_auth') || '{}');
+		expect(preAuth.challengeToken).toBe('ct-abc');
+		expect(preAuth.enrolledMfaMethods).toEqual(['email']);
+		expect(preAuth.requiredMfaMethods).toEqual(['totp', 'sms', 'email']);
+		sessionStorage.removeItem('mfa_pre_auth');
+	});
 });
 
 describe('LoginPage - passkey 入口', () => {
