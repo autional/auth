@@ -46,18 +46,17 @@ vi.mock('@/lib/i18n', () => ({
 // data-*，断言 search 整串（含 from_requireauth / rt 兄弟参数）原样抵达
 vi.mock('@/app/page', async () => {
 	const { useLocation } = await import('react-router');
-	return {
-		default: () => {
-			const location = useLocation();
-			return (
-				<div
-					data-testid="login-probe"
-					data-pathname={location.pathname}
-					data-search={location.search}
-				/>
-			);
-		},
-	};
+	function LoginProbe() {
+		const location = useLocation();
+		return (
+			<div
+				data-testid="login-probe"
+				data-pathname={location.pathname}
+				data-search={location.search}
+			/>
+		);
+	}
+	return { default: LoginProbe };
 });
 
 /**

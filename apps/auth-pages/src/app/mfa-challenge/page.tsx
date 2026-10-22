@@ -123,7 +123,7 @@ export default function MFAChallengePage() {
 			navigate(loginPath, { replace: true });
 			return;
 		}
-		let parsed: PreAuthData | null = null;
+		let parsed: PreAuthData | null;
 		try {
 			parsed = JSON.parse(raw);
 		} catch {
