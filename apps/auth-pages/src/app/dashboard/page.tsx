@@ -67,10 +67,22 @@ interface AuthorizedApp {
 	id: string;
 	clientId: string;
 	clientName?: string;
+	/** 显示简称（metadata.alias）：优先于 clientName */
+	alias?: string;
 	logoUri?: string;
 	website?: string;
 	scopes?: string;
 	grantedAt?: string;
+}
+
+/**
+ * 展示名优先级：别名 → 去掉门户前缀的名称 → 原名称。
+ * "Default Client for demo" 这类前缀对用户没有信息量，兜底时剥掉。
+ */
+function displayAppName(app: AuthorizedApp): string {
+	if (app.alias) return app.alias;
+	const name = app.clientName || '';
+	return name.replace(/^Default Client for\s+/i, '') || name;
 }
 
 interface PortalPrefs {
@@ -227,7 +239,7 @@ export default function DashboardPage() {
 
 	// 无名称的应用不渲染（后端富化失败/客户端已删时只剩 client_id，显示裸 ID 是噪音）
 	const authorizedAppsVisible = useMemo(
-		() => authorizedApps.filter((a) => !!a.clientName),
+		() => authorizedApps.filter((a) => !!displayAppName(a)),
 		[authorizedApps],
 	);
 
@@ -351,7 +363,7 @@ export default function DashboardPage() {
 							{authorizedAppsVisible.map((app) => (
 								<AppTile
 									key={`app-${app.id}`}
-									name={app.clientName || app.clientId}
+									name={displayAppName(app)}
 									href={app.website}
 									logoUrl={app.logoUri}
 								/>

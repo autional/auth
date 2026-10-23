@@ -342,6 +342,8 @@ describe('DashboardPage', () => {
 					id: 'consent-1',
 					clientId: 'client-novel',
 					clientName: 'novel-demo',
+					// 显示简称优先于全名
+					alias: '小说',
 					website: 'https://novel.example.com',
 					grantedAt: '2026-10-23T00:00:00Z',
 				},
@@ -365,12 +367,13 @@ describe('DashboardPage', () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('novel-demo')).toBeInTheDocument();
+			expect(screen.getByText('小说')).toBeInTheDocument();
 		});
 
+		expect(screen.queryByText('novel-demo')).not.toBeInTheDocument();
 		expect(screen.queryByText('client-orphan')).not.toBeInTheDocument();
 
-		const safeTile = screen.getByText('novel-demo').closest('a');
+		const safeTile = screen.getByText('小说').closest('a');
 		// 规范化后的绝对地址（safeExternalUrl 统一走 new URL().toString()，与 user 门户同语义）
 		expect(safeTile).toHaveAttribute('href', 'https://novel.example.com/');
 		expect(safeTile).toHaveAttribute('rel', 'noopener noreferrer');

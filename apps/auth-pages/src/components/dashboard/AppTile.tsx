@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useI18n } from '@/lib/i18n';
+import { safeExternalUrl } from '@/lib/safe-url';
 
 /**
  * 「我的应用」磁贴（平台门户与已授权应用共用）。
@@ -9,19 +10,9 @@ import { useI18n } from '@/lib/i18n';
  * 三条约束来自实施规范：
  * 1. 固定高度（`min-h-[104px]`）—— 图标/名称晚到时不改变网格高度（CLS）。
  * 2. 不做 hover-only 操作 —— 手机没有 hover，「管理」入口统一放分组标题右侧。
- * 3. `website` 只接受 http/https —— 授权数据里的 URL 属外部输入，
- *    `javascript:` / `data:` 一律不渲染成链接（防伪协议注入）。
+ * 3. `website` / `logoUrl` 只接受**绝对** http/https（见 `lib/safe-url.ts`）：
+ *    相对路径与协议相对地址（`//evil.com`）一律不渲染。
  */
-export function isSafeHttpUrl(value?: string): boolean {
-	if (!value) return false;
-	try {
-		const url = new URL(value, window.location.origin);
-		return url.protocol === 'http:' || url.protocol === 'https:';
-	} catch {
-		return false;
-	}
-}
-
 export interface AppTileProps {
 	/** 展示名（已 i18n 或来自客户端名称） */
 	name: string;
@@ -35,19 +26,21 @@ export interface AppTileProps {
 
 export function AppTile({ name, href, icon, logoUrl }: AppTileProps) {
 	const { t } = useI18n();
-	const safeHref = isSafeHttpUrl(href) ? href : undefined;
+	const safeHref = safeExternalUrl(href);
+	const safeLogo = safeExternalUrl(logoUrl);
 
 	const body = (
 		<>
 			<span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[var(--color-bg-surface)] text-[var(--color-brand)]">
-				{logoUrl ? (
+				{safeLogo ? (
 					<img
-						src={logoUrl}
+						src={safeLogo}
 						alt=""
 						aria-hidden="true"
 						width={44}
 						height={44}
 						loading="lazy"
+						referrerPolicy="no-referrer"
 						className="h-11 w-11 object-cover"
 					/>
 				) : icon ? (
