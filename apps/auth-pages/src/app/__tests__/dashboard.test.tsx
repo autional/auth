@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ const {
 	mockPublicTenants,
 } = vi.hoisted(() => ({
 	mockHandleLogout: vi.fn(),
-	mockApiClientGet: vi.fn(() => Promise.resolve({ data: { items: [] } })),
+	mockApiClientGet: vi.fn(async (): Promise<{ data: any }> => ({ data: [] })),
 	mockGetMe: vi.fn(),
 	mockAuthMeMemberships: vi.fn(() => Promise.resolve({ items: [] })),
 	mockAuthMeSessions: vi.fn(() => Promise.resolve({ items: [] })),
@@ -85,7 +85,11 @@ vi.mock('react-router', async () => {
 	return {
 		...actual,
 		useNavigate: () => mockNavigate,
-		Link: ({ to, children }: any) => <a href={to}>{children}</a>,
+		Link: ({ to, children, ...rest }: any) => (
+			<a href={to} {...rest}>
+				{children}
+			</a>
+		),
 	};
 });
 
@@ -217,24 +221,26 @@ beforeEach(() => {
 	state.accessToken = 'fake-token';
 	state.role = 'user';
 	mockGetMe.mockResolvedValue(state.user);
-	mockApiClientGet.mockResolvedValue({ data: { items: [] } });
+	mockApiClientGet.mockResolvedValue({ data: [] });
 	// U93 缺省 fail-open（空名单 → 不拦截），单测按需覆盖
 	mockPublicTenants.mockReturnValue({ data: [], isSuccess: true });
 	queryClient.clear();
 });
 
 describe('DashboardPage', () => {
-	it('渲染用户信息（用户名、邮箱、ID、状态）', async () => {
+	it('渲染账号身份（问候、邮箱）与状态摘要', async () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.userId')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.greeting {"name":"testuser"}')).toBeInTheDocument();
 		});
 
-		expect(screen.getByText('user_123')).toBeInTheDocument();
-		expect(screen.getByText('testuser')).toBeInTheDocument();
 		expect(screen.getByText('test@example.com')).toBeInTheDocument();
-		expect(screen.getByText('active')).toBeInTheDocument();
+		// 状态 / MFA / 最后登录 / 在线设备 收敛为一行摘要
+		expect(screen.getByText(/dashboard\.status: active/)).toBeInTheDocument();
+		expect(screen.getByText(/MFA: dashboard\.mfaEnabled/)).toBeInTheDocument();
+		expect(screen.getByText(/dashboard\.lastLogin:/)).toBeInTheDocument();
+		expect(screen.getByText(/dashboard\.sessionsOnline/)).toBeInTheDocument();
 	});
 
 	it('根据 super_admin 角色显示管理员专属 Portal 链接', async () => {
@@ -255,7 +261,7 @@ describe('DashboardPage', () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.loggedIn')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.myApps')).toBeInTheDocument();
 		});
 
 		expect(screen.queryByText('dashboard.adminConsole')).not.toBeInTheDocument();
@@ -266,16 +272,17 @@ describe('DashboardPage', () => {
 		expect(screen.queryByText('dashboard.authenticatorApp')).not.toBeInTheDocument();
 	});
 
-	it('显示安全概览卡片', async () => {
+	it('账户与安全摘要只出现一次 MFA（去重回归）', async () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.securityOverview')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.summaryTitle')).toBeInTheDocument();
 		});
 
-		const mfaLabels = screen.getAllByText('dashboard.mfaEnabled');
-		expect(mfaLabels).toHaveLength(2);
-		expect(screen.getByText('dashboard.manageSecurity →')).toBeInTheDocument();
+		// 旧版把 MFA 同时渲染在「账户信息卡」与「安全概览卡」（AUTH-44 遗留），
+		// 现收敛为一行摘要；>1 即为回归。
+		expect(screen.getAllByText(/dashboard\.mfaEnabled/)).toHaveLength(1);
+		expect(screen.getByText(/dashboard\.manageSecurity/)).toBeInTheDocument();
 	});
 
 	it('处理加载状态', () => {
@@ -318,6 +325,55 @@ describe('DashboardPage', () => {
 
 		expect(mockHandleLogout).toHaveBeenCalled();
 	});
+
+	it('顶层导航固定两个分区，当前分区带 aria-current', async () => {
+		renderPage();
+
+		const nav = await screen.findByRole('navigation', { name: 'dashboard.tabs.label' });
+		const links = within(nav).getAllByRole('link');
+		expect(links).toHaveLength(2);
+		expect(links[0]).toHaveAttribute('href', '/dashboard');
+		expect(links[0]).toHaveAttribute('aria-current', 'page');
+		expect(links[1]).toHaveAttribute('href', '/account');
+		expect(links[1]).not.toHaveAttribute('aria-current');
+	});
+
+	it('渲染已授权应用磁贴，非 http(s) 的 website 不渲染成链接', async () => {
+		mockApiClientGet.mockResolvedValue({
+			data: [
+				{
+					id: 'consent-1',
+					clientId: 'client-novel',
+					clientName: 'novel-demo',
+					website: 'https://novel.example.com',
+					grantedAt: '2026-10-23T00:00:00Z',
+				},
+				{
+					id: 'consent-2',
+					clientId: 'client-next',
+					clientName: 'nextchat',
+					// 外部输入的伪协议：不得变成可点击链接
+					website: 'javascript:alert(1)',
+					grantedAt: '2026-10-23T00:00:00Z',
+				},
+			],
+		});
+
+		renderPage();
+
+		await waitFor(() => {
+			expect(screen.getByText('novel-demo')).toBeInTheDocument();
+		});
+
+		const safeTile = screen.getByText('novel-demo').closest('a');
+		expect(safeTile).toHaveAttribute('href', 'https://novel.example.com');
+		expect(safeTile).toHaveAttribute('rel', 'noopener noreferrer');
+
+		// 伪协议：降级为不可点击磁贴 + 「未配置入口」提示
+		const unsafeTile = screen.getByText('nextchat').closest('a');
+		expect(unsafeTile).toBeNull();
+		expect(screen.getByText('dashboard.appNoLink')).toBeInTheDocument();
+	});
 });
 
 // ============================================================
@@ -355,7 +411,7 @@ describe('DashboardPage slug↔会话一致性（U93）', () => {
 			expect(mockNavigate).toHaveBeenCalledWith('/demo/dashboard', { replace: true });
 		});
 		expect(screen.getByText('dashboard.loading')).toBeInTheDocument();
-		expect(screen.queryByText('dashboard.loggedIn')).not.toBeInTheDocument();
+		expect(screen.queryByText('dashboard.myApps')).not.toBeInTheDocument();
 	});
 
 	it('U93-2 URL slug = 会话租户 → 不重定向，正常渲染', async () => {
@@ -364,7 +420,7 @@ describe('DashboardPage slug↔会话一致性（U93）', () => {
 		renderSlugPage('demo');
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.loggedIn')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.myApps')).toBeInTheDocument();
 		});
 		expect(mockNavigate).not.toHaveBeenCalled();
 	});
@@ -375,7 +431,7 @@ describe('DashboardPage slug↔会话一致性（U93）', () => {
 		renderSlugPage('acme');
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.loggedIn')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.myApps')).toBeInTheDocument();
 		});
 		expect(mockNavigate).not.toHaveBeenCalled();
 	});
@@ -389,7 +445,7 @@ describe('DashboardPage slug↔会话一致性（U93）', () => {
 		renderSlugPage('acme');
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.loggedIn')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.myApps')).toBeInTheDocument();
 		});
 		expect(mockNavigate).not.toHaveBeenCalled();
 	});

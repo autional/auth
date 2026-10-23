@@ -70,7 +70,9 @@ vi.mock('@autional/shared', async (importOriginal) => ({
 
 vi.mock('@autional/shared/generated/api', () => ({
 	sessionsUserSessionsByUser: vi.fn(() => Promise.resolve({ data: { items: [] } })),
+	authMeSessions: vi.fn(() => Promise.resolve({ items: [] })),
 	authMeMemberships: vi.fn(() => Promise.resolve({ items: [] })),
+	authMePut: vi.fn(() => Promise.resolve({})),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -118,7 +120,10 @@ beforeEach(() => {
 describe('Logout / Dashboard', () => {
 	it('displays user info after loading', async () => {
 		renderDashboard();
-		expect(await screen.findByText('dashboard.title', {}, { timeout: 3_000 })).toBeInTheDocument();
+		// 2026-10-23：仪表盘改为「问候 + 我的应用 + 摘要」，加载完成标记改用问候语
+		expect(
+			await screen.findByText(/dashboard\.greeting/, {}, { timeout: 3_000 }),
+		).toBeInTheDocument();
 	});
 
 	it('redirects to login when no token exists', async () => {

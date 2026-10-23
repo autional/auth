@@ -4,6 +4,7 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
 import { userPortalUrl } from '@/lib/portal-links';
 import { AuthCard } from '@/components/auth/AuthCard';
+import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import {
 	UserCircle,
 	ShieldCheck,
@@ -16,6 +17,7 @@ import {
 	Phone,
 	Lock,
 	UserX,
+	Blocks,
 	type LucideIcon,
 } from 'lucide-react';
 
@@ -82,6 +84,14 @@ const links: AccountLink[] = [
 		icon: Link2,
 	},
 	{
+		// 2026-10-23：已授权应用（OAuth consent）。auth 站只做入口，页面在 user 门户
+		// （AUTH-45①：账户中心跨门户深链必须带 slug，由 userPortalUrl 拼装）。
+		path: '/security/authorized-apps',
+		labelKey: 'account.authorizedApps',
+		descKey: 'account.authorizedAppsDesc',
+		icon: Blocks,
+	},
+	{
 		path: '/security/recovery-contacts',
 		labelKey: 'account.recoveryContacts',
 		descKey: 'account.recoveryContactsDesc',
@@ -113,7 +123,9 @@ export default function AccountPage() {
 	usePageTitle('account.title');
 
 	return (
-		<AuthCard maxWidth="lg" title={t('account.title')} subtitle={t('account.subtitle')}>
+		<AuthCard maxWidth="2xl" align="start" title={t('account.title')} subtitle={t('account.subtitle')}>
+			{/* 与概览同一条顶层导航；两个分区宽度一致，切换时不产生横向/纵向跳动 */}
+			<DashboardNav current="account" />
 			<div className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-muted)] divide-y divide-[var(--color-border-subtle)]">
 				{links.map((link) => (
 					<a
