@@ -243,6 +243,78 @@ describe('MFAChallengePage', () => {
 		expect(sessionStorage.getItem('mfa_pre_auth')).toBeNull();
 	});
 
+	// U88 同口径：MFA 通过后继续回程（OAuth 授权链不中断）
+	it('continues to the post-login redirect target after successful MFA', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp'] });
+		mockVerifyMFAChallenge.mockResolvedValue({
+			accessToken: 'AT',
+			refreshToken: 'RT',
+			user: { id: 'u1' },
+		});
+
+		const originalLocation = window.location;
+		delete (window as any).location;
+		(window as any).location = Object.defineProperties(
+			{},
+			{
+				...Object.getOwnPropertyDescriptors(originalLocation),
+				origin: { get: () => 'https://auth.autional.cn', configurable: true },
+				hostname: { get: () => 'auth.autional.cn', configurable: true },
+				href: { value: '', writable: true, configurable: true },
+			},
+		);
+		try {
+			const user = userEvent.setup();
+			render(
+				<MemoryRouter
+					initialEntries={['/mfa-challenge?redirect=%2Fplatform%2Fdashboard%3Ftab%3Dsecurity']}
+				>
+					<MFAChallengePage />
+				</MemoryRouter>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+			});
+			await user.type(screen.getByPlaceholderText('mfa.challenge.codePlaceholder'), '123456');
+			await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
+
+			await waitFor(() => {
+				expect((window as any).location.href).toBe('/platform/dashboard?tab=security');
+			});
+			expect(mockNavigate).not.toHaveBeenCalledWith('/dashboard');
+			expect(sessionStorage.getItem('mfa_pre_auth')).toBeNull();
+		} finally {
+			Object.defineProperty(window, 'location', { value: originalLocation, writable: true });
+		}
+	});
+
+	it('ignores an invalid redirect and falls back to dashboard', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp'] });
+		mockVerifyMFAChallenge.mockResolvedValue({
+			accessToken: 'AT',
+			refreshToken: 'RT',
+			user: { id: 'u1' },
+		});
+
+		const user = userEvent.setup();
+		render(
+			<MemoryRouter initialEntries={['/mfa-challenge?redirect=%2F%2Fevil.example']}>
+				<MFAChallengePage />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+		});
+		await user.type(screen.getByPlaceholderText('mfa.challenge.codePlaceholder'), '123456');
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
+
+		await waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+		});
+	});
+
 	it('submits backup code with explicit backup method from the authenticator panel (AUTH-38)', async () => {
 		seedPreAuth({ requiredMfaMethods: ['totp'] });
 		mockVerifyMFAChallenge.mockResolvedValue({ accessToken: 'AT', refreshToken: 'RT', user: { id: 'u1' } });

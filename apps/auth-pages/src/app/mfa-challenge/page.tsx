@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
-import { useNavigate, useParams, Link } from 'react-router';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,6 +16,7 @@ import { createMfaTOTPSchema, createMfaSMSSchema } from '@/lib/validators';
 import type { MFATOTPFormData, MFASMSFormData } from '@/lib/validators';
 import { verifyMFAChallenge, sendMFAChallengeCode } from '@/lib/api.generated';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
+import { resolvePostLoginRedirect } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
@@ -81,6 +82,9 @@ export default function MFAChallengePage() {
 	usePageTitle('mfa.challenge.title');
 	const navigate = useNavigate();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
+	const [searchParams] = useSearchParams();
+	// 登录页透传的回程目标（如 OAuth 发起方）；缺省落 dashboard
+	const redirect = searchParams.get('redirect');
 	const loginPath = tenantSlug ? `/${tenantSlug}/login` : '/';
 	const dashboardPath = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard';
 	const { data: knownTenants } = usePublicTenantSlugs();
@@ -179,6 +183,12 @@ export default function MFAChallengePage() {
 				knownTenants,
 			});
 			sessionStorage.removeItem('mfa_pre_auth');
+			// 有回程目标则继续原跳转（OAuth 授权链不中断），否则落默认 dashboard
+			const postLoginRedirect = resolvePostLoginRedirect(redirect, tenantSlug || null);
+			if (postLoginRedirect) {
+				window.location.href = postLoginRedirect;
+				return;
+			}
 			navigate(dashboardPath);
 		} catch (err) {
 			const status = (err as any)?.response?.status;

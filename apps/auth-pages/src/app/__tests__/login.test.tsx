@@ -25,6 +25,7 @@ vi.mock('react-router', async () => {
 
 const mockLoginWithTokens = vi.fn();
 const mockGetAccessToken = vi.fn(() => null);
+const mockIsValidRedirect = vi.fn((_url: string) => false);
 
 vi.mock('@autional/shared', async (importOriginal) => ({
 	...(await importOriginal<typeof import('@autional/shared')>()),
@@ -41,7 +42,7 @@ vi.mock('@autional/shared', async (importOriginal) => ({
 		}),
 	},
 	apiClient: { get: vi.fn(() => Promise.resolve({ data: { items: [] } })) },
-	isValidRedirect: () => false,
+	isValidRedirect: (url: string) => mockIsValidRedirect(url),
 	processPasswordForTransmission: async (password: string, mode?: string) => ({
 		password,
 		passwordTransmission: mode || 'plain',
@@ -122,6 +123,7 @@ vi.mock('@/hooks/use-tenant-auth-config', () => ({
 beforeEach(() => {
 	vi.clearAllMocks();
 	mockGetAccessToken.mockReturnValue(null);
+	mockIsValidRedirect.mockReturnValue(false);
 	mockLoginMethods = undefined;
 	mockOAuthProviders = [];
 	mockConfigTenantId = 't-test';
@@ -251,6 +253,34 @@ describe('LoginPage', () => {
 		expect(preAuth.enrolledMfaMethods).toEqual(['email']);
 		expect(preAuth.requiredMfaMethods).toEqual(['totp', 'sms', 'email']);
 		sessionStorage.removeItem('mfa_pre_auth');
+	});
+
+	// U88 同口径：MFA 挑战页必须拿到回程目标，认证完成后才能续回 OAuth 发起方
+	it('forwards the redirect target to the MFA challenge URL', async () => {
+		mockIsValidRedirect.mockReturnValue(true);
+		mockAuthLoginPost.mockResolvedValue({
+			requiresMfa: true,
+			challengeToken: 'header.payload.sig',
+		});
+		const user = userEvent.setup();
+		render(
+			<QueryClientProvider client={queryClient}>
+				<MemoryRouter initialEntries={['/acme-corp/login?redirect=%2Fplatform%2Fdashboard']}>
+					<Routes>
+						<Route path=":tenantSlug/login" element={<LoginPage />} />
+					</Routes>
+				</MemoryRouter>
+			</QueryClientProvider>,
+		);
+		await user.type(screen.getByPlaceholderText('auth.login.identityPlaceholder'), 'testuser');
+		await user.type(screen.getByPlaceholderText('auth.login.passwordPlaceholder'), 'pass123');
+		await user.click(screen.getByRole('button', { name: 'login.submit' }));
+
+		await waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith(
+				'/acme-corp/mfa-challenge?redirect=%2Fplatform%2Fdashboard',
+			);
+		});
 	});
 });
 

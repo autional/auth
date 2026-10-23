@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Button, Input, Label } from '@autional/ui';
 import { authLoginPost, authCaptchaChallenge, authMe } from '@autional/shared/generated/api';
 import { loadAuthExtras } from '@/lib/api';
-import { loginWithTokens, useAuthStore, getAccessToken, isValidRedirect, initiateOAuthLogin, extractSlugFromPath, getPortalUrl, getRootDomain, API_BASE_URL, crossAppUrl, TRUST_CENTER_URL } from '@autional/shared';
+import { loginWithTokens, useAuthStore, getAccessToken, isValidRedirect, initiateOAuthLogin, extractSlugFromPath, getPortalUrl, API_BASE_URL, crossAppUrl, TRUST_CENTER_URL } from '@autional/shared';
 import { useResolvedTenantSlug } from '@/hooks/use-tenant-slug';
 import { createLoginSchema } from '@/lib/validators';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
@@ -21,6 +21,7 @@ import { useTenantAuthConfig } from '@/hooks/use-tenant-auth-config';
 import { useAuthPageInit } from '@/hooks/use-auth-page-init';
 import { resolveClientIdForRequireAuth } from '@/lib/from-requireauth';
 import { bumpRequireAuthLoop } from '@/lib/requireauth-loop-guard';
+import { buildMfaChallengeUrl, resolvePostLoginRedirect } from '@/lib/post-login-redirect';
 import { TenantSelector } from '@/components/auth/TenantSelector';
 const DEBUG_TAG = '[captcha]';
 function debug(...args: unknown[]) {
@@ -650,7 +651,8 @@ export default function LoginPage() {
 						phone: loginResult.user?.phone || '',
 					}),
 				);
-				navigate(`/${tenantSlug}/mfa-challenge`);
+				// 回程目标随查询串透传到挑战页（MFA 通过后继续回 OAuth 发起方，U88 同口径）
+				navigate(buildMfaChallengeUrl(tenantSlug, redirect));
 				return;
 			}
 			if ('requiresEmailVerification' in loginResult && loginResult.requiresEmailVerification) {
@@ -700,53 +702,10 @@ export default function LoginPage() {
 
 			const at = loginResult.accessToken || loginResult.data?.accessToken;
 
-			if (redirect && isValidRedirect(redirect)) {
-				// 注入租户 slug 到重定向 URL（如 /admin/ ?/acme-corp/admin/
-				let finalRedirect = redirect;
-				try {
-					const url = new URL(redirect);
-					// slug 注入目标域名：从当前域名剥离已知 portal 前缀得到根
-					const _hostParts = window.location.hostname.split('.');
-					const _knownPrefixes = [
-						'auth',
-						'admin',
-						'security',
-						'user',
-						'status',
-						'trust',
-						'platform',
-						'authenticator',
-					];
-					const slugRoot =
-						_hostParts.length >= 3 && _knownPrefixes.includes(_hostParts[0])
-							? _hostParts.slice(1).join('.')
-							: getRootDomain(window.location.hostname);
-					const slugDomains = ['app.' + slugRoot];
-					const slugPaths = [
-						'/admin/',
-						'/developer/',
-						'/security/',
-						'/status/',
-						'/trust/',
-						'/platform/',
-					];
-					if (
-						slugDomains.includes(url.hostname) &&
-						tenantSlug &&
-						!url.pathname.includes(`/${tenantSlug}/`)
-					) {
-						const needsSlug = slugPaths.some(
-							(p) => url.pathname === p || url.pathname.startsWith(p),
-						);
-						if (needsSlug) {
-							url.pathname = `/${tenantSlug}${url.pathname}`;
-							finalRedirect = url.toString();
-						}
-					}
-				} catch {
-					/* ignore invalid URL */
-				}
-				window.location.href = finalRedirect;
+			// 回程目标：校验白名单 + 给 app.<根域> 的管理门户路径补租户 slug
+			const postLoginRedirect = resolvePostLoginRedirect(redirect, tenantSlug);
+			if (postLoginRedirect) {
+				window.location.href = postLoginRedirect;
 			} else {
 				const at = loginResult.accessToken || loginResult.data?.accessToken;
 				// 偏好驱动的默认跳转（响应经拦截器 camel 化：portal_preferences → portalPreferences；
