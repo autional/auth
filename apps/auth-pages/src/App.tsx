@@ -26,6 +26,7 @@ const PasskeyPage = lazy(() => import('./app/passkey/page'));
 const ErrorPage = lazy(() => import('./app/error/page'));
 const AccountDeletionPage = lazy(() => import('./app/account-deletion/page'));
 const AccountPage = lazy(() => import('./app/account/page'));
+const SecurityPage = lazy(() => import('./app/security/page'));
 const DashboardPage = lazy(() => import('./app/dashboard/page'));
 const ReapplyPage = lazy(() => import('./app/reapply/page'));
 const RecoverAccountPage = lazy(() => import('./app/recover-account/page'));
@@ -270,6 +271,23 @@ export default function App() {
 									element={
 										<RequireAuth>
 											<AccountPage />
+										</RequireAuth>
+									}
+								/>
+								{/* 安全分区（顶层导航第三项）：静态段在前，避免被 /:tenantSlug 贪心吃掉 */}
+								<Route
+									path="/security"
+									element={
+										<RequireAuth>
+											<SecurityPage />
+										</RequireAuth>
+									}
+								/>
+								<Route
+									path="/:tenantSlug/security"
+									element={
+										<RequireAuth>
+											<SecurityPage />
 										</RequireAuth>
 									}
 								/>

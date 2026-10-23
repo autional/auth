@@ -18,10 +18,11 @@ import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
 
 const SECTIONS = [
 	{ key: 'overview', path: '/dashboard', labelKey: 'dashboard.tabs.overview' },
+	{ key: 'security', path: '/security', labelKey: 'dashboard.tabs.security' },
 	{ key: 'account', path: '/account', labelKey: 'dashboard.tabs.account' },
 ] as const;
 
-export function DashboardNav({ current }: { current: 'overview' | 'account' }) {
+export function DashboardNav({ current }: { current: 'overview' | 'security' | 'account' }) {
 	const { t } = useI18n();
 	const slug = useEffectiveTenantSlug();
 
@@ -32,7 +33,7 @@ export function DashboardNav({ current }: { current: 'overview' | 'account' }) {
 	return (
 		<nav
 			aria-label={t('dashboard.tabs.label')}
-			className="grid grid-cols-2 gap-1 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-muted)] p-1"
+			className="grid grid-cols-3 gap-1 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-muted)] p-1"
 		>
 			{SECTIONS.map((section) => {
 				const isActive = section.key === active;

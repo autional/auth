@@ -228,7 +228,7 @@ beforeEach(() => {
 });
 
 describe('DashboardPage', () => {
-	it('渲染账号身份（问候、邮箱）与状态摘要', async () => {
+	it('渲染账号身份（问候、邮箱）', async () => {
 		renderPage();
 
 		await waitFor(() => {
@@ -236,11 +236,6 @@ describe('DashboardPage', () => {
 		});
 
 		expect(screen.getByText('test@example.com')).toBeInTheDocument();
-		// 状态 / MFA / 最后登录 / 在线设备 收敛为一行摘要
-		expect(screen.getByText(/dashboard\.status: active/)).toBeInTheDocument();
-		expect(screen.getByText(/MFA: dashboard\.mfaEnabled/)).toBeInTheDocument();
-		expect(screen.getByText(/dashboard\.lastLogin:/)).toBeInTheDocument();
-		expect(screen.getByText(/dashboard\.sessionsOnline/)).toBeInTheDocument();
 	});
 
 	it('根据 super_admin 角色显示管理员专属 Portal 链接', async () => {
@@ -272,17 +267,17 @@ describe('DashboardPage', () => {
 		expect(screen.queryByText('dashboard.authenticatorApp')).not.toBeInTheDocument();
 	});
 
-	it('账户与安全摘要只出现一次 MFA（去重回归）', async () => {
+	it('概览不再渲染账户安全摘要（已迁到安全分区）', async () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('dashboard.summaryTitle')).toBeInTheDocument();
+			expect(screen.getByText('dashboard.myApps')).toBeInTheDocument();
 		});
 
-		// 旧版把 MFA 同时渲染在「账户信息卡」与「安全概览卡」（AUTH-44 遗留），
-		// 现收敛为一行摘要；>1 即为回归。
-		expect(screen.getAllByText(/dashboard\.mfaEnabled/)).toHaveLength(1);
-		expect(screen.getByText(/dashboard\.manageSecurity/)).toBeInTheDocument();
+		// 去重 + 分区化：MFA / 最后登录 / 在线设备只在「安全」分区出现，
+		// 概览若再次出现即为回归（旧 AUTH-44 的堆叠）。
+		expect(screen.queryByText(/dashboard\.mfaEnabled/)).not.toBeInTheDocument();
+		expect(screen.queryByText(/dashboard\.sessionsOnline/)).not.toBeInTheDocument();
 	});
 
 	it('处理加载状态', () => {
@@ -326,16 +321,18 @@ describe('DashboardPage', () => {
 		expect(mockHandleLogout).toHaveBeenCalled();
 	});
 
-	it('顶层导航固定两个分区，当前分区带 aria-current', async () => {
+	it('顶层导航固定三个分区，当前分区带 aria-current', async () => {
 		renderPage();
 
 		const nav = await screen.findByRole('navigation', { name: 'dashboard.tabs.label' });
 		const links = within(nav).getAllByRole('link');
-		expect(links).toHaveLength(2);
+		expect(links).toHaveLength(3);
 		expect(links[0]).toHaveAttribute('href', '/dashboard');
 		expect(links[0]).toHaveAttribute('aria-current', 'page');
-		expect(links[1]).toHaveAttribute('href', '/account');
+		expect(links[1]).toHaveAttribute('href', '/security');
+		expect(links[2]).toHaveAttribute('href', '/account');
 		expect(links[1]).not.toHaveAttribute('aria-current');
+		expect(links[2]).not.toHaveAttribute('aria-current');
 	});
 
 	it('渲染已授权应用磁贴，非 http(s) 的 website 不渲染成链接', async () => {
@@ -356,6 +353,12 @@ describe('DashboardPage', () => {
 					website: 'javascript:alert(1)',
 					grantedAt: '2026-10-23T00:00:00Z',
 				},
+				{
+					// 富化失败/客户端已删：只有 client_id，不得渲染成裸 ID 卡片
+					id: 'consent-3',
+					clientId: 'client-orphan',
+					grantedAt: '2026-10-23T00:00:00Z',
+				},
 			],
 		});
 
@@ -365,14 +368,17 @@ describe('DashboardPage', () => {
 			expect(screen.getByText('novel-demo')).toBeInTheDocument();
 		});
 
+		expect(screen.queryByText('client-orphan')).not.toBeInTheDocument();
+
 		const safeTile = screen.getByText('novel-demo').closest('a');
 		expect(safeTile).toHaveAttribute('href', 'https://novel.example.com');
 		expect(safeTile).toHaveAttribute('rel', 'noopener noreferrer');
 
-		// 伪协议：降级为不可点击磁贴 + 「未配置入口」提示
-		const unsafeTile = screen.getByText('nextchat').closest('a');
-		expect(unsafeTile).toBeNull();
-		expect(screen.getByText('dashboard.appNoLink')).toBeInTheDocument();
+		// 伪协议：降级为不可点击磁贴（不渲染「未配置入口」灰字，避免噪音；语义走 title/aria）
+		expect(screen.getByText('nextchat').closest('a')).toBeNull();
+		const blocked = screen.getByText('nextchat').closest('[data-disabled="true"]');
+		expect(blocked).toHaveAttribute('aria-disabled', 'true');
+		expect(blocked).toHaveAttribute('title', 'dashboard.appNoLink');
 	});
 });
 

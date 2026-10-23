@@ -13,7 +13,7 @@ import {
 	getCurrentTenantId,
 	usePublicTenantSlugs,
 } from '@autional/shared';
-import { authMeSessions, authMeMemberships, authMePut } from '@autional/shared/generated/api';
+import { authMeMemberships, authMePut } from '@autional/shared/generated/api';
 import { getMe } from '@/lib/api';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
@@ -61,15 +61,6 @@ const PORTAL_LABELS: Record<string, string> = {
 	platform: 'dashboard.platformConsole',
 	developer: 'dashboard.developerPortal',
 };
-
-/** /auth/me/sessions payload 经拦截器 camel 化后的行形状（见 identity dto.SessionResponse） */
-interface SessionInfo {
-	deviceType?: string;
-	userAgent?: string;
-	ip?: string;
-	isCurrentSession?: boolean;
-	lastActiveAt?: string;
-}
 
 /** GET /oauth/consents 的载荷行（oauth-service 已在 2026-10-23 补充客户端展示元信息） */
 interface AuthorizedApp {
@@ -123,7 +114,6 @@ export default function DashboardPage() {
 	const [meData, setMeData] = useState<any>(null);
 	const [memberships, setMemberships] = useState<MembershipInfo[]>([]);
 	const [pendingMembers, setPendingMembers] = useState<MembershipInfo[]>([]);
-	const [sessions, setSessions] = useState<SessionInfo[]>([]);
 	const [authorizedApps, setAuthorizedApps] = useState<AuthorizedApp[]>([]);
 	const [showPrefs, setShowPrefs] = useState(false);
 	const [prefs, setPrefs] = useState<PortalPrefs>({
@@ -185,14 +175,13 @@ export default function DashboardPage() {
 		slug: tenantSlug,
 	});
 
-	// 账户数据装载：四路并行 + allSettled，全部落定后才关闭骨架屏（避免分块插入的位移）。
-	// /auth/me 失败 → 非阻塞错误态 + 重试；其余三路失败仅隐藏对应块（AUTH-43/44）。
+	// 概览数据装载：三路并行 + allSettled，全部落定后才关闭骨架屏（避免分块插入的位移）。
+	// /auth/me 失败 → 非阻塞错误态 + 重试；其余两路失败仅隐藏对应块（AUTH-43/44）。
+	// 会话/在线设备属于「安全」分区，不在概览装载（见 app/security/page.tsx）。
 	const loadAccountData = useCallback(async () => {
 		setLoading(true);
-		const [meRes, sessRes, memRes, consentsRes] = await Promise.allSettled([
+		const [meRes, memRes, consentsRes] = await Promise.allSettled([
 			getMe(),
-			// /auth/me/sessions：自作用域端点，payload = {items: [...]}（拦截器已 camel 化）
-			authMeSessions(),
 			// /auth/me/memberships：payload 为数组（NewDataResponse）
 			authMeMemberships(),
 			apiClient.get('/oauth/api/v1/oauth/consents'),
@@ -203,10 +192,6 @@ export default function DashboardPage() {
 			setMeError(false);
 		} else {
 			setMeError(true);
-		}
-
-		if (sessRes.status === 'fulfilled') {
-			setSessions(extractList<SessionInfo>(sessRes.value));
 		}
 
 		if (memRes.status === 'fulfilled') {
@@ -240,6 +225,12 @@ export default function DashboardPage() {
 	// Hook 顺序保持一致：以下计算都在早返回之前完成
 	const displayUser = meData || user;
 
+	// 无名称的应用不渲染（后端富化失败/客户端已删时只剩 client_id，显示裸 ID 是噪音）
+	const authorizedAppsVisible = useMemo(
+		() => authorizedApps.filter((a) => !!a.clientName),
+		[authorizedApps],
+	);
+
 	// 动态 Portal 列表（usePortalCatalog 已内置排除 auth/landing、order 排序与 URL 拼装）
 	const visiblePortals = useMemo(() => {
 		if (prefs.show_all || !prefs.visible?.length) return catalogPortals;
@@ -268,16 +259,7 @@ export default function DashboardPage() {
 		return <DashboardSkeleton current="overview" message={t('dashboard.loading')} />;
 	}
 
-	const lastLoginText = displayUser?.lastLoginAt
-		? new Date(displayUser.lastLoginAt).toLocaleString()
-		: t('dashboard.lastLoginUnknown');
-	const mfaText =
-		displayUser?.mfaEnabled === undefined
-			? '-'
-			: displayUser.mfaEnabled
-				? t('dashboard.mfaEnabled')
-				: t('dashboard.mfaDisabled');
-	const authorizedCount = authorizedApps.length;
+	const authorizedCount = authorizedAppsVisible.length;
 
 	return (
 		<AuthCard maxWidth="2xl" align="start">
@@ -366,7 +348,7 @@ export default function DashboardPage() {
 							{t('dashboard.groupAuthorized')}
 						</h3>
 						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-							{authorizedApps.map((app) => (
+							{authorizedAppsVisible.map((app) => (
 								<AppTile
 									key={`app-${app.id}`}
 									name={app.clientName || app.clientId}
@@ -442,44 +424,6 @@ export default function DashboardPage() {
 						</button>
 					</div>
 				)}
-			</section>
-
-			{/* 账户与安全：一行摘要（替代原来的「账户信息卡 + 安全概览卡 + 会话卡 + 最后登录卡」四块） */}
-			<section aria-labelledby="account-summary-heading" className="space-y-2">
-				<div className="flex items-center justify-between gap-3">
-					<h2
-						id="account-summary-heading"
-						className="text-sm font-semibold text-[var(--color-text-primary)]"
-					>
-						{t('dashboard.summaryTitle')}
-					</h2>
-					<a
-						href={userPortalUrl(slug, '/security')}
-						className="text-xs font-medium text-brand-text hover:underline decoration-2 underline-offset-4"
-					>
-						{t('dashboard.manageSecurity')} →
-					</a>
-				</div>
-
-				<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-secondary)]">
-					<span className="inline-flex items-center gap-1.5">
-						<span
-							aria-hidden="true"
-							className="inline-block h-1.5 w-1.5 rounded-full bg-success"
-						/>
-						{t('dashboard.status')}: {displayUser?.status || '-'}
-					</span>
-					<span>MFA: {mfaText}</span>
-					<span>
-						{t('dashboard.lastLogin')}: {lastLoginText}
-					</span>
-					<a
-						href={userPortalUrl(slug, '/sessions')}
-						className="text-brand-text hover:underline decoration-2 underline-offset-4"
-					>
-						{t('dashboard.sessionsOnline', { count: sessions.length })}
-					</a>
-				</div>
 			</section>
 
 			{/* 我的组织：成员状态（有数据才渲染；待审批已在页首横幅覆盖） */}

@@ -61,20 +61,23 @@ export function AppTile({ name, href, icon, logoUrl }: AppTileProps) {
 			<span className="line-clamp-2 text-sm font-medium leading-tight text-[var(--color-text-primary)]">
 				{name}
 			</span>
-			{!safeHref && (
-				<span className="text-[11px] text-[var(--color-text-muted)]">
-					{t('dashboard.appNoLink')}
-				</span>
-			)}
 		</>
 	);
 
 	const baseClass =
 		'group flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-muted)] p-3 text-center transition-colors duration-150';
 
+	// 没有可用入口：整卡不可点，且不渲染「未配置入口」文字。
+	// 每张卡都挂一行灰字只会制造噪音（portal 客户端本就无 website）；
+	// 可访问性上由 aria-disabled + title 说明，视觉上保持干净。
 	if (!safeHref) {
 		return (
-			<div className={`${baseClass} opacity-70`} data-disabled="true">
+			<div
+				className={`${baseClass} opacity-70`}
+				data-disabled="true"
+				aria-disabled="true"
+				title={t('dashboard.appNoLink')}
+			>
 				{body}
 			</div>
 		);
