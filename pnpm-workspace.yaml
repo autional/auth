@@ -8,3 +8,10 @@ overrides:
   react: 19.2.5
   'react-dom': 19.2.5
   vite: 6.4.4
+# @hookform/resolvers@3.10.0 声明缺失：其 dist/types.d.ts 里 `import { z } from 'zod'` 但没有 zod 依赖/peer，
+# pnpm 隐藏 hoist 被 eslint 工具链带入的 zod v4 抢占（.pnpm/node_modules/zod → zod@4.6.7），
+# 导致所有 zodResolver() 调用类型报错（zod v3 schema ≠ v4 Schema）。补 peer 后 pnpm 为它链上本仓 zod v3。
+packageExtensions:
+  '@hookform/resolvers@3.10.0':
+    peerDependencies:
+      zod: ^3.23.8
