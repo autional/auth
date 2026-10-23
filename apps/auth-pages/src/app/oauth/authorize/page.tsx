@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
 import { getAccessToken, apiClient, extractItem, decodeJwtPayload, useAuthStore } from '@autional/shared';
@@ -61,6 +61,9 @@ function OAuthAuthorizeContent() {
 	const [clientLogo, setClientLogo] = useState('');
 	const [tenantBranding, setTenantBranding] = useState<{ name: string; logo: string } | null>(null);
 	const [loading, setLoading] = useState(false);
+	// 授权决定锁：同意（含自动同意）与拒绝共用出口，同一时刻只允许一方生效
+	// （竞态说明见 submitConsent）。
+	const decisionRef = useRef(false);
 	const [error, setError] = useState('');
 	const [userId, setUserId] = useState('');
 	const [tenantId, setTenantId] = useState('');
@@ -155,9 +158,15 @@ function OAuthAuthorizeContent() {
 			await redirectToLogin(); // 会话中途失效 → 回登录页（redirect 指回本页）
 			return;
 		}
+		// 并发锁：自动同意（consent/check 返回 hasConsent=true）与用户点击可能几乎同时
+		// 到达；无锁会各发一次 authorize → 两个授权码 → 两个回调争抢同一 state，
+		// 后到者 400「登录状态已失效」（2026-10-23 现场实证：两 POST 间隔 0.1s）。
+		if (decisionRef.current) return;
+		decisionRef.current = true;
 		setLoading(true);
 		setError('');
 		const fallback = t('oauth.authorize.authorizeFailed', '授权失败，请稍后重试');
+		let navigating = false;
 		try {
 			const body = new URLSearchParams({
 				client_id: clientId,
@@ -198,7 +207,6 @@ function OAuthAuthorizeContent() {
 								fallback,
 							}),
 						);
-						setLoading(false);
 						return;
 					}
 				} catch {
@@ -215,6 +223,7 @@ function OAuthAuthorizeContent() {
 				// 会话并回登录页，而不是把授权失败落在死胡同（反复点「授权」只会反复失败）。
 				if (res.status === 401 || code === 'login_required') {
 					useAuthStore.getState().clearAuth();
+					navigating = true; // 保持锁定/加载态直到跳转完成
 					void redirectToLogin();
 					return;
 				}
@@ -224,19 +233,23 @@ function OAuthAuthorizeContent() {
 					code ? null : payload?.message,
 				);
 				setError(oauthErrorText(t, { code, description, fallback }));
-				setLoading(false);
 				return;
 			}
 			const target = payload?.redirect_to || payload?.data?.redirect_to;
 			if (!target) {
 				setError(t('oauth.authorize.invalidResponse', '授权响应异常，未获取到跳转地址'));
-				setLoading(false);
 				return;
 			}
+			navigating = true;
 			window.location.href = target;
 		} catch {
 			setError(fallback);
-			setLoading(false);
+		} finally {
+			// 失败 → 释放锁，允许用户重试；成功/跳转 → 保持锁定直到页面卸载。
+			if (!navigating) {
+				decisionRef.current = false;
+				setLoading(false);
+			}
 		}
 	};
 
@@ -279,6 +292,10 @@ function OAuthAuthorizeContent() {
 		const url = new URL(redirectUri);
 		url.searchParams.set('error', 'access_denied');
 		if (state) url.searchParams.set('state', state);
+		// 同意与拒绝竞争同一出口：一方已作出决定后另一方不得改判——否则「拒绝」会被
+		// 随后到达的自动同意覆盖（自动提交已发出授权码，用户看到的是拒绝还是授权取决于时序）。
+		if (decisionRef.current) return;
+		decisionRef.current = true;
 		window.location.href = url.toString();
 	};
 
