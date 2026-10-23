@@ -12,7 +12,12 @@ import { useI18n } from '@/lib/i18n';
 import { useCountdown } from '@/hooks/use-countdown';
 import QRCode from 'qrcode';
 
-export default function QRLoginPanel() {
+interface QRLoginPanelProps {
+	/** 地址栏/slug 解析出的租户；作为发起会话的权威租户（空则回落服务端 header/默认）。 */
+	tenantId?: string;
+}
+
+export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const { t } = useI18n();
 	const { tenantSlug } = useParams();
 	const [searchParams] = useSearchParams();
@@ -30,7 +35,7 @@ export default function QRLoginPanel() {
 		setLoading(true);
 		setError('');
 		try {
-			const data = await authQrLoginInitiatePost();
+			const data = await authQrLoginInitiatePost(tenantId ? { tenantId } : undefined);
 			// 拦截器已解包信封并转 camelCase（AUTH-17 同族）
 			const token = data?.sessionToken || '';
 			const nm = data?.numberMatching || '';
@@ -58,10 +63,10 @@ export default function QRLoginPanel() {
 
 				if (st === 'confirmed' && data?.accessToken) {
 					loginWithTokens(data.accessToken, data.refreshToken || '', null as any);
-					// AUTH-53⑤：会话建立即锚定（QR 扫码登录；无 tenantId prop，JWT claim 兜底）
+					// AUTH-53⑤：会话建立即锚定（QR 扫码登录；优先地址栏租户，JWT claim 兜底）
 					anchorSessionFromToken(data.accessToken || '', {
 						slug: tenantSlug || null,
-						tenantId: null,
+						tenantId: tenantId || null,
 					});
 					await loadAuthExtras().catch(() => {});
 					setStatus('success');

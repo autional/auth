@@ -81,6 +81,9 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
 
+		// 无租户 prop ⇒ 发起不带显式租户（旧调用方行为不变）
+		expect(vi.mocked(authQrLoginInitiatePost)).toHaveBeenCalledWith(undefined);
+
 		// 轮询周期 2s——等待确认分支建立会话并锚定（real timers，超时上限 8s）
 		await waitFor(
 			() => {
@@ -92,5 +95,35 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 			{ timeout: 8000 },
 		);
 		expect(vi.mocked(loginWithTokens)).toHaveBeenCalledWith('at-1', 'rt-1', null);
+	}, 10000);
+
+	// 地址栏租户是发起会话与会话锚定两处的权威（Wave 1）。
+	it('带 tenantId prop：发起 body 与锚定租户均取地址栏租户', async () => {
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route
+						path=":tenantSlug/login"
+						element={<QRLoginPanel tenantId="tenant_demo" />}
+					/>
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+
+		expect(vi.mocked(authQrLoginInitiatePost)).toHaveBeenCalledWith({
+			tenantId: 'tenant_demo',
+		});
+
+		await waitFor(
+			() => {
+				expect(vi.mocked(anchorSessionFromToken)).toHaveBeenCalledWith('at-1', {
+					slug: 'demo',
+					tenantId: 'tenant_demo',
+				});
+			},
+			{ timeout: 8000 },
+		);
 	}, 10000);
 });

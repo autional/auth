@@ -454,16 +454,29 @@ export default function LoginPage() {
 
 	const rememberMe = watch('rememberMe');
 
-	const handleOAuthLogin = useCallback((provider: string) => {
-		// 社交登录必须整页导航：identity 端点对本请求 302 到第三方授权页，
-		// XHR/axios 会因跨域重定向被 CORS 拦死（历史必败根因）；整页导航由浏览器原生跟随。
-		// 未配置凭据的 provider 已由服务端列表门禁过滤，按钮不会渲染（AUTH-01）。
-		// callback_origin 让后端在本站已登记的回调中选择同站地址（.cn / .com 多域）。
-		const callbackOrigin = encodeURIComponent(window.location.origin);
-		window.location.assign(
-			`${API_BASE_URL}/identity/api/v1/auth/oauth/${encodeURIComponent(provider)}?callback_origin=${callbackOrigin}`
-		);
-	}, []);
+	// 地址栏租户优先（slug 配置 > 表单选择）；显式租户随发起 URL 进入签名 state，
+	// 回跳页因此不再依赖 localStorage 残留的 X-Tenant-ID。
+	const oauthTenantId = slugAuthConfig?.tenantId || (watch('tenantId') as string) || '';
+
+	const handleOAuthLogin = useCallback(
+		(provider: string) => {
+			// 社交登录必须整页导航：identity 端点对本请求 302 到第三方授权页，
+			// XHR/axios 会因跨域重定向被 CORS 拦死（历史必败根因）；整页导航由浏览器原生跟随。
+			// 未配置凭据的 provider 已由服务端列表门禁过滤，按钮不会渲染（AUTH-01）。
+			// callback_origin 让后端在本站已登记的回调中选择同站地址（.cn / .com 多域）。
+			// slug 页租户未解析完成 → fail-closed，不用残留 header 冒充地址栏租户。
+			if (tenantSlug && !oauthTenantId) {
+				setError(t('login.error.configLoading'));
+				return;
+			}
+			const callbackOrigin = encodeURIComponent(window.location.origin);
+			const tenantQuery = oauthTenantId ? `&tenant_id=${encodeURIComponent(oauthTenantId)}` : '';
+			window.location.assign(
+				`${API_BASE_URL}/identity/api/v1/auth/oauth/${encodeURIComponent(provider)}?callback_origin=${callbackOrigin}${tenantQuery}`
+			);
+		},
+		[oauthTenantId, tenantSlug, t]
+	);
 
 	const onSubmit = async (data: FormData) => {
 		debug('onSubmit: START, captchaStatus=', captchaStatus, 'rateLimitStep=', rateLimitStep);
@@ -996,7 +1009,9 @@ export default function LoginPage() {
 				)}
 
 				{/* Always show QR panel when qr is the only method OR selected */}
-				{loginMethod === 'qr' && loginMethods.includes('qr') && <QRLoginPanel />}
+				{loginMethod === 'qr' && loginMethods.includes('qr') && (
+					<QRLoginPanel tenantId={slugAuthConfig?.tenantId || watch('tenantId')} />
+				)}
 
 				{loginMethod === 'magic_link' &&
 					loginMethods.includes('magic_link') &&

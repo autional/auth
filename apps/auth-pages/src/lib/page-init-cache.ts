@@ -22,7 +22,8 @@ const LEGACY_PREFIXES = ['auth-config:', 'tenant-branding:'];
 export const CACHE_KEYS = {
 	AUTH_CONFIG: (slug: string) => `${PAGE_INIT_PREFIX}auth-config:${slug}`,
 	PUBLIC_TENANTS: `${PAGE_INIT_PREFIX}public-tenants`,
-	OAUTH_PROVIDERS: `${PAGE_INIT_PREFIX}oauth-providers`,
+	// 按租户作用域缓存（地址栏租户优先；未解析用 'unresolved'，非 slug 页用 'default'）
+	OAUTH_PROVIDERS: (scope: string) => `${PAGE_INIT_PREFIX}oauth-providers:${scope}`,
 	TENANT_BRANDING: (slug: string) => `${PAGE_INIT_PREFIX}tenant-branding:${slug}`,
 } as const;
 

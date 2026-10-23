@@ -1,6 +1,6 @@
 'use client';
 
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import {
 	PublicAuthConfigBySlugByBySlug,
 	tenantPublicTenants,
@@ -93,16 +93,18 @@ export interface AuthPageInitResult {
 /**
  * Unified initialization hook for auth pages.
  *
- * Merges 4 read-only, low-frequency API calls into a single `useQueries` call:
+ * Merges 3 read-only, low-frequency API calls into a single `useQueries` call:
  *   1. Auth config by slug (24h cache)
  *   2. Public tenants list (6h cache)
- *   3. OAuth providers (24h cache)
- *   4. Tenant branding (24h cache)
+ *   3. Tenant branding (24h cache)
+ *
+ * OAuth providers are a separate, tenant-scoped query: slug 页必须先解析出地址栏
+ * 租户（auth-config.tenantId）再取数（fail-closed），避免残留 localStorage 租户
+ * 或全局缓存把其它租户的 provider 列表带进来。
  *
  * Query keys match existing hooks for automatic deduplication:
  *   - `tenant-auth-config-by-slug` matches useTenantAuthConfigBySlug
  *   - `public-tenants` matches usePublicTenants
- *   - `oauth-providers` matches the inline query in page.tsx
  *   - `tenant-branding` is new (shared with BrandingInitializer)
  *
  * All data is preloaded from localStorage cache at module load for zero-wait first paint.
@@ -117,9 +119,6 @@ export function useAuthPageInit(slug: string | null): AuthPageInitResult {
 	const preloadedTenants: TenantOption[] | undefined =
 		getPreloaded<TenantOption[]>(CACHE_KEYS.PUBLIC_TENANTS) ?? undefined;
 
-	const preloadedOAuth: OAuthProviderItem[] | undefined =
-		getPreloaded<OAuthProviderItem[]>(CACHE_KEYS.OAUTH_PROVIDERS) ?? undefined;
-
 	const preloadedBranding: BrandingData | undefined = slug
 		? (getPreloaded<BrandingData>(CACHE_KEYS.TENANT_BRANDING(slug)) ??
 			getPreloaded<BrandingData>(`tenant-branding:${slug}`)) // legacy key
@@ -130,7 +129,6 @@ export function useAuthPageInit(slug: string | null): AuthPageInitResult {
 		? getCached<AuthConfigBySlug>(CACHE_KEYS.AUTH_CONFIG(slug))
 		: null;
 	const fallbackTenants = getCached<TenantOption[]>(CACHE_KEYS.PUBLIC_TENANTS);
-	const fallbackOAuth = getCached<OAuthProviderItem[]>(CACHE_KEYS.OAUTH_PROVIDERS);
 	const fallbackBranding = slug ? getCached<BrandingData>(CACHE_KEYS.TENANT_BRANDING(slug)) : null;
 
 	const results = useQueries({
@@ -166,26 +164,7 @@ export function useAuthPageInit(slug: string | null): AuthPageInitResult {
 					| TenantOption[]
 					| undefined,
 			},
-			// 3. OAuth providers — key matches page.tsx inline query
-			{
-				queryKey: ['oauth-providers'],
-				queryFn: async () => {
-					const res = await getOAuthProviders();
-					const providers = res?.data?.providers || res?.providers || [];
-					const items: OAuthProviderItem[] = (providers as any[]).map((x: any) => {
-						if (typeof x === 'string') return { type: x, name: x };
-						return { type: x.type || x.name, name: x.name || x.type };
-					});
-					setCached(CACHE_KEYS.OAUTH_PROVIDERS, items);
-					return items;
-				},
-				staleTime: TTL.OAUTH_PROVIDERS,
-				gcTime: TTL.OAUTH_PROVIDERS * 2,
-				placeholderData: (preloadedOAuth ?? fallbackOAuth ?? undefined) as
-					| OAuthProviderItem[]
-					| undefined,
-			},
-			// 4. Tenant branding — new key (shared with BrandingInitializer)
+			// 3. Tenant branding — new key (shared with BrandingInitializer)
 			{
 				queryKey: ['tenant-branding', slug],
 				queryFn: async () => {
@@ -207,6 +186,41 @@ export function useAuthPageInit(slug: string | null): AuthPageInitResult {
 		],
 	});
 
+	// ── OAuth providers: tenant-scoped (地址栏租户优先) ──
+	// slug 页在 auth-config 解析出 tenantId 之前保持 disabled（不请求、不展示），
+	// 避免用残留 header / 全局缓存冒充本租户的 provider 列表。
+	const resolvedTenantId = slug
+		? (results[0].data as AuthConfigBySlug | null | undefined)?.tenantId
+		: undefined;
+	const oauthScope = slug ? (resolvedTenantId ?? 'unresolved') : 'default';
+
+	const preloadedOAuth: OAuthProviderItem[] | undefined =
+		getPreloaded<OAuthProviderItem[]>(CACHE_KEYS.OAUTH_PROVIDERS(oauthScope)) ?? undefined;
+	const fallbackOAuth = getCached<OAuthProviderItem[]>(CACHE_KEYS.OAUTH_PROVIDERS(oauthScope));
+
+	const oauthQuery = useQuery<OAuthProviderItem[]>({
+		queryKey: ['oauth-providers', oauthScope],
+		queryFn: async () => {
+			const res = await getOAuthProviders(
+				resolvedTenantId ? { tenantId: resolvedTenantId } : undefined,
+			);
+			const providers = res?.data?.providers || res?.providers || [];
+			const items: OAuthProviderItem[] = (providers as any[]).map((x: any) => {
+				if (typeof x === 'string') return { type: x, name: x };
+				return { type: x.type || x.name, name: x.name || x.type };
+			});
+			setCached(CACHE_KEYS.OAUTH_PROVIDERS(oauthScope), items);
+			return items;
+		},
+		enabled: !slug || !!resolvedTenantId,
+		staleTime: TTL.OAUTH_PROVIDERS,
+		gcTime: TTL.OAUTH_PROVIDERS * 2,
+		placeholderData: preloadedOAuth ?? fallbackOAuth ?? undefined,
+	});
+
+	const isLoading = results.some((r) => r.isLoading) || oauthQuery.isLoading;
+	const isError = results.some((r) => r.isError) || oauthQuery.isError;
+
 	return {
 		authConfig: {
 			data: results[0].data,
@@ -219,16 +233,16 @@ export function useAuthPageInit(slug: string | null): AuthPageInitResult {
 			isError: results[1].isError,
 		},
 		oauthProviders: {
-			data: (results[2].data as OAuthProviderItem[]) ?? [],
+			data: oauthQuery.data ?? [],
+			isLoading: oauthQuery.isLoading,
+			isError: oauthQuery.isError,
+		},
+		branding: {
+			data: results[2].data as BrandingData | null | undefined,
 			isLoading: results[2].isLoading,
 			isError: results[2].isError,
 		},
-		branding: {
-			data: results[3].data as BrandingData | null | undefined,
-			isLoading: results[3].isLoading,
-			isError: results[3].isError,
-		},
-		isLoading: results.some((r) => r.isLoading),
-		isError: results.some((r) => r.isError),
+		isLoading,
+		isError,
 	};
 }

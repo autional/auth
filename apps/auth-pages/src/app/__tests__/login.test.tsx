@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LoginPage from '../page';
 
@@ -79,17 +79,31 @@ function renderLogin() {
 	);
 }
 
+// 带 slug 路由的渲染（useParams 生效）；用于验证 slug 解析失败时的页面形态。
+function renderLoginWithSlug() {
+	return render(
+		<QueryClientProvider client={queryClient}>
+			<MemoryRouter initialEntries={['/acme-corp/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<LoginPage />} />
+				</Routes>
+			</MemoryRouter>
+		</QueryClientProvider>,
+	);
+}
+
 vi.mock('@/lib/api', () => ({
 	loadAuthExtras: vi.fn(() => Promise.resolve()),
 }));
 
 let mockLoginMethods: string[] | undefined;
 let mockOAuthProviders: any[] = [];
+let mockConfigTenantId: string | undefined = 't-test';
 
 vi.mock('@/hooks/use-auth-page-init', () => ({
 	useAuthPageInit: () => ({
 		authConfig: {
-			data: { tenantId: 't-test', loginMethods: mockLoginMethods },
+			data: { tenantId: mockConfigTenantId, loginMethods: mockLoginMethods },
 			isLoading: false,
 			isError: false,
 		},
@@ -110,6 +124,7 @@ beforeEach(() => {
 	mockGetAccessToken.mockReturnValue(null);
 	mockLoginMethods = undefined;
 	mockOAuthProviders = [];
+	mockConfigTenantId = 't-test';
 });
 
 afterEach(() => {
@@ -147,9 +162,26 @@ describe('LoginPage', () => {
 			expect(assignMock).toHaveBeenCalledWith(
 				expect.stringContaining('callback_origin=https%3A%2F%2Fauth.autional.com'),
 			);
+			// 地址栏（slug 配置）租户必须随发起 URL 显式携带，回跳页不再依赖残留 header。
+			expect(assignMock).toHaveBeenCalledWith(
+				expect.stringContaining('tenant_id=t-test'),
+			);
 		} finally {
 			Object.defineProperty(window, 'location', { value: originalLocation, writable: true });
 		}
+	});
+
+	// slug 页配置未解析出 tenantId → fail-closed：页面只渲染租户选择，不暴露 OAuth 入口，
+	// 也就不会用 localStorage 残留租户发起登录。
+	it('slug 租户未解析时不暴露 OAuth 入口', async () => {
+		mockConfigTenantId = undefined;
+		mockOAuthProviders = [{ id: 'prov-github', type: 'github', name: 'GitHub' }];
+		renderLoginWithSlug();
+
+		await waitFor(() => {
+			expect(screen.getByText('login.tenantNotFound')).toBeInTheDocument();
+		});
+		expect(screen.queryByRole('button', { name: 'GitHub' })).not.toBeInTheDocument();
 	});
 
 	it('shows validation error when submitting empty form', async () => {
