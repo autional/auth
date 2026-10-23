@@ -13,7 +13,11 @@ vi.mock('@autional/shared', async (importOriginal) => ({
 	SECURITY_DASHBOARD_URL: () => '/security',
 }));
 
-import { getPostLoginTarget } from '../post-login-redirect';
+import {
+	getPostLoginTarget,
+	resolvePostLoginRedirect,
+	buildMfaChallengeUrl,
+} from '../post-login-redirect';
 
 describe('getPostLoginTarget', () => {
 	beforeEach(() => {
@@ -68,5 +72,51 @@ describe('getPostLoginTarget', () => {
 		it('empty slug → /dashboard', () => {
 			expect(getPostLoginTarget({ tenantSlug: '' })).toBe('/dashboard');
 		});
+	});
+});
+
+describe('resolvePostLoginRedirect（MFA/密码登录共用回程）', () => {
+	beforeEach(() => {
+		mockIsValidRedirect.mockImplementation((url: string) => url.startsWith('/'));
+	});
+
+	it('合法相对回程原样返回', () => {
+		expect(resolvePostLoginRedirect('/platform/dashboard?tab=security', 'acme')).toBe(
+			'/platform/dashboard?tab=security',
+		);
+	});
+
+	it('无回程或非法回程 → null', () => {
+		expect(resolvePostLoginRedirect(null, 'acme')).toBeNull();
+		mockIsValidRedirect.mockReturnValue(false);
+		expect(resolvePostLoginRedirect('//evil.example', 'acme')).toBeNull();
+	});
+});
+
+describe('buildMfaChallengeUrl', () => {
+	beforeEach(() => {
+		mockIsValidRedirect.mockImplementation((url: string) => url.startsWith('/'));
+	});
+
+	it('带租户 slug 与回程目标', () => {
+		expect(buildMfaChallengeUrl('acme', '/platform/dashboard')).toBe(
+			'/acme/mfa-challenge?redirect=%2Fplatform%2Fdashboard',
+		);
+	});
+
+	it('无回程目标时只带挑战路径', () => {
+		expect(buildMfaChallengeUrl('acme', null)).toBe('/acme/mfa-challenge');
+	});
+
+	it('无租户 slug 走非租户路由（不得拼 /null/）', () => {
+		expect(buildMfaChallengeUrl(null, '/platform/dashboard')).toBe(
+			'/mfa-challenge?redirect=%2Fplatform%2Fdashboard',
+		);
+		expect(buildMfaChallengeUrl(null, null)).toBe('/mfa-challenge');
+	});
+
+	it('非法回程目标不透传', () => {
+		mockIsValidRedirect.mockReturnValue(false);
+		expect(buildMfaChallengeUrl('acme', '//evil.example')).toBe('/acme/mfa-challenge');
 	});
 });

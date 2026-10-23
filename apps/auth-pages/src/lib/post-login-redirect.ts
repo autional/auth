@@ -98,7 +98,8 @@ export function resolvePostLoginRedirect(
  * MFA 挑战页 URL：把登录页收到的回程目标随查询串透传（仅透传合法值）。
  */
 export function buildMfaChallengeUrl(tenantSlug: string | null, redirect: string | null): string {
-	const base = `/${tenantSlug}/mfa-challenge`;
+	// 无租户 slug（根登录页 /login）走非租户路由；否则会拼出 /null/mfa-challenge
+	const base = tenantSlug ? `/${tenantSlug}/mfa-challenge` : '/mfa-challenge';
 	return redirect && isValidRedirect(redirect)
 		? `${base}?redirect=${encodeURIComponent(redirect)}`
 		: base;
