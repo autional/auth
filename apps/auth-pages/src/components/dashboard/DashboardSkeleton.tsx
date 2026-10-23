@@ -14,7 +14,7 @@ export function DashboardSkeleton({
 	current,
 	message,
 }: {
-	current: 'overview' | 'security' | 'account';
+	current: 'overview' | 'activity' | 'settings';
 	message: string;
 }) {
 	const pulse = 'animate-pulse rounded-xs bg-[var(--color-bg-muted)]';

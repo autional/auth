@@ -61,6 +61,8 @@ vi.mock('lucide-react', () => ({
 	UserX: () => null,
 	// 2026-10-23：已授权应用卡图标
 	Blocks: () => null,
+	// 2026-10-23：通行密钥卡图标
+	Fingerprint: () => null,
 }));
 
 const renderPage = () =>
@@ -70,28 +72,30 @@ const renderPage = () =>
 		</MemoryRouter>,
 	);
 
-describe('AccountPage', () => {
+describe('AccountPage（设置分区）', () => {
 	it('renders title and subtitle', () => {
 		renderPage();
 
-		expect(screen.getByText('account.title')).toBeInTheDocument();
-		expect(screen.getByText('account.subtitle')).toBeInTheDocument();
+		expect(screen.getByText('settings.title')).toBeInTheDocument();
+		expect(screen.getByText('settings.subtitle')).toBeInTheDocument();
 	});
 
-	it('renders all 12 link labels', () => {
+	it('renders all 11 setting labels', () => {
 		renderPage();
 
 		const linkLabels = [
-			'account.profile',
-			'account.security',
-			'account.sessions',
-			'account.notifPrefs',
+			// 登录方式
 			'account.changePassword',
-			'account.loginHistory',
-			'account.roleActivations',
+			'security.passkey',
+			'security.mfa',
 			'account.linkedAccounts',
-			'account.authorizedApps',
 			'account.recoveryContacts',
+			// 个人资料与偏好
+			'account.profile',
+			'account.notifPrefs',
+			// 授权与数据
+			'account.authorizedApps',
+			'account.roleActivations',
 			'account.privacyCenter',
 			'account.deleteAccount',
 		];
@@ -99,33 +103,40 @@ describe('AccountPage', () => {
 		for (const label of linkLabels) {
 			expect(screen.getByText(label)).toBeInTheDocument();
 		}
+
+		// 活动类条目已迁到「活动」分区，设置页不再重复
+		expect(screen.queryByText('account.sessions')).not.toBeInTheDocument();
+		expect(screen.queryByText('account.loginHistory')).not.toBeInTheDocument();
+		expect(screen.queryByText('account.security')).not.toBeInTheDocument();
 	});
 
 	it('links point to correct URLs', () => {
 		renderPage();
 
-		// 只数「账户卡片」内的链接（10）：全页计数会把 AuthCard 的顶层导航与页脚内链、
-		// 以及另一容器里的隐私/删除账号卡算进来，而它们由其他批次演进
-		// （2026-10-23 实测：并发 DashboardNav 让全页计数 13→16 → 任何一批单独回退都会假红）。
-		// 卡片容器 = 第一个账户链接的父元素；隐私/删除账号卡在下方的独立区块。
-		const card = screen.getByText('account.profile').closest('a')!.parentElement!;
-		expect(within(card).getAllByRole('link')).toHaveLength(10);
+		// 只数第一组「登录方式」卡内的链接（5）：全页计数会把顶层导航、页脚内链与其他分组算进来。
+		const card = screen.getByText('account.changePassword').closest('a')!.parentElement!;
+		expect(within(card).getAllByRole('link')).toHaveLength(5);
 
-		// 文本锚定而非下标：AUTH-45 卡片增删不再脆断断言
-		const profileLink = screen.getByText('account.profile').closest('a');
-		expect(profileLink).toHaveAttribute('href', expect.stringContaining('/profile'));
+		// 本仓页面：带租户 slug（AUTH-45①）
+		expect(screen.getByText('account.changePassword').closest('a')).toHaveAttribute(
+			'href',
+			'/demo/change-password',
+		);
+		expect(screen.getByText('account.deleteAccount').closest('a')).toHaveAttribute(
+			'href',
+			'/demo/account-deletion',
+		);
+		expect(screen.getByText('account.privacyCenter').closest('a')).toHaveAttribute(
+			'href',
+			'/demo/privacy',
+		);
 
-		// AUTH-45②：注销账户卡落本仓 account-deletion（测试路由无租户段 → 裸链）
-		const deleteLink = screen.getByText('account.deleteAccount').closest('a');
-		expect(deleteLink).toHaveAttribute('href', '/account-deletion');
-
-		const privacyLink = screen.getByText('account.privacyCenter').closest('a');
-		expect(privacyLink).toHaveAttribute('href', '/privacy');
-
-		// 2026-10-23 补写：已授权应用卡是跨门户深链，必须带租户 slug（AUTH-45①：
-		// 裸链 user.<域名>/security/... 无租户上下文 → 用户门户 404）。
-		const authorizedAppsLink = screen.getByText('account.authorizedApps').closest('a');
-		expect(authorizedAppsLink).toHaveAttribute(
+		// 跨门户深链：必须带租户 slug（裸链 → 用户门户 404）
+		expect(screen.getByText('account.profile').closest('a')).toHaveAttribute(
+			'href',
+			'http://user.example.com/demo/profile',
+		);
+		expect(screen.getByText('account.authorizedApps').closest('a')).toHaveAttribute(
 			'href',
 			'http://user.example.com/demo/security/authorized-apps',
 		);

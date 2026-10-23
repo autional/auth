@@ -18,11 +18,11 @@ import { useEffectiveTenantSlug } from '@/hooks/use-tenant-slug';
 
 const SECTIONS = [
 	{ key: 'overview', path: '/dashboard', labelKey: 'dashboard.tabs.overview' },
-	{ key: 'security', path: '/security', labelKey: 'dashboard.tabs.security' },
-	{ key: 'account', path: '/account', labelKey: 'dashboard.tabs.account' },
+	{ key: 'activity', path: '/activity', labelKey: 'dashboard.tabs.activity' },
+	{ key: 'settings', path: '/account', labelKey: 'dashboard.tabs.settings' },
 ] as const;
 
-export function DashboardNav({ current }: { current: 'overview' | 'security' | 'account' }) {
+export function DashboardNav({ current }: { current: 'overview' | 'activity' | 'settings' }) {
 	const { t } = useI18n();
 	const slug = useEffectiveTenantSlug();
 

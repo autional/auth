@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route, Navigate, useParams } from 'react-router';
 import { useAuthStore, RequireAuth, TenantIndexGuard, useLogout, OAuthCallbackPage as OAuthLoginCallbackPage, useBranding } from '@autional/shared';
 import { useEffect, lazy, Suspense } from 'react';
 import { I18nProvider, useI18n } from '@/lib/i18n';
@@ -26,7 +26,7 @@ const PasskeyPage = lazy(() => import('./app/passkey/page'));
 const ErrorPage = lazy(() => import('./app/error/page'));
 const AccountDeletionPage = lazy(() => import('./app/account-deletion/page'));
 const AccountPage = lazy(() => import('./app/account/page'));
-const SecurityPage = lazy(() => import('./app/security/page'));
+const ActivityPage = lazy(() => import('./app/activity/page'));
 const DashboardPage = lazy(() => import('./app/dashboard/page'));
 const ReapplyPage = lazy(() => import('./app/reapply/page'));
 const RecoverAccountPage = lazy(() => import('./app/recover-account/page'));
@@ -93,6 +93,12 @@ function DashboardSlugRedirect() {
 			<Navigate to={to} replace />
 		</RequireAuth>
 	);
+}
+
+/** 旧 /<slug>/security（已改名活动）→ /<slug>/activity；保留租户段 */
+function SecurityLegacyRedirect() {
+	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
+	return <Navigate to={tenantSlug ? `/${tenantSlug}/activity` : '/activity'} replace />;
 }
 
 function SkipLink() {
@@ -274,12 +280,29 @@ export default function App() {
 										</RequireAuth>
 									}
 								/>
-								{/* 安全分区（顶层导航第三项）：静态段在前，避免被 /:tenantSlug 贪心吃掉 */}
+								{/* 活动分区（第二项）：只读——状态 / 最近活动 / 会话 / 消息 */}
+								<Route
+									path="/activity"
+									element={
+										<RequireAuth>
+											<ActivityPage />
+										</RequireAuth>
+									}
+								/>
+								<Route
+									path="/:tenantSlug/activity"
+									element={
+										<RequireAuth>
+											<ActivityPage />
+										</RequireAuth>
+									}
+								/>
+								{/* 2026-10-23 短暂上线过的 /security：改名后保留重定向，避免旧书签死链 */}
 								<Route
 									path="/security"
 									element={
 										<RequireAuth>
-											<SecurityPage />
+											<Navigate to="/activity" replace />
 										</RequireAuth>
 									}
 								/>
@@ -287,7 +310,7 @@ export default function App() {
 									path="/:tenantSlug/security"
 									element={
 										<RequireAuth>
-											<SecurityPage />
+											<SecurityLegacyRedirect />
 										</RequireAuth>
 									}
 								/>

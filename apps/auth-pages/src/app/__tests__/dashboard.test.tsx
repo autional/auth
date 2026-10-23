@@ -329,7 +329,7 @@ describe('DashboardPage', () => {
 		expect(links).toHaveLength(3);
 		expect(links[0]).toHaveAttribute('href', '/dashboard');
 		expect(links[0]).toHaveAttribute('aria-current', 'page');
-		expect(links[1]).toHaveAttribute('href', '/security');
+		expect(links[1]).toHaveAttribute('href', '/activity');
 		expect(links[2]).toHaveAttribute('href', '/account');
 		expect(links[1]).not.toHaveAttribute('aria-current');
 		expect(links[2]).not.toHaveAttribute('aria-current');
@@ -371,7 +371,8 @@ describe('DashboardPage', () => {
 		expect(screen.queryByText('client-orphan')).not.toBeInTheDocument();
 
 		const safeTile = screen.getByText('novel-demo').closest('a');
-		expect(safeTile).toHaveAttribute('href', 'https://novel.example.com');
+		// 规范化后的绝对地址（safeExternalUrl 统一走 new URL().toString()，与 user 门户同语义）
+		expect(safeTile).toHaveAttribute('href', 'https://novel.example.com/');
 		expect(safeTile).toHaveAttribute('rel', 'noopener noreferrer');
 
 		// 伪协议：降级为不可点击磁贴（不渲染「未配置入口」灰字，避免噪音；语义走 title/aria）

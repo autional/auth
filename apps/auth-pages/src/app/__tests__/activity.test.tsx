@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import SecurityPage from '../security/page';
+import ActivityPage from '../activity/page';
 
 vi.mock('react-i18next', () => ({
 	useTranslation: () => ({
@@ -27,6 +27,8 @@ vi.mock('react-router', async () => {
 const mocks = vi.hoisted(() => ({
 	getMe: vi.fn(),
 	sessions: vi.fn(),
+	audit: vi.fn(),
+	notifications: vi.fn(),
 }));
 
 vi.mock('@/lib/api', () => ({ getMe: mocks.getMe }));
@@ -42,10 +44,13 @@ vi.mock('@autional/shared', async (importOriginal) => ({
 	usePublicTenantSlugs: () => ({ data: [], isSuccess: true }),
 	END_USER_PORTAL_URL: () => 'http://user.example.com',
 	crossAppUrl: (base: string, path?: string) => base + (path || ''),
+	apiClient: { get: vi.fn() },
 }));
 
 vi.mock('@autional/shared/generated/api', () => ({
 	authMeSessions: mocks.sessions,
+	authMeAuditLogs: mocks.audit,
+	notifications: mocks.notifications,
 }));
 
 vi.mock('@/hooks/use-tenant-slug', () => ({
@@ -65,19 +70,10 @@ vi.mock('@/lib/i18n', () => ({
 
 vi.mock('@/hooks/use-page-title', () => ({ usePageTitle: vi.fn() }));
 
-vi.mock('lucide-react', () => ({
-	KeyRound: () => null,
-	Fingerprint: () => null,
-	ShieldCheck: () => null,
-	Monitor: () => null,
-	History: () => null,
-	UserX: () => null,
-}));
-
 const renderPage = () =>
 	render(
-		<MemoryRouter initialEntries={['/security']}>
-			<SecurityPage />
+		<MemoryRouter initialEntries={['/activity']}>
+			<ActivityPage />
 		</MemoryRouter>,
 	);
 
@@ -91,55 +87,74 @@ beforeEach(() => {
 		mfaEnabled: true,
 		lastLoginAt: '2026-06-09T08:00:00Z',
 	});
-	mocks.sessions.mockResolvedValue({ items: [{}, {}] });
+	mocks.sessions.mockResolvedValue({ items: [{}, {}, {}] });
+	mocks.audit.mockResolvedValue({
+		items: [
+			{ id: 'a1', action: 'login', status: 'success', ip: '10.0.0.1', createdAt: '2026-10-23T01:00:00Z' },
+			{ id: 'a2', action: 'password_change', status: 'success', createdAt: '2026-10-22T01:00:00Z' },
+		],
+		total: 2,
+	});
+	mocks.notifications.mockResolvedValue({
+		items: [{ id: 'n1', title: 'Maintenance' }],
+		total: 2,
+	});
 });
 
-describe('SecurityPage', () => {
-	it('渲染标题与状态摘要（状态 / MFA / 最后登录 / 在线设备）', async () => {
+describe('ActivityPage', () => {
+	it('渲染状态摘要（状态 / MFA / 最后登录）', async () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('security.title')).toBeInTheDocument();
+			expect(screen.getByText('activity.title')).toBeInTheDocument();
 		});
 
 		expect(screen.getByText(/dashboard\.status: active/)).toBeInTheDocument();
 		expect(screen.getByText(/MFA: dashboard\.mfaEnabled/)).toBeInTheDocument();
 		expect(screen.getByText(/dashboard\.lastLogin:/)).toBeInTheDocument();
-		expect(screen.getByText(/dashboard\.sessionsOnline/)).toBeInTheDocument();
 	});
 
-	it('顶层导航三项，当前分区是安全', async () => {
+	it('顶层导航三项，当前分区是活动', async () => {
 		renderPage();
 
 		const nav = await screen.findByRole('navigation', { name: 'dashboard.tabs.label' });
 		const links = nav.querySelectorAll('a');
 		expect(links).toHaveLength(3);
-		expect(links[1]).toHaveAttribute('href', '/demo/security');
+		expect(links[0]).toHaveAttribute('href', '/demo/dashboard');
+		expect(links[1]).toHaveAttribute('href', '/demo/activity');
 		expect(links[1]).toHaveAttribute('aria-current', 'page');
+		expect(links[2]).toHaveAttribute('href', '/demo/account');
 	});
 
-	it('快捷操作：本仓页带租户 slug，跨门户页走用户门户', async () => {
+	it('最近活动按 action 映射为可读文案，外链带租户 slug', async () => {
 		renderPage();
 
 		await waitFor(() => {
-			expect(screen.getByText('security.quickActions')).toBeInTheDocument();
+			expect(screen.getByText('activity.action.login')).toBeInTheDocument();
 		});
 
-		expect(screen.getByText('account.changePassword').closest('a')).toHaveAttribute(
+		expect(screen.getByText('activity.action.passwordChange')).toBeInTheDocument();
+		expect(screen.getByText(/activity\.viewAll/).closest('a')).toHaveAttribute(
 			'href',
-			'/demo/change-password',
+			'http://user.example.com/demo/activity',
 		);
-		expect(screen.getByText('security.passkey').closest('a')).toHaveAttribute(
-			'href',
-			'/demo/passkey',
-		);
-		expect(screen.getByText('account.sessions').closest('a')).toHaveAttribute(
+		expect(screen.getByText(/activity\.manageSessions/).closest('a')).toHaveAttribute(
 			'href',
 			'http://user.example.com/demo/sessions',
 		);
-		expect(screen.getByText('account.loginHistory').closest('a')).toHaveAttribute(
+	});
+
+	it('消息显示未读数与最新标题', async () => {
+		renderPage();
+
+		await waitFor(() => {
+			expect(screen.getByText('Maintenance')).toBeInTheDocument();
+		});
+
+		expect(screen.getByText(/activity\.unreadCount/)).toBeInTheDocument();
+		expect(screen.getByText(/activity\.viewMessages/).closest('a')).toHaveAttribute(
 			'href',
-			'http://user.example.com/demo/security/login-history',
+			'http://user.example.com/demo/notifications',
 		);
 	});
 });
