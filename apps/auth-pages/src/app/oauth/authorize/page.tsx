@@ -8,6 +8,7 @@ import { getOAuthClient } from '@/lib/api.generated';
 import { authMe, PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
 import { buildTenantLoginUrl, fetchTenantSlugByClientId } from '@/lib/oauth-cold-start';
 import { oauthErrorText } from '@/lib/oauth-error-text';
+import { safeExternalUrl } from '@/lib/safe-url';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
@@ -299,14 +300,22 @@ function OAuthAuthorizeContent() {
 		window.location.href = url.toString();
 	};
 
+	// 图标来自客户端元数据（应用方填写）：只放行绝对 http/https，
+	// 且必须 no-referrer —— 这是授权决策页，不能把 auth 域 URL 作为 Referer 送给第三方。
+	const safeClientLogo = safeExternalUrl(clientLogo);
+	// 租户品牌 logo 同理（同一页两处外部图片，规则必须一致）。
+	const safeTenantLogo = safeExternalUrl(tenantBranding?.logo);
+
 	return (
 		<AuthCard>
 			<div className="text-center">
 				<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-bg-muted)] text-2xl">
-					{clientLogo ? (
+					{safeClientLogo ? (
 						<img
-							src={clientLogo}
+							src={safeClientLogo}
 							alt={clientName}
+							loading="lazy"
+							referrerPolicy="no-referrer"
 							className="h-10 w-10 rounded-full object-cover"
 						/>
 					) : (
@@ -319,10 +328,12 @@ function OAuthAuthorizeContent() {
 				/>
 				{tenantBranding && (
 					<div className="mt-3 flex items-center justify-center gap-2 text-xs text-[var(--color-text-muted)]">
-						{tenantBranding.logo ? (
+						{safeTenantLogo ? (
 							<img
-								src={tenantBranding.logo}
+								src={safeTenantLogo}
 								alt={tenantBranding.name}
+								loading="lazy"
+								referrerPolicy="no-referrer"
 								className="h-5 w-5 rounded-full object-cover"
 							/>
 						) : (

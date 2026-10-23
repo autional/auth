@@ -67,6 +67,7 @@ vi.mock('@/lib/i18n', () => ({
 }));
 
 import OAuthAuthorizePage from '../oauth/authorize/page';
+import { PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
 
 const DEFAULT_PARAMS =
 	'/oauth/authorize?client_id=test-client&redirect_uri=https://example.com/callback&scope=openid+profile&state=random-state';
@@ -116,6 +117,40 @@ describe('OAuthAuthorizePage', () => {
 				screen.getByText('auth.oauth.requestAccess {"clientName":"My OAuth App"}'),
 			).toBeInTheDocument();
 		});
+	});
+
+	it('malicious logoUri (javascript:) is not rendered as an image', async () => {
+		// 组件读取的是 camelCase 的 logoUri（apiClient 拦截器归一后的形状）；
+		// 用 snake_case `logo_url` 会让 logo 分支根本不进入 → 用例假绿（经审查实测）。
+		mockGetOAuthClient.mockResolvedValue({
+			data: { clientName: 'Bad Logo App', logoUri: 'javascript:alert(1)' },
+		});
+
+		renderOAuthAuthorize();
+
+		await waitFor(() => {
+			expect(screen.getByText(/Bad Logo App/)).toBeInTheDocument();
+		});
+		// 同意页不得把应用方提供的伪协议 logo 渲染成 <img>（防 XSS/Referer 外泄）
+		expect(document.querySelector('img[src^="javascript"]')).toBeNull();
+	});
+
+
+	it('malicious tenant branding logo (javascript:) falls back to emoji, not an image', async () => {
+		// 租户品牌 logo 与客户端 logo 同属外部输入：同一页两处都必须过白名单。
+		mockGetOAuthClient.mockResolvedValue({
+			data: { clientName: 'Acme App', logoUri: '', tenantId: 'acme' },
+		});
+		vi.mocked(PublicAuthConfigByAuthConfig).mockResolvedValue({
+			data: { displayName: 'Acme', branding: { logoUrl: 'javascript:alert(1)' } },
+		} as never);
+
+		renderOAuthAuthorize();
+
+		await waitFor(() => {
+			expect(screen.getAllByText(/Acme/).length).toBeGreaterThan(0);
+		});
+		expect(document.querySelector('img[src^="javascript"]')).toBeNull();
 	});
 
 	it('shows unknownApp fallback when API fails', async () => {
