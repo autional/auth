@@ -63,6 +63,11 @@ vi.mock('@/hooks/use-page-title', () => ({
 	usePageTitle: vi.fn(),
 }));
 
+// WS-G G2（AUTH-04）：recover-account 租户来源 = slug 认证配置。
+vi.mock('@/hooks/use-tenant-auth-config', () => ({
+	useTenantAuthConfigBySlug: () => ({ data: { tenantId: 't-acme' }, isLoading: false }),
+}));
+
 vi.mock('@autional/shared/generated/api', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@autional/shared/generated/api')>();
 	return {
@@ -173,7 +178,7 @@ describe('recover-account: request 步骤', () => {
 		await user.click(screen.getByRole('button', { name: 'auth.recoverAccount.sendCode' }));
 		await screen.findByPlaceholderText('000000');
 		expect(mockRecoverRequestPost).toHaveBeenCalledTimes(1);
-		expect(mockRecoverRequestPost).toHaveBeenCalledWith({ identity: 'user@x.com' });
+		expect(mockRecoverRequestPost).toHaveBeenCalledWith({ identity: 'user@x.com', tenantId: 't-acme' });
 		// maskedTo 经 i18n 插值进 codeSent（t mock 把 opts 序列化在 key 后）
 		expect(screen.getByText(/auth\.recoverAccount\.codeSent .*u\*\*\*r@x\.com/)).toBeInTheDocument();
 	});
@@ -253,6 +258,7 @@ describe('recover-account: reset 步骤', () => {
 			code: '123456',
 			newPassword: 'NewSecurePass123!',
 			passwordTransmission: 'plain',
+			tenantId: 't-acme',
 		});
 	});
 
@@ -388,12 +394,13 @@ describe('recover-account: 完整串联', () => {
 		await screen.findByText('auth.recoverAccount.success');
 
 		// ---- 全链路 API 调用参数断言 ----
-		expect(mockRecoverRequestPost).toHaveBeenCalledWith({ identity: 'user@x.com' });
+		expect(mockRecoverRequestPost).toHaveBeenCalledWith({ identity: 'user@x.com', tenantId: 't-acme' });
 		expect(mockRecoverResetPost).toHaveBeenCalledWith({
 			identity: 'user@x.com',
 			code: '123456',
 			newPassword: 'NewSecurePass123!',
 			passwordTransmission: 'plain',
+			tenantId: 't-acme',
 		});
 	});
 });

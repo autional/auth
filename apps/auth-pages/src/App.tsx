@@ -336,6 +336,8 @@ export default function App() {
 								<Route path="/:tenantSlug/register" element={<RegisterPage />} />
 								<Route path="/:tenantSlug/reapply" element={<ReapplyPage />} />
 								<Route path="/:tenantSlug/forgot-password" element={<ForgotPasswordPage />} />
+								{/* WS-G G3（R3 m-12）：租户深链重置页；租户仍只取 query/sessionStorage，slug 仅做入口 */}
+								<Route path="/:tenantSlug/reset-password" element={<ResetPasswordPage />} />
 								<Route path="/:tenantSlug/recover-account" element={<RecoverAccountPage />} />
 								{/* AUTH-22：改密页调 authProtected 的 /auth/me/password，必须持会话；
 								    匿名深链此前可直渲染表单（force 流程已改为登录期建会话后进入） */}

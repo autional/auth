@@ -7,7 +7,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Label } from '@autional/ui';
 import { createResetPasswordSchema } from '@/lib/validators';
-import { authVerifyResetCodePost, authResetPasswordPost, PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
+import { PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
+import { resetPassword, verifyResetCode } from '@/lib/api-tenant';
 import { processPasswordForTransmission } from '@autional/shared';
 import { checkPasswordBreached } from '@/lib/breach-check';
 import type { ResetPasswordFormData } from '@/lib/validators';
@@ -28,6 +29,9 @@ function ResetPasswordContent() {
 	const [searchParams] = useSearchParams();
 	const token = searchParams.get('token') || '';
 	const identity = sessionStorage.getItem('reset_password_identity') || '';
+	// WS-G G2（R3 m-11/m-12）：query 优先 → sessionStorage；根路由不回落默认租户。
+	const queryTenantId = searchParams.get('tenant_id') || '';
+	const tenantId = queryTenantId || sessionStorage.getItem('reset_password_tenant_id') || '';
 
 	const [verifying, setVerifying] = useState(true);
 	const [tokenValid, setTokenValid] = useState(false);
@@ -50,12 +54,19 @@ function ResetPasswordContent() {
 			return;
 		}
 
-		authVerifyResetCodePost({ code: token, identity })
+		// AUTH-04（AC-G5）：缺租户 → 错误页，不发请求（不猜测、不回落默认租户）。
+		if (!tenantId) {
+			setVerifying(false);
+			setTokenError(t('error.tenant_required'));
+			return;
+		}
+
+		verifyResetCode(identity, token, tenantId)
 			.then((res: any) => {
-				// 2026-08-17 修复：VerifyResetCode 返回 tenant_id，前端据此获取密码传输模式
-				const tenantId = (res as any)?.tenantId ?? (res as any)?.tenant_id ?? '';
-				if (tenantId) {
-					sessionStorage.setItem('reset_password_tenant_id', tenantId);
+				// VerifyResetCode 返回租户（服务端权威）：留存供后续提交/刷新使用。
+				const resolvedTenantId = res?.tenantId ?? res?.tenant_id ?? '';
+				if (resolvedTenantId) {
+					sessionStorage.setItem('reset_password_tenant_id', resolvedTenantId);
 				}
 				setTokenValid(true);
 			})
@@ -65,7 +76,7 @@ function ResetPasswordContent() {
 			.finally(() => {
 				setVerifying(false);
 			});
-	}, [token]);
+	}, [token, tenantId]);
 
 	const onSubmit = async (data: ResetPasswordFormData) => {
 		// HIBP k-anonymity breach check — per NIST SP 800-63B §5.1.1.2
@@ -82,9 +93,8 @@ function ResetPasswordContent() {
 		setSubmitting(true);
 		try {
 			// 2026-08-17 修复：必须根据租户配置决定密码传输模式。
-			// tenant_id 来自 VerifyResetCode 响应（sessionStorage）；缺失 = 无法确定模式，
+			// tenant_id 来自 query/sessionStorage（WS-G G2）；缺失 = 无法确定模式，
 			// 不能静默发明文（hash 租户会 61000104），必须报错暴露。
-			const tenantId = sessionStorage.getItem('reset_password_tenant_id') || '';
 			if (!tenantId) {
 				throw new Error('reset tenant context missing, cannot determine password transmission mode');
 			}
@@ -101,12 +111,13 @@ function ResetPasswordContent() {
 				tenantId,
 				undefined,
 			);
-			await authResetPasswordPost({
+			await resetPassword({
 				code: token,
 				identity,
 				newPassword: transmissionResult.password,
-				password_transmission: transmissionResult.passwordTransmission,
-			} as any);
+				passwordTransmission: transmissionResult.passwordTransmission,
+				tenantId,
+			});
 			setSuccess(true);
 		} catch (err: any) {
 			setTokenError(err.response?.data?.message || t('auth.resetPassword.failed'));

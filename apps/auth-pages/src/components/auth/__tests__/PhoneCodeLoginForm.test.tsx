@@ -78,6 +78,41 @@ function renderForm() {
 	);
 }
 
+describe('PhoneCodeLoginForm - WS-G 租户透传与待审', () => {
+	it('AC-G4: 发送短信验证码携带地址栏租户', async () => {
+		renderForm();
+
+		fireEvent.change(screen.getByPlaceholderText('+86 13800000000'), {
+			target: { value: '+86 13800000000' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'auth.phoneCode.sendCode' }));
+
+		await waitFor(() => {
+			expect(vi.mocked(authSendSmsCodePost)).toHaveBeenCalledWith({
+				phone: '+8613800000000',
+				tenantId: 'tenant-1',
+			});
+		});
+	});
+
+	it('AC-G2: pending 登录只提示待审，不写 token、不跳转', async () => {
+		vi.mocked(authLoginPhoneCodePost).mockResolvedValue({ membershipStatus: 'pending' } as any);
+		renderForm();
+
+		fireEvent.change(screen.getByPlaceholderText('+86 13800000000'), {
+			target: { value: '+86 13800000000' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'auth.phoneCode.sendCode' }));
+		const codeInput = await screen.findByPlaceholderText('000000');
+		fireEvent.change(codeInput, { target: { value: '123456' } });
+		fireEvent.click(screen.getByRole('button', { name: 'auth.phoneCode.login' }));
+
+		expect(await screen.findByText('error.membership_pending')).toBeInTheDocument();
+		expect(vi.mocked(loginWithTokens)).not.toHaveBeenCalled();
+		expect(vi.mocked(anchorSessionFromToken)).not.toHaveBeenCalled();
+	});
+});
+
 describe('PhoneCodeLoginForm - AUTH-53⑤ 会话锚定', () => {
 	it('手机验证码登录成功后锚定租户（slug 取路由、tenantId 取 prop）', async () => {
 		renderForm();

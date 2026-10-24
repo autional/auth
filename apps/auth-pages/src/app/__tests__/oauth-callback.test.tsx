@@ -152,6 +152,17 @@ describe('OAuthCallbackPage RFC 9207（iss 转发）', () => {
 	});
 });
 
+describe('OAuthCallbackPage WS-G（审批制首登）', () => {
+	it('AC-G3: membershipStatus=pending → 待审提示，且不写入令牌', async () => {
+		mockExchangeCodeForToken.mockResolvedValue({ data: { membershipStatus: 'pending' } });
+		renderCallback('/oauth/callback/github?code=auth-code&state=s1');
+
+		expect(await screen.findByText('auth.pending.title')).toBeInTheDocument();
+		expect(screen.getByText('auth.pending.body')).toBeInTheDocument();
+		expect(vi.mocked(loginWithTokens)).not.toHaveBeenCalled();
+	});
+});
+
 describe('OAuthCallbackPage S0（第三方身份未绑定不自动登录）', () => {
 	it('linkRequired → 引导先登录再绑定，且不签发/写入令牌', async () => {
 		mockExchangeCodeForToken.mockResolvedValue({ data: { linkRequired: true } });

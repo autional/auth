@@ -5,11 +5,9 @@ import { Link, useParams } from 'react-router';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Button, Input, Label } from '@autional/ui';
-import {
-	authRecoverAccountPost,
-	authRecoverAccountResetPost,
-	PublicAuthConfigBySlugByBySlug,
-} from '@autional/shared/generated/api';
+import { PublicAuthConfigBySlugByBySlug } from '@autional/shared/generated/api';
+import { requestAccountRecovery, resetAccountRecovery } from '@/lib/api-tenant';
+import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
 import { processPasswordForTransmission } from '@autional/shared';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
@@ -31,13 +29,20 @@ export default function RecoverAccountPage() {
 
 	const { tenantSlug: slugParam } = useParams();
 	const tenantSlug = slugParam || null;
+	// WS-G G2（AUTH-04）：租户唯一来源 = slug 认证配置；不从默认租户兜底。
+	const { data: slugAuthConfig } = useTenantAuthConfigBySlug(tenantSlug);
+	const tenantId = slugAuthConfig?.tenantId || '';
 
 	const handleRequestRecovery = async () => {
 		if (!identity.trim()) return;
+		if (!tenantId) {
+			setError(t('error.tenant_required'));
+			return;
+		}
 		setLoading(true);
 		setError('');
 		try {
-			const res = await authRecoverAccountPost({ identity: identity.trim() });
+			const res = await requestAccountRecovery(identity.trim(), tenantId);
 			// 反枚举一致响应：账号是否存在都进入验证步（提示统一，不泄露账号存在性）
 			setMaskedTarget(res?.maskedTo || '');
 			setStep('reset');
@@ -65,21 +70,23 @@ export default function RecoverAccountPage() {
 					'password transmission mode is missing from tenant auth-config (contract error)',
 				);
 			}
-			const tenantId = (authConfig as any)?.tenantId || (authConfig as any)?.tenant_id || '';
-			if (!tenantId) {
+			const resolvedTenantId =
+				(authConfig as any)?.tenantId || (authConfig as any)?.tenant_id || tenantId;
+			if (!resolvedTenantId) {
 				throw new Error('tenant id missing from auth-config, cannot hash password');
 			}
 			const transmissionResult = await processPasswordForTransmission(
 				newPassword,
 				mode,
-				tenantId,
+				resolvedTenantId,
 				undefined,
 			);
-			await authRecoverAccountResetPost({
+			await resetAccountRecovery({
 				identity: identity.trim(),
 				code: code.trim(),
 				newPassword: transmissionResult.password,
 				passwordTransmission: transmissionResult.passwordTransmission,
+				tenantId: resolvedTenantId,
 			});
 			setStep('success');
 		} catch (err: any) {

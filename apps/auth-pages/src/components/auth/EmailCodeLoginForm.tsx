@@ -3,11 +3,8 @@
 import { useState, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { Button, Input, Label } from '@autional/ui';
-import {
-	authLoginEmailCodePost,
-	authRegisterEmailCodePost,
-	authSendVerificationEmailPost,
-} from '@autional/shared/generated/api';
+import { authLoginEmailCodePost, authRegisterEmailCodePost } from '@autional/shared/generated/api';
+import { sendVerificationEmail } from '@/lib/api-tenant';
 import { loginWithTokens } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
@@ -56,7 +53,8 @@ export default function EmailCodeLoginForm({
 		setLoading(true);
 		setError('');
 		try {
-			await authSendVerificationEmailPost({ email: email.trim() });
+			// 地址栏租户优先（AUTH-01）：发码与登录必须落在同一租户。
+			await sendVerificationEmail(email.trim(), tenantId);
 			setSent(true);
 			setStep('code');
 			startCountdown();
@@ -104,6 +102,12 @@ export default function EmailCodeLoginForm({
 					loginPayload.captchaChallengeId = captchaChallengeId;
 				}
 				res = await authLoginEmailCodePost(loginPayload as any);
+			}
+
+			// WS-G / AUTH-02：审批制租户 → membership_status=pending，服务端不签发 token。
+			if (res?.membershipStatus === 'pending' || res?.data?.membershipStatus === 'pending') {
+				setError(t('error.membership_pending'));
+				return;
 			}
 
 			// 拦截器已解包信封并转 camelCase（{code,data:{access_token..}} → {accessToken..}）

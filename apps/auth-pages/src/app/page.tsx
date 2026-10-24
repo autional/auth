@@ -53,13 +53,19 @@ const ERROR_CODE_MAP: Record<string, string> = {
 	'40800506': 'login.error.invalidCaptcha',
 };
 
-function getErrorMessage(err: any, t: (k: string) => string): string {
+function getErrorMessage(err: any, t: (k: string, fallback?: string) => string): string {
 	const status = err?.response?.status as number | undefined;
 	const data = err?.response?.data;
 	const code =
 		typeof data === 'object' && data !== null ? (data.code as string | undefined) : undefined;
 	const message =
 		typeof data === 'object' && data !== null ? (data.message as string | undefined) : undefined;
+	// WS-G G4（AUTH-02）：租户停用 / 待审批等租户权威错误带 i18n_key（Problem 无 message 字段），
+	// 键已登记时本地化；未登记（含自动 error.<码>）落既有码表/兜底。
+	const i18nKey =
+		typeof data === 'object' && data !== null
+			? ((data.i18n_key || data.i18nKey) as string | undefined)
+			: undefined;
 
 	if (!status && !err?.response) {
 		return t('login.error.network');
@@ -69,6 +75,10 @@ function getErrorMessage(err: any, t: (k: string) => string): string {
 	}
 	if (status === 404) {
 		return t('login.error.serviceNotFound');
+	}
+	const localized = i18nKey ? t(i18nKey, '') : '';
+	if (localized) {
+		return localized;
 	}
 	if (code && ERROR_CODE_MAP[code]) {
 		return t(ERROR_CODE_MAP[code]);

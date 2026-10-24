@@ -5,7 +5,8 @@ import { Link, useParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Label } from '@autional/ui';
-import { authForgotPasswordPost } from '@autional/shared/generated/api';
+import { forgotPassword } from '@/lib/api-tenant';
+import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
 import { createForgotPasswordSchema } from '@/lib/validators';
 import type { ForgotPasswordFormData } from '@/lib/validators';
 import { useCountdown } from '@/hooks/use-countdown';
@@ -24,6 +25,9 @@ export default function ForgotPasswordPage() {
 	usePageTitle('forgot.title');
 	const { tenantSlug: slugParam } = useParams();
 	const tenantSlug = slugParam || '';
+	// WS-G G2（AUTH-01）：找回密码的唯一租户来源 = slug 认证配置；不以默认租户兜底。
+	const { data: slugAuthConfig } = useTenantAuthConfigBySlug(tenantSlug || null);
+	const tenantId = slugAuthConfig?.tenantId || '';
 	const [submitted, setSubmitted] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [channel, setChannel] = useState<RecoveryChannel>('email');
@@ -43,7 +47,10 @@ export default function ForgotPasswordPage() {
 		setLoading(true);
 
 		try {
-			await authForgotPasswordPost({ identity });
+			// R3 m-10：身份与租户一并留存 —— 重置页（根路由）只认 query/session，不反查。
+			sessionStorage.setItem('reset_password_identity', identity);
+			sessionStorage.setItem('reset_password_tenant_id', tenantId);
+			await forgotPassword(identity, tenantId || undefined);
 		} catch {
 			// 统一提示，不暴露具体错误
 		} finally {

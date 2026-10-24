@@ -5,13 +5,24 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import RegisterPage from '../register/page';
 
-vi.mock('react-i18next', () => ({
-	useTranslation: () => ({
-		t: (key: string, opts?: any) => (opts ? `${key} ${JSON.stringify(opts)}` : key),
-		i18n: { language: 'zh-CN', changeLanguage: vi.fn() },
-	}),
-	I18nextProvider: ({ children }: any) => children,
-}));
+// 模拟真实 i18next（keySeparator=false）：已登记键命中返回键名；带 defaultValue 且未命中
+// 返回默认值（useI18n 的 flat./无前缀两级回落依赖此语义）；其余沿用旧口径。
+vi.mock('react-i18next', () => {
+	const knownKeys = new Set(['error.invitation_invalid']);
+	return {
+		useTranslation: () => ({
+			t: (key: string, opts?: any) => {
+				const rawKey = key.startsWith('flat.') ? key.slice(5) : key;
+				if (knownKeys.has(rawKey)) return rawKey;
+				if (typeof opts === 'string') return opts;
+				if (opts && typeof opts === 'object' && 'defaultValue' in opts) return opts.defaultValue;
+				return opts ? `${key} ${JSON.stringify(opts)}` : key;
+			},
+			i18n: { language: 'zh-CN', changeLanguage: vi.fn() },
+		}),
+		I18nextProvider: ({ children }: any) => children,
+	};
+});
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async () => {
@@ -256,6 +267,85 @@ describe('RegisterPage', () => {
 			expect(mockAuthRegisterCheckUsername).toHaveBeenCalledWith(
 				expect.objectContaining({ username: 'sluguser', tenantId: 'tenant-slug-1' }),
 			);
+		});
+	});
+
+	// WS-G AC-G1（AUTH-02）：审批制租户注册 → membership_status=pending。
+	// 必须展示待审页，且不自动登录、不写 token、不跳转。
+	it('AC-G1: pending registration shows the pending page without creating a session', async () => {
+		mockAuthRegisterPost.mockResolvedValue({ membershipStatus: 'pending', status: 'pending' });
+		const user = userEvent.setup();
+		renderRegister();
+		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
+		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
+		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
+		await user.click(screen.getByRole('checkbox'));
+
+		await user.click(screen.getByRole('button', { name: 'register.submit' }));
+
+		expect(await screen.findByText('auth.pending.title')).toBeInTheDocument();
+		expect(screen.getByText('auth.pending.body')).toBeInTheDocument();
+		expect(mockAuthRegisterPost).toHaveBeenCalledTimes(1);
+		expect(mockAuthLoginPost).not.toHaveBeenCalled();
+		expect(mockLoginWithTokens).not.toHaveBeenCalled();
+		expect(mockAuthMeConsentPost).not.toHaveBeenCalled();
+	});
+
+	// WS-G G4（AUTH-02）：邀请码无效 → 本地化提示，不直出服务端英文细节。
+	it('AC-G1: invitation error shows the localized message without internal detail', async () => {
+		mockAuthRegisterPost.mockRejectedValue({
+			response: {
+				status: 403,
+				data: {
+					code: 61000003,
+					title: 'invitation invalid',
+					i18n_key: 'error.invitation_invalid',
+				},
+			},
+		});
+		const user = userEvent.setup();
+		renderRegister();
+		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
+		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
+		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
+		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
+		await user.click(screen.getByRole('checkbox'));
+
+		await user.click(screen.getByRole('button', { name: 'register.submit' }));
+
+		expect(await screen.findByText('error.invitation_invalid')).toBeInTheDocument();
+		expect(screen.queryByText('register.genericError')).toBeNull();
+		// 服务端英文 title 不落屏
+		expect(screen.queryByText('invitation invalid')).toBeNull();
+	});
+
+	// WS-G AC-G4（AUTH-01）：email 查重必须带地址栏租户，与注册同租户。
+	it('AC-G4: check-email carries the address-bar tenant', async () => {
+		mockUseTenantAuthConfigBySlug.mockReturnValue({
+			data: { tenantId: 'tenant-slug-1' },
+			isLoading: false,
+		});
+
+		render(
+			<QueryClientProvider client={queryClient}>
+				<MemoryRouter initialEntries={['/acme-corp/register']}>
+					<Routes>
+						<Route path="/:tenantSlug/register" element={<RegisterPage />} />
+					</Routes>
+				</MemoryRouter>
+			</QueryClientProvider>,
+		);
+
+		fireEvent.change(screen.getByPlaceholderText('register.emailPlaceholder'), {
+			target: { value: 'slug@example.com' },
+		});
+
+		await waitFor(() => {
+			expect(mockAuthRegisterCheckEmail).toHaveBeenCalledWith({
+				email: 'slug@example.com',
+				tenantId: 'tenant-slug-1',
+			});
 		});
 	});
 

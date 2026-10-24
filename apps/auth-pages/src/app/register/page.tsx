@@ -7,14 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Label, Input } from '@autional/ui';
 import {
-	authRegisterPost,
 	authRegisterCheckUsernamePost,
-	authRegisterCheckEmailPost,
 	authLoginPost,
 	authMeConsentPost,
 	tenantPublicTenants,
 	authCaptchaChallenge,
 } from '@autional/shared/generated/api';
+import { checkEmailAvailability, registerAccount } from '@/lib/api-tenant';
 import { checkPasswordBreached } from '@/lib/breach-check';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
 import { loadAuthExtras } from '@/lib/api';
@@ -163,6 +162,8 @@ export default function RegisterPage() {
 	const [usernameStatus, setUsernameStatus] = useState<CheckStatus>('idle');
 	const [emailStatus, setEmailStatus] = useState<CheckStatus>('idle');
 	const [registrationSuccess, setRegistrationSuccess] = useState(false);
+	// WS-G / AUTH-02：审批制租户新注册 → membership_status=pending；不建会话、不跳转。
+	const [pendingApproval, setPendingApproval] = useState(false);
 	// 注册成功后的 Passkey 登记需要原口令重认证（begin 端点 password 必填）
 	const [registeredPassword, setRegisteredPassword] = useState('');
 	const [rateLimitStep, setRateLimitStep] = useState(0);
@@ -291,7 +292,8 @@ export default function RegisterPage() {
 		setEmailStatus('checking');
 		emailTimer.current = setTimeout(async () => {
 			try {
-				const res = await authRegisterCheckEmailPost({ email: watchedEmail });
+				// 地址栏租户优先：查重与注册必须落在同一租户（AUTH-01/04）。
+				const res = await checkEmailAvailability(watchedEmail, checkTenantId);
 				setEmailStatus(res.available ? 'available' : 'taken');
 			} catch {
 				setEmailStatus('idle');
@@ -300,7 +302,7 @@ export default function RegisterPage() {
 		return () => {
 			if (emailTimer.current) clearTimeout(emailTimer.current);
 		};
-	}, [watchedEmail]);
+	}, [watchedEmail, checkTenantId]);
 
 	const onSubmit = async (data: FormData) => {
 		setError('');
@@ -407,7 +409,14 @@ export default function RegisterPage() {
 				payload.captchaChallengeId = captchaChallengeId;
 			}
 
-			await authRegisterPost(payload);
+			const regRes = await registerAccount(payload);
+
+			// WS-G / AUTH-02（R3 M-7）：审批制租户 → 服务端 200 + membership_status=pending，
+			// 且不签发 token。此时禁止自动登录/写 token/跳转，只展示待审页。
+			if (regRes?.membershipStatus === 'pending') {
+				setPendingApproval(true);
+				return;
+			}
 
 			// 自动登录 = best-effort：注册已成功，登录失败绝不能把结果改写为「注册失败」（AUTH-13）。
 			// 密码必须用与注册相同的传输处理结果 —— 裸明文在 hash 租户必 401。
@@ -482,8 +491,17 @@ export default function RegisterPage() {
 		} catch (err: any) {
 			const status = err?.response?.status;
 			const message = err?.response?.data?.message;
+			// WS-G G4（AUTH-02/05）：后端 Problem 带已登记的 i18n_key（邀请无效 / 租户停用 /
+			// 注册未开放 / 待审批）时优先本地化，不直出服务端英文细节。
+			const i18nKey = err?.response?.data?.i18n_key || err?.response?.data?.i18nKey;
+			const localized = i18nKey ? t(i18nKey, '') : '';
 			// 409 = 账号已存在（ErrCodeUserAlreadyExists 61000102）→ 给「去登录」指路，而非笼统失败
-			setError(status === 409 ? message || t('auth.register.conflict') : message || t('register.genericError'));
+			setError(
+				localized ||
+					(status === 409
+						? message || t('auth.register.conflict')
+						: message || t('register.genericError')),
+			);
 			const step = parseInt(err?.response?.headers?.['x-ratelimit-step'] || '0', 10);
 			if (step >= 1) {
 				setRateLimitStep(step);
@@ -553,6 +571,19 @@ export default function RegisterPage() {
 			setInlineConfigId(null);
 		}
 	}, []);
+
+	if (pendingApproval) {
+		return (
+			<AuthCard logoUrl={logoUrl} hideFooter>
+				<AuthHeader title={t('auth.pending.title')} subtitle={t('auth.pending.body')} />
+				<Link to={tenantSlug ? `/${tenantSlug}/login` : '/login'} className="block">
+					<Button fullWidth variant="outline">
+						{t('auth.common.backToLogin')}
+					</Button>
+				</Link>
+			</AuthCard>
+		);
+	}
 
 	if (registrationSuccess) {
 		return (

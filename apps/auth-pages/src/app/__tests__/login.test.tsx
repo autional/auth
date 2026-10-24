@@ -5,13 +5,24 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LoginPage from '../page';
 
-vi.mock('react-i18next', () => ({
-	useTranslation: () => ({
-		t: (key: string, opts?: any) => (opts ? `${key} ${JSON.stringify(opts)}` : key),
-		i18n: { language: 'zh-CN', changeLanguage: vi.fn() },
-	}),
-	I18nextProvider: ({ children }: any) => children,
-}));
+// 模拟真实 i18next（keySeparator=false）：已登记键命中返回键名；带 defaultValue 且未命中
+// 返回默认值（useI18n 的 flat./无前缀两级回落依赖此语义）；其余沿用旧口径。
+vi.mock('react-i18next', () => {
+	const knownKeys = new Set(['error.membership_pending']);
+	return {
+		useTranslation: () => ({
+			t: (key: string, opts?: any) => {
+				const rawKey = key.startsWith('flat.') ? key.slice(5) : key;
+				if (knownKeys.has(rawKey)) return rawKey;
+				if (typeof opts === 'string') return opts;
+				if (opts && typeof opts === 'object' && 'defaultValue' in opts) return opts.defaultValue;
+				return opts ? `${key} ${JSON.stringify(opts)}` : key;
+			},
+			i18n: { language: 'zh-CN', changeLanguage: vi.fn() },
+		}),
+		I18nextProvider: ({ children }: any) => children,
+	};
+});
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async () => {
@@ -207,6 +218,31 @@ describe('LoginPage', () => {
 		await waitFor(() => {
 			expect(screen.getByText('login.error.credentials')).toBeInTheDocument();
 		});
+	});
+
+	// WS-G G4（AUTH-02）：待审批用户密码登录 → 403 i18n_key → 本地化提示，不建会话。
+	it('AC-G2: pending membership login shows the pending hint and creates no session', async () => {
+		mockAuthLoginPost.mockRejectedValue({
+			response: {
+				status: 403,
+				data: {
+					code: 61000003,
+					title: 'membership pending approval',
+					i18n_key: 'error.membership_pending',
+				},
+			},
+		});
+		const user = userEvent.setup();
+		renderLogin();
+		await user.type(screen.getByPlaceholderText('auth.login.identityPlaceholder'), 'pendinguser');
+		await user.type(screen.getByPlaceholderText('auth.login.passwordPlaceholder'), 'pass123');
+		await user.click(screen.getByRole('button', { name: 'login.submit' }));
+
+		await waitFor(() => {
+			expect(screen.getByText('error.membership_pending')).toBeInTheDocument();
+		});
+		expect(mockLoginWithTokens).not.toHaveBeenCalled();
+		expect(screen.queryByText('login.error.credentials')).toBeNull();
 	});
 
 	it('navigates on successful login', async () => {

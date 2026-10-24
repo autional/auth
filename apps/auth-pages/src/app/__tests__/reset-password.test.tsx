@@ -14,13 +14,19 @@ vi.mock('react-i18next', () => ({
 
 const mockNavigate = vi.fn();
 let mockSearchParamsToken = '';
+let mockSearchParamsTenant = '';
+const mockGet = (key: string) => {
+	if (key === 'token') return mockSearchParamsToken;
+	if (key === 'tenant_id') return mockSearchParamsTenant;
+	return null;
+};
 
 vi.mock('react-router', async () => {
 	const actual = await vi.importActual('react-router');
 	return {
 		...actual,
 		useNavigate: () => mockNavigate,
-		useSearchParams: () => [{ get: (_k: string) => mockSearchParamsToken }, vi.fn()],
+		useSearchParams: () => [{ get: mockGet }, vi.fn()],
 		Link: ({ to, children }: any) => <a href={to}>{children}</a>,
 	};
 });
@@ -53,6 +59,8 @@ function renderResetPassword() {
 beforeEach(() => {
 	vi.clearAllMocks();
 	mockSearchParamsToken = '';
+	mockSearchParamsTenant = 't-acme';
+	sessionStorage.clear();
 	mockAuthVerifyResetCodePost.mockReset();
 	mockAuthResetPasswordPost.mockReset();
 	mockCheckPasswordBreached.mockReset();
@@ -80,6 +88,7 @@ describe('ResetPasswordPage', () => {
 		expect(mockAuthVerifyResetCodePost).toHaveBeenCalledWith({
 			code: 'valid-reset-token',
 			identity: '',
+			tenantId: 't-acme',
 		});
 	});
 
@@ -131,6 +140,33 @@ describe('ResetPasswordPage', () => {
 		});
 	});
 
+	// WS-G AC-G5（AUTH-04 / R3 m-11）：token 在但租户缺失 → 错误页，不发请求。
+	it('AC-G5: 缺租户时显示错误页且不发验证请求', async () => {
+		mockSearchParamsToken = 'valid-reset-token';
+		mockSearchParamsTenant = '';
+		renderResetPassword();
+
+		await waitFor(() => {
+			expect(screen.getByText('error.tenant_required')).toBeInTheDocument();
+		});
+		expect(mockAuthVerifyResetCodePost).not.toHaveBeenCalled();
+	});
+
+	// WS-G G2：query 缺失时回落 sessionStorage（forgot-password 已留存）。
+	it('AC-G4: 租户回落到 reset_password_tenant_id 并随验证请求下发', async () => {
+		mockSearchParamsToken = 'valid-reset-token';
+		mockSearchParamsTenant = '';
+		sessionStorage.setItem('reset_password_tenant_id', 't-stored');
+		mockAuthVerifyResetCodePost.mockReturnValue(new Promise(() => {}));
+		renderResetPassword();
+
+		expect(mockAuthVerifyResetCodePost).toHaveBeenCalledWith({
+			code: 'valid-reset-token',
+			identity: '',
+			tenantId: 't-stored',
+		});
+	});
+
 	it('shows success message on successful password reset', async () => {
 		vi.useFakeTimers();
 		// 2026-08-17 契约：VerifyResetCode 返回 tenantId，提交时据此取密码传输模式
@@ -163,7 +199,8 @@ describe('ResetPasswordPage', () => {
 			code: 'valid-reset-token',
 			identity: '',
 			newPassword: 'NewPass123!',
-			password_transmission: 'plain',
+			passwordTransmission: 'plain',
+			tenantId: 't-acme',
 		});
 		expect(screen.getByText('auth.resetPassword.success')).toBeInTheDocument();
 

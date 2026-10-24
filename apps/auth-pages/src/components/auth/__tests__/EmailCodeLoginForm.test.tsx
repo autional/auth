@@ -79,6 +79,41 @@ function renderForm() {
 	);
 }
 
+describe('EmailCodeLoginForm - WS-G 租户透传与待审', () => {
+	it('AC-G4: 发送验证码携带地址栏租户', async () => {
+		renderForm();
+
+		fireEvent.change(screen.getByPlaceholderText('user@example.com'), {
+			target: { value: 'u@example.com' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'auth.emailCode.sendCode' }));
+
+		await waitFor(() => {
+			expect(vi.mocked(authSendVerificationEmailPost)).toHaveBeenCalledWith({
+				email: 'u@example.com',
+				tenantId: 'tenant-1',
+			});
+		});
+	});
+
+	it('AC-G2: pending 登录只提示待审，不写 token、不跳转', async () => {
+		vi.mocked(authLoginEmailCodePost).mockResolvedValue({ membershipStatus: 'pending' } as any);
+		renderForm();
+
+		fireEvent.change(screen.getByPlaceholderText('user@example.com'), {
+			target: { value: 'u@example.com' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'auth.emailCode.sendCode' }));
+		const codeInput = await screen.findByPlaceholderText('000000');
+		fireEvent.change(codeInput, { target: { value: '123456' } });
+		fireEvent.click(screen.getByRole('button', { name: 'auth.emailCode.login' }));
+
+		expect(await screen.findByText('error.membership_pending')).toBeInTheDocument();
+		expect(vi.mocked(loginWithTokens)).not.toHaveBeenCalled();
+		expect(vi.mocked(anchorSessionFromToken)).not.toHaveBeenCalled();
+	});
+});
+
 describe('EmailCodeLoginForm - AUTH-53⑤ 会话锚定', () => {
 	it('邮箱验证码登录成功后锚定租户（slug 取路由、tenantId 取 prop）', async () => {
 		renderForm();

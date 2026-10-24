@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Input, Label } from '@autional/ui';
-import { authVerifyEmailPost, authResendVerificationEmailPost } from '@autional/shared/generated/api';
+import { resendVerificationEmail, verifyEmailAddress } from '@/lib/api-tenant';
+import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
 import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
@@ -22,6 +23,11 @@ function VerifyEmailContent() {
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
 	const email = searchParams.get('email') || '';
 	const code = searchParams.get('code') || '';
+	// WS-G G2（AUTH-04）：邮件链接 query tenant_id 优先；否则 slug 认证配置。
+	const { data: slugAuthConfig, isLoading: slugConfigLoading } = useTenantAuthConfigBySlug(
+		tenantSlug || null,
+	);
+	const tenantId = searchParams.get('tenant_id') || slugAuthConfig?.tenantId || '';
 
 	const [status, setStatus] = useState<VerifyStatus>('verifying');
 	const [message, setMessage] = useState('');
@@ -54,16 +60,24 @@ function VerifyEmailContent() {
 		if (invalidParams) setStatus('error');
 	}, [invalidParams]);
 
+	// AUTH-04（WS-G G2）：租户来源 = query.tenant_id → slug 配置；缺失即无效链接，
+	// 不发无租户请求（后端必 400）。
+	useEffect(() => {
+		if (invalidParams || slugConfigLoading || tenantId) return;
+		setMessage(t('error.tenant_required'));
+		setStatus('error');
+	}, [invalidParams, slugConfigLoading, tenantId, t]);
+
 	// 验证请求按 (email, code) 单发守卫：验证码一次性消费，重复 POST 会让后续 400
 	// 覆盖首个 200 的成功态（AUTH-24；同时防 React StrictMode 开发态双调用）
 	const verifyKeyRef = useRef<string | null>(null);
 	useEffect(() => {
-		if (invalidParams) return;
-		const key = `${email}|${code}`;
+		if (invalidParams || !tenantId) return;
+		const key = `${tenantId}|${email}|${code}`;
 		if (verifyKeyRef.current === key) return;
 		verifyKeyRef.current = key;
 
-		authVerifyEmailPost({ email, code })
+		verifyEmailAddress(email, code, tenantId)
 			.then(() => {
 				setStatus('success');
 			})
@@ -77,13 +91,13 @@ function VerifyEmailContent() {
 					setStatus('error');
 				}
 			});
-	}, [email, code, t, invalidParams]);
+	}, [email, code, tenantId, t, invalidParams]);
 
 	const onResend = async (data: ResendFormData) => {
 		setResending(true);
 		setResendSuccess(false);
 		try {
-			await authResendVerificationEmailPost({ email: data.email });
+			await resendVerificationEmail(data.email, tenantId || undefined);
 			setResendSuccess(true);
 		} catch (err: any) {
 			// 429 限流专属文案（AUTH-24③）：后端 RFC7807 无 message 字段，

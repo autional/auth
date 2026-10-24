@@ -19,7 +19,7 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 
-type CallbackStatus = 'loading' | 'success' | 'error' | 'linkRequired';
+type CallbackStatus = 'loading' | 'success' | 'error' | 'linkRequired' | 'pending';
 
 function OAuthCallbackContent() {
 	const { t } = useI18n();
@@ -97,6 +97,11 @@ function OAuthCallbackContent() {
 					// S0：第三方已验证邮箱命中已有本地账号，但该第三方身份尚未绑定。
 					// 不签发令牌（防未验证自动关联）→ 引导先登录再主动绑定。
 					setStatus('linkRequired');
+					return;
+				}
+				if (data.membershipStatus === 'pending') {
+					// WS-G / AUTH-03：审批制租户首登 → 无 token；只提示等待审批。
+					setStatus('pending');
 					return;
 				}
 				if (data.accessToken) {
@@ -179,6 +184,18 @@ function OAuthCallbackContent() {
 						title={t('auth.oauth.linkRequiredTitle')}
 						subtitle={t('auth.oauth.linkRequiredHint')}
 					/>
+					<Button fullWidth onClick={() => navigate('/')}>
+						{t('auth.common.backToLogin')}
+					</Button>
+				</div>
+			)}
+
+			{status === 'pending' && (
+				<div className="text-center space-y-6">
+					<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-warning-soft text-3xl">
+						⏳
+					</div>
+					<AuthHeader title={t('auth.pending.title')} subtitle={t('auth.pending.body')} />
 					<Button fullWidth onClick={() => navigate('/')}>
 						{t('auth.common.backToLogin')}
 					</Button>

@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams, Link } from 'react-router';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Input, Label } from '@autional/ui';
 import { extractApiError } from '@autional/shared';
 import { createVerifyPhoneSchema } from '@/lib/validators';
 import type { VerifyPhoneFormData } from '@/lib/validators';
-import { sendSmsCode, verifyPhone } from '@/lib/api.generated';
+import { sendLoginSmsCode, verifyPhoneNumber } from '@/lib/api-tenant';
+import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
 import { useI18n } from '@/lib/i18n';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
@@ -19,6 +20,10 @@ export default function VerifyPhonePage() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const { tenantSlug } = useParams<{ tenantSlug?: string }>();
+	const [searchParams] = useSearchParams();
+	// WS-G G2（AUTH-04）：短信深链 query tenant_id 优先；否则 slug 认证配置。
+	const { data: slugAuthConfig } = useTenantAuthConfigBySlug(tenantSlug || null);
+	const tenantId = searchParams.get('tenant_id') || slugAuthConfig?.tenantId || '';
 	const schema = createVerifyPhoneSchema(t);
 	const [countdown, setCountdown] = useState(0);
 	const [sending, setSending] = useState(false);
@@ -63,23 +68,31 @@ export default function VerifyPhonePage() {
 		if (countdown > 0 || sending) return;
 		// AUTH-27：格式门控先行——无效手机号不发请求，错误以内联字段提示呈现
 		if (!(await trigger('phone'))) return;
+		if (!tenantId) {
+			setError(t('error.tenant_required'));
+			return;
+		}
 		setSending(true);
 		setError('');
 		try {
-			await sendSmsCode({ phone: phoneValue });
+			await sendLoginSmsCode(phoneValue, tenantId);
 			setCountdown(COOLDOWN_SECONDS);
 		} catch (err: any) {
 			setError(resolveErrorMessage(err, 'auth.verifyPhone.errorSendFailed'));
 		} finally {
 			setSending(false);
 		}
-	}, [phoneValue, countdown, sending, trigger, resolveErrorMessage]);
+	}, [phoneValue, tenantId, countdown, sending, trigger, resolveErrorMessage, t]);
 
 	const onSubmit = async (_data: VerifyPhoneFormData) => {
+		if (!tenantId) {
+			setError(t('error.tenant_required'));
+			return;
+		}
 		setSubmitting(true);
 		setError('');
 		try {
-			await verifyPhone({ phone: _data.phone, code: _data.code });
+			await verifyPhoneNumber(_data.phone, _data.code, tenantId);
 			setSuccess(true);
 			setTimeout(() => {
 				navigate(tenantSlug ? `/${tenantSlug}/login` : '/');

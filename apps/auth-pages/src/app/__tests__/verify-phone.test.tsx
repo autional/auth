@@ -49,9 +49,14 @@ vi.mock('react-router', async () => {
 const mockSendSmsCode = vi.fn();
 const mockVerifyPhone = vi.fn();
 
-vi.mock('@/lib/api.generated', () => ({
-	sendSmsCode: (...args: any[]) => mockSendSmsCode(...args),
-	verifyPhone: (...args: any[]) => mockVerifyPhone(...args),
+vi.mock('@autional/shared/generated/api', () => ({
+	authSendSmsCodePost: (...args: any[]) => mockSendSmsCode(...args),
+	authVerifyPhonePost: (...args: any[]) => mockVerifyPhone(...args),
+}));
+
+// WS-G G2（AUTH-04）：短信深链的租户由 query 或 slug 配置解析；本套测试用 slug 配置给值。
+vi.mock('@/hooks/use-tenant-auth-config', () => ({
+	useTenantAuthConfigBySlug: () => ({ data: { tenantId: 't-acme' }, isLoading: false }),
 }));
 
 function renderVerifyPhone() {
@@ -101,7 +106,7 @@ describe('VerifyPhonePage', () => {
 
 		await act(() => vi.advanceTimersByTime(0));
 
-		expect(mockSendSmsCode).toHaveBeenCalledWith({ phone: VALID_PHONE });
+		expect(mockSendSmsCode).toHaveBeenCalledWith({ phone: VALID_PHONE, tenantId: 't-acme' });
 		expect(screen.getByText('flat.auth.verifyPhone.countdown {"seconds":60}')).toBeInTheDocument();
 
 		vi.useRealTimers();
@@ -256,7 +261,7 @@ describe('VerifyPhonePage', () => {
 
 		await act(() => vi.advanceTimersByTime(0));
 
-		expect(mockVerifyPhone).toHaveBeenCalledWith({ phone: VALID_PHONE, code: '654321' });
+		expect(mockVerifyPhone).toHaveBeenCalledWith({ phone: VALID_PHONE, code: '654321', tenantId: 't-acme' });
 		expect(screen.getByText('auth.verifyPhone.success')).toBeInTheDocument();
 
 		act(() => {

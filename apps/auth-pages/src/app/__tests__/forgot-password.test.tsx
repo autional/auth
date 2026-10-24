@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Routes, Route } from 'react-router';
 import ForgotPasswordPage from '../forgot-password/page';
 
 vi.mock('react-i18next', () => ({
@@ -25,6 +25,11 @@ vi.mock('@autional/shared/generated/api', () => ({
 	authForgotPasswordPost: (...args: any[]) => mockAuthForgotPasswordPost(...args),
 }));
 
+const mockUseTenantAuthConfigBySlug = vi.fn();
+vi.mock('@/hooks/use-tenant-auth-config', () => ({
+	useTenantAuthConfigBySlug: (...args: any[]) => mockUseTenantAuthConfigBySlug(...args),
+}));
+
 function renderForgotPassword() {
 	return render(
 		<MemoryRouter initialEntries={['/forgot-password']}>
@@ -35,6 +40,8 @@ function renderForgotPassword() {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	sessionStorage.clear();
+	mockUseTenantAuthConfigBySlug.mockReturnValue({ data: null, isLoading: false });
 });
 
 describe('ForgotPasswordPage', () => {
@@ -121,5 +128,35 @@ describe('ForgotPasswordPage', () => {
 			fireEvent.click(screen.getByRole('button', { name: 'forgot.submit' }));
 		});
 		expect(screen.getByText('validation.identityRequired')).toBeInTheDocument();
+	});
+
+	// WS-G AC-G4（AUTH-01）：slug 页面的找回请求带租户，并留存 reset_password_tenant_id
+	// 供根路由 /reset-password 使用（R3 m-10）。
+	it('AC-G4: slug 页面提交携带租户并留存租户键', async () => {
+		mockAuthForgotPasswordPost.mockResolvedValue({});
+		mockUseTenantAuthConfigBySlug.mockReturnValue({
+			data: { tenantId: 't-acme' },
+			isLoading: false,
+		});
+		render(
+			<MemoryRouter initialEntries={['/acme/forgot-password']}>
+				<Routes>
+					<Route path="/:tenantSlug/forgot-password" element={<ForgotPasswordPage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+		fireEvent.change(screen.getByPlaceholderText('email@example.com'), {
+			target: { value: 'test@example.com' },
+		});
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: 'forgot.submit' }));
+		});
+
+		expect(mockAuthForgotPasswordPost).toHaveBeenCalledWith({
+			identity: 'test@example.com',
+			tenantId: 't-acme',
+		});
+		expect(sessionStorage.getItem('reset_password_identity')).toBe('test@example.com');
+		expect(sessionStorage.getItem('reset_password_tenant_id')).toBe('t-acme');
 	});
 });
