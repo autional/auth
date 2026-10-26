@@ -565,6 +565,7 @@
   "auth.login.errorTooManyAttempts": "登录次数过多，请稍后再试",
   "auth.login.errorDefault": "登录失败，请检查用户名和密码",
   "auth.login.passwordTab": "密码登录",
+  "auth.login.passkeyTab": "Passkey",
   "auth.login.qrTab": "扫码登录",
   "auth.login.emailCodeTab": "验证码登录",
   "auth.login.phoneCodeTab": "短信登录",

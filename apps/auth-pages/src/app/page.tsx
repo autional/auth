@@ -946,7 +946,7 @@ export default function LoginPage() {
 							{ key: 'password', icon: Lock, label: t('auth.login.passwordTab') },
 							{ key: 'qr', icon: QrCode, label: t('auth.login.qrTab') },
 							{ key: 'magic_link', icon: Mail, label: t('magicLink.title') },
-							{ key: 'passkey', icon: Fingerprint, label: t('passkey.submitLogin') },
+							{ key: 'passkey', icon: Fingerprint, label: t('auth.login.passkeyTab') },
 							{
 								key: 'email_code',
 								icon: Inbox,

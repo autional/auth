@@ -560,6 +560,7 @@
   "auth.login.errorTooManyAttempts": "Too many login attempts. Please try again later",
   "auth.login.errorDefault": "Login failed. Please check your username and password",
   "auth.login.passwordTab": "Password",
+  "auth.login.passkeyTab": "Passkey",
   "auth.login.qrTab": "QR Code",
   "auth.login.emailCodeTab": "Email Code",
   "auth.login.phoneCodeTab": "SMS Code",

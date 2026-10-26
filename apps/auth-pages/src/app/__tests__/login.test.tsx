@@ -345,7 +345,7 @@ describe('LoginPage - passkey 入口', () => {
 
 		expect(screen.queryByTestId('passkey-submit-button')).not.toBeInTheDocument();
 
-		fireEvent.click(screen.getByRole('button', { name: 'passkey.submitLogin' }));
+		fireEvent.click(screen.getByRole('button', { name: 'auth.login.passkeyTab' }));
 
 		await waitFor(() => {
 			expect(screen.getAllByTestId('passkey-submit-button')).toHaveLength(1);
@@ -380,7 +380,7 @@ describe('LoginPage - passkey 入口', () => {
 			expect.objectContaining({ tenantId: 't-test', mediation: 'conditional' }),
 		);
 
-		fireEvent.click(screen.getByRole('button', { name: 'passkey.submitLogin' }));
+		fireEvent.click(screen.getByRole('button', { name: 'auth.login.passkeyTab' }));
 
 		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));
 	});
