@@ -587,6 +587,36 @@ Auth Pages 加载
 3. **后端错误码映射**：后端返回 `code + message`，前端优先按 code 匹配 i18n 文案，fallback 用后端 message
 4. **邮件模板中的链接文案**：如"点击验证邮箱"等（邮件模板本身由后端/communication-service 负责）
 
+### 7.4 登录/注册方式页签的命名（注意事项）
+
+页签文案是**同一概念在不同页面的唯一叫法**，改动前先读本节。
+
+| 位置 | i18n key | zh-CN | en-US |
+|------|----------|-------|-------|
+| 登录页 | `auth.login.passwordTab` | 密码登录 | Password |
+| 登录页 | `auth.login.qrTab` | 扫码登录 | QR Code |
+| 登录页 | `magicLink.title` | Magic Link 登录 | Magic Link |
+| 登录页 | `auth.login.passkeyTab` | Passkey | Passkey |
+| 登录页 | `auth.login.emailCodeTab` | **邮箱验证码** | Email Code |
+| 登录页 | `auth.login.phoneCodeTab` | **短信验证码** | SMS Code |
+| 注册页 | `auth.register.magicLinkTab` | 邮箱注册 | Email Sign Up |
+| 注册页 | `auth.register.emailCodeTab` | **邮箱验证码** | Email Code |
+| 注册页 | `auth.register.phoneCodeTab` | **短信验证码** | SMS Code |
+
+约定：
+
+1. **必须写明渠道**（邮箱 / 短信）。不要用「验证码登录」这种无法区分渠道的写法——
+   历史上 `auth.login.emailCodeTab` 曾写作「验证码登录」、`phoneCodeTab` 写作「短信登录」，
+   同一排页签一半说渠道、一半说码，用户无法判断哪个是邮箱。
+2. 与 MFA 页用词保持一致：`mfa.emailCode`=邮箱验证码、`mfa.smsCode`=短信验证码。
+3. 中英对称：邮箱一律 `邮箱…` / `Email`，短信一律 `短信…` / `SMS`；不要一侧用 `OTP`、另一侧用 `Code`。
+4. **页签是否出现由租户 `login_methods` 决定**，不由前端硬编码：`src/app/page.tsx` 按
+   auth-config 的 `loginMethods` 过滤（缺省渲染全部 6 个）；后端 `service-identity`
+   `checkLoginMethodAllowed` 做同样的 fail-closed 门（未开通即 403 `… login is disabled`）。
+   只开 `email_code` 的租户（如 `platform`）登录页只会有「邮箱验证码」一个页签。
+5. 改完必须跑 i18n 守护测试（键对齐 + 源码无中文字面量）：
+   `npx vitest run src/i18n/__tests__/locales-guard.test.ts src/lib/__tests__/i18n-guard.test.ts`
+
 ---
 
 ## 8. 组件拆分建议

@@ -950,12 +950,12 @@ export default function LoginPage() {
 							{
 								key: 'email_code',
 								icon: Inbox,
-								label: t('auth.login.emailCodeTab') || '邮箱验证码登录',
+								label: t('auth.login.emailCodeTab') || '邮箱验证码',
 							},
 							{
 								key: 'phone_code',
 								icon: Smartphone,
-								label: t('auth.login.phoneCodeTab') || '短信验证码登录',
+								label: t('auth.login.phoneCodeTab') || '短信验证码',
 							},
 						]
 							.filter((m) => loginMethods.includes(m.key))
