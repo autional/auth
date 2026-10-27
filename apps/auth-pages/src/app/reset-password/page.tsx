@@ -169,10 +169,20 @@ function ResetPasswordContent() {
 			/>
 
 			<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+				{/* 密码表单语义：隐藏 username 供密码管理器/AT 识别输入目的（与改密/注销页同口径）。 */}
+				<input
+					type="text"
+					name="username"
+					autoComplete="username"
+					value={identity}
+					readOnly
+					hidden
+				/>
 				<div className="space-y-2">
 					<Label htmlFor="password">{t('auth.resetPassword.newPassword')}</Label>
 					<PasswordInput
 						id="password"
+						autoComplete="new-password"
 						placeholder={t('auth.resetPassword.passwordPlaceholder')}
 						showStrength
 						{...register('password')}
@@ -184,6 +194,7 @@ function ResetPasswordContent() {
 					<Label htmlFor="confirmPassword">{t('auth.resetPassword.confirmNewPassword')}</Label>
 					<PasswordInput
 						id="confirmPassword"
+						autoComplete="new-password"
 						placeholder={t('auth.resetPassword.confirmPasswordPlaceholder')}
 						{...register('confirmPassword')}
 						error={errors.confirmPassword?.message}

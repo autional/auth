@@ -140,6 +140,15 @@ export default function RecoverAccountPage() {
 					}}
 					className="space-y-4"
 				>
+					{/* 密码表单语义：隐藏 username 供密码管理器/AT 识别输入目的（与改密/注销页同口径）。 */}
+					<input
+						type="text"
+						name="username"
+						autoComplete="username"
+						value={identity}
+						readOnly
+						hidden
+					/>
 					<div className="rounded-md bg-[var(--color-bg-muted)] p-3 text-sm text-[var(--color-text-secondary)]">
 						{maskedTarget
 							? t('auth.recoverAccount.codeSent', { target: maskedTarget })
@@ -160,6 +169,7 @@ export default function RecoverAccountPage() {
 						<Label htmlFor="newPassword">{t('auth.recoverAccount.newPasswordLabel')}</Label>
 						<PasswordInput
 							id="newPassword"
+							autoComplete="new-password"
 							showStrength
 							value={newPassword}
 							onChange={(e) => setNewPassword(e.target.value)}

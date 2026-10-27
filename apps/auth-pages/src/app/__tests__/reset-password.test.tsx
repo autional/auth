@@ -111,6 +111,33 @@ describe('ResetPasswordPage', () => {
 		expect(screen.getByRole('button', { name: 'auth.resetPassword.submit' })).toBeInTheDocument();
 	});
 
+	// DevTools 密码语义回归锁（2026-10-27）：Chromium 三条 VERBOSE [DOM] 警告清零的结构前提 —
+	// 密码输入在 <form> 内、带 autocomplete，且 form 内含 username 语义隐藏字段。
+	it('password form carries form semantics (hidden username + autocomplete)', async () => {
+		mockAuthVerifyResetCodePost.mockResolvedValue({});
+		mockCheckPasswordBreached.mockResolvedValue({ breached: false });
+		mockSearchParamsToken = 'valid-reset-token';
+		sessionStorage.setItem('reset_password_identity', 'alice@example.com');
+		const { container } = renderResetPassword();
+
+		await waitFor(() => {
+			expect(
+				screen.getByPlaceholderText('auth.resetPassword.passwordPlaceholder'),
+			).toBeInTheDocument();
+		});
+
+		const passwords = container.querySelectorAll<HTMLInputElement>('input[type="password"]');
+		expect(passwords).toHaveLength(2);
+		for (const password of passwords) {
+			expect(password.closest('form')).not.toBeNull();
+			expect(password.getAttribute('autocomplete')).toBe('new-password');
+		}
+		const username = container.querySelector<HTMLInputElement>('form input[name="username"]')!;
+		expect(username).not.toBeNull();
+		expect(username.getAttribute('autocomplete')).toBe('username');
+		expect(username.value).toBe('alice@example.com');
+	});
+
 	it('shows Zod error when passwords mismatch', async () => {
 		mockAuthVerifyResetCodePost.mockResolvedValue({});
 		mockCheckPasswordBreached.mockResolvedValue({ breached: false });

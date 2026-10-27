@@ -240,6 +240,25 @@ describe('recover-account: reset 步骤', () => {
 		expect(mockCheckHIBP).not.toHaveBeenCalled();
 	});
 
+	// DevTools 密码语义回归锁（2026-10-27）：密码输入在 <form> 内 + autocomplete=new-password
+	// + form 内含 username 语义隐藏字段（Chromium 三条 VERBOSE [DOM] 警告清零的结构前提）。
+	it('reset 步密码表单携带 form 语义（hidden username + autocomplete）', async () => {
+		const user = userEvent.setup();
+		await goToReset(user, 'user@x.com');
+
+		const password = screen.getByLabelText<HTMLInputElement>(
+			'auth.recoverAccount.newPasswordLabel',
+		);
+		const form = password.closest('form');
+		expect(form).not.toBeNull();
+		expect(password.getAttribute('autocomplete')).toBe('new-password');
+
+		const username = form!.querySelector<HTMLInputElement>('input[name="username"]');
+		expect(username).not.toBeNull();
+		expect(username!.getAttribute('autocomplete')).toBe('username');
+		expect(username!.value).toBe('user@x.com');
+	});
+
 	it('密码 <8 字符或空 code 提交不发请求', async () => {
 		const user = userEvent.setup();
 		await goToReset(user);
