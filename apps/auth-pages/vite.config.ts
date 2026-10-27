@@ -29,6 +29,7 @@ function regionPlugin(): Plugin {
     LANG: copy.locale,
     TITLE: copy.title,
     DESCRIPTION: copy.description,
+    CDN_ORIGIN: buildEnv.cdnHost,
     CDN_ASSET_BASE,
   };
   return {
@@ -100,8 +101,16 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        globIgnores: ['**/env.js', '**/android-chrome-*.png', '**/favicon.svg'],
+        // 安装图标（android-chrome-*/apple-touch-icon）不参与离线壳，浏览器只在「添加到主屏」时取。
+        // includeManifestIcons:false 关掉插件对 manifest.icons 的强制注入（它绕过 globIgnores）。
+        globIgnores: [
+          '**/env.js',
+          '**/android-chrome-*.png',
+          '**/apple-touch-icon.png',
+          '**/favicon.svg',
+        ],
       },
+      includeManifestIcons: false,
       devOptions: {
         enabled: false,
       },
