@@ -10,6 +10,7 @@ import {
 	loginWithTokens,
 	decodeJwtPayload,
 	extractApiError,
+	getAccessToken,
 	usePublicTenantSlugs,
 } from '@autional/shared';
 import { createMfaTOTPSchema, createMfaSMSSchema } from '@/lib/validators';
@@ -315,6 +316,8 @@ export default function MFAChallengePage() {
 	};
 
 	if (fatal === 'used') {
+		// 有会话（同源共享）→ 直接继续；已退出 → 只能重新登录（否则会被目标站弹回）
+		const hasSession = Boolean(getAccessToken());
 		return (
 			<AuthCard>
 				<div className="text-center space-y-6">
@@ -323,18 +326,30 @@ export default function MFAChallengePage() {
 					</div>
 					<AuthHeader
 						title={t('mfa.challenge.sessionUsedTitle')}
-						subtitle={t('mfa.challenge.sessionUsedDesc')}
+						subtitle={
+							hasSession
+								? t('mfa.challenge.sessionUsedDesc')
+								: t('mfa.challenge.sessionUsedLoggedOutDesc')
+						}
 					/>
-					<Button fullWidth onClick={handleContinue}>
-						{t('mfa.challenge.sessionUsedAction')}
-					</Button>
-					<button
-						type="button"
-						onClick={() => navigate(loginPathWithRedirect, { replace: true })}
-						className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-					>
-						{t('mfa.challenge.sessionExpiredAction')}
-					</button>
+					{hasSession ? (
+						<Button fullWidth onClick={handleContinue}>
+							{t('mfa.challenge.sessionUsedAction')}
+						</Button>
+					) : (
+						<Button fullWidth onClick={() => navigate(loginPathWithRedirect, { replace: true })}>
+							{t('mfa.challenge.sessionExpiredAction')}
+						</Button>
+					)}
+					{hasSession && (
+						<button
+							type="button"
+							onClick={() => navigate(loginPathWithRedirect, { replace: true })}
+							className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+						>
+							{t('mfa.challenge.sessionExpiredAction')}
+						</button>
+					)}
 				</div>
 			</AuthCard>
 		);

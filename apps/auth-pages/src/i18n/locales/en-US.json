@@ -1160,6 +1160,7 @@
   "mfa.challenge.sessionExpiredAction": "Sign in again",
   "mfa.challenge.sessionUsedTitle": "Verification already completed",
   "mfa.challenge.sessionUsedDesc": "This verification session has already been used (possibly completed in another tab or window). Please continue.",
+  "mfa.challenge.sessionUsedLoggedOutDesc": "This verification session has already been used and you are not signed in. Please sign in again to continue.",
   "mfa.challenge.sessionUsedAction": "Continue",
   "mfa.challenge.rateLimited": "Too many attempts. Please try again later.",
   "mfa.challenge.sendCode": "Send code",
