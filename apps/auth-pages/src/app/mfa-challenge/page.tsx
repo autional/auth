@@ -86,6 +86,10 @@ export default function MFAChallengePage() {
 	// 登录页透传的回程目标（如 OAuth 发起方）；缺省落 dashboard
 	const redirect = searchParams.get('redirect');
 	const loginPath = tenantSlug ? `/${tenantSlug}/login` : '/';
+	// 重新登录时保留回程目标（否则 MFA 过期/已用后重登会丢失 redirect）
+	const loginPathWithRedirect = redirect
+		? `${loginPath}?redirect=${encodeURIComponent(redirect)}`
+		: loginPath;
 	const dashboardPath = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard';
 	const { data: knownTenants } = usePublicTenantSlugs();
 
@@ -127,7 +131,7 @@ export default function MFAChallengePage() {
 	useEffect(() => {
 		const raw = sessionStorage.getItem('mfa_pre_auth');
 		if (!raw) {
-			navigate(loginPath, { replace: true });
+			navigate(loginPathWithRedirect, { replace: true });
 			return;
 		}
 		let parsed: PreAuthData | null;
@@ -326,7 +330,7 @@ export default function MFAChallengePage() {
 					</Button>
 					<button
 						type="button"
-						onClick={() => navigate(loginPath, { replace: true })}
+						onClick={() => navigate(loginPathWithRedirect, { replace: true })}
 						className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
 					>
 						{t('mfa.challenge.sessionExpiredAction')}
@@ -348,7 +352,7 @@ export default function MFAChallengePage() {
 						title={t('mfa.challenge.sessionExpiredTitle')}
 						subtitle={t('mfa.challenge.sessionExpiredDesc')}
 					/>
-					<Button fullWidth onClick={() => navigate(loginPath, { replace: true })}>
+					<Button fullWidth onClick={() => navigate(loginPathWithRedirect, { replace: true })}>
 						{t('mfa.challenge.sessionExpiredAction')}
 					</Button>
 				</div>
