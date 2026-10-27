@@ -3,9 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- 预热 CDN 连接（跨域阻塞资源，证书不共用）：前一条供 stylesheet，后一条供 @font-face 的 CORS 请求。 -->
-    <link rel="preconnect" href="{{CDN_ORIGIN}}" />
-    <link rel="preconnect" href="{{CDN_ORIGIN}}" crossorigin />
+    <!-- preconnect:cdn -->
     <link rel="stylesheet" href="{{CDN_ASSET_BASE}}/tokens.css" />
     <link rel="icon" href="{{CDN_ASSET_BASE}}/icons/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="{{CDN_ASSET_BASE}}/icons/favicon-32x32.png" />

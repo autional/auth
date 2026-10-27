@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { readFileSync } from 'node:fs';
 import path from 'path';
 import { CDN_PIN, readBuildEnv } from '../../scripts/env.mjs';
+import { cdnHeadPlugin } from '../../scripts/vite-cdn.mjs';
 import { REGION_COPY } from '../../scripts/region-copy.mjs';
 
 function normalizeViteBase(p: string | undefined): string {
@@ -29,7 +30,6 @@ function regionPlugin(): Plugin {
     LANG: copy.locale,
     TITLE: copy.title,
     DESCRIPTION: copy.description,
-    CDN_ORIGIN: buildEnv.cdnHost,
     CDN_ASSET_BASE,
   };
   return {
@@ -74,6 +74,7 @@ function inlineEnvPlugin(): Plugin {
 export default defineConfig({
   plugins: [
     react(),
+    cdnHeadPlugin({ cdnHost: buildEnv.cdnHost }),
     inlineEnvPlugin(),
     regionPlugin(),
     VitePWA({
