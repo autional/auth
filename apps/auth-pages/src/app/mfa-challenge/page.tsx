@@ -100,7 +100,7 @@ export default function MFAChallengePage() {
 	);
 
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
-	const [fatal, setFatal] = useState<'' | 'expired'>('');
+	const [fatal, setFatal] = useState<'' | 'expired' | 'used'>('');
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
@@ -196,9 +196,12 @@ export default function MFAChallengePage() {
 			// 挑战令牌已失效（服务端复验口径）→ 清会话，引导重新登录。
 			// 契约优先；未收录码回落「403」状态判定（保持原行为，不漏判）。
 			if (ui === 'reauth_required' || (ui === undefined && status === 403)) {
+				// 61000403 同时覆盖「令牌过期」与「令牌已被使用」：后者通常是另一标签页已成功，
+				// 不应误导为过期（2026-10-27 线上实证：先 200 成功，后同一令牌 403 already used）。
+				const detail = extractApiError(err, '').message || '';
 				sessionStorage.removeItem('mfa_pre_auth');
 				setPreAuth(null);
-				setFatal('expired');
+				setFatal(/already used/i.test(detail) ? 'used' : 'expired');
 				return;
 			}
 			if (ui === 'form_error') {
@@ -234,9 +237,12 @@ export default function MFAChallengePage() {
 			const ui = semanticsOfError(err)?.uiObservation;
 			// 挑战令牌失效（与验证同口径：契约优先，未收录码回落 403）
 			if (ui === 'reauth_required' || (ui === undefined && status === 403)) {
+				// 61000403 同时覆盖「令牌过期」与「令牌已被使用」：后者通常是另一标签页已成功，
+				// 不应误导为过期（2026-10-27 线上实证：先 200 成功，后同一令牌 403 already used）。
+				const detail = extractApiError(err, '').message || '';
 				sessionStorage.removeItem('mfa_pre_auth');
 				setPreAuth(null);
-				setFatal('expired');
+				setFatal(/already used/i.test(detail) ? 'used' : 'expired');
 				return;
 			}
 			if (status === 429) {
@@ -293,6 +299,42 @@ export default function MFAChallengePage() {
 					: t('mfa.challenge.sendCode')}
 		</Button>
 	);
+
+	// 「令牌已被使用」通常是另一标签页已完成：直接继续到目标页（同源会话共享）
+	const handleContinue = () => {
+		const target = resolvePostLoginRedirect(redirect, tenantSlug || null);
+		if (target) {
+			window.location.href = target;
+			return;
+		}
+		navigate(dashboardPath);
+	};
+
+	if (fatal === 'used') {
+		return (
+			<AuthCard>
+				<div className="text-center space-y-6">
+					<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-3xl">
+						✅
+					</div>
+					<AuthHeader
+						title={t('mfa.challenge.sessionUsedTitle')}
+						subtitle={t('mfa.challenge.sessionUsedDesc')}
+					/>
+					<Button fullWidth onClick={handleContinue}>
+						{t('mfa.challenge.sessionUsedAction')}
+					</Button>
+					<button
+						type="button"
+						onClick={() => navigate(loginPath, { replace: true })}
+						className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+					>
+						{t('mfa.challenge.sessionExpiredAction')}
+					</button>
+				</div>
+			</AuthCard>
+		);
+	}
 
 	// 验证会话已过期（挂载预检或服务端 403 复验）——引导重新登录
 	if (fatal === 'expired') {
