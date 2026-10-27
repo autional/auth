@@ -5,7 +5,7 @@
  *   REGION=cn|com  SITE_URL  DEFAULT_LANG=zh|en  FALLBACK_LANG=zh|en  CDN_HOST
  * 本地 dev 无 env 时兜底 cn 值（与迁移前基线一致）；**生产（VERCEL_ENV=production）缺失即抛错**，见下方 assertStrictEnv。
  */
-export const CDN_PIN = 'v0.1.0-rc.f0db1b97';
+export const CDN_PIN = 'v0.1.0-rc.be30012d';
 
 const pickLang = (v) => (v === 'en' || v === 'zh' ? v : undefined);
 
