@@ -40,6 +40,8 @@ const PORTALS = [
   ['brand', 'brand'],
 ];
 const portalConfig = PORTALS.map(([name, host]) => `    ${name}: { host: "${host}", base: "" }`).join(',\n');
+// 2026-10-27：API 基址按 apiMode 决定（direct=跨域直连 / proxy=同域 rewrite）
+const apiBase = buildEnv.apiMode === 'direct' ? `${buildEnv.apiOrigin}/bff` : '/bff';
 write(
   'env.js',
   `window.__APP_CONFIG__ = {
@@ -49,7 +51,7 @@ write(
 ${portalConfig}
   },
   VITE_COOKIE_DOMAIN: ".${buildEnv.rootDomain}",
-  VITE_API_BASE_URL: "/bff"
+  VITE_API_BASE_URL: "${apiBase}"
 };
 `,
 );
