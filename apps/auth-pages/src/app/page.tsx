@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Button, Input, Label } from '@autional/ui';
 import { authLoginPost, authCaptchaChallenge, authMe } from '@autional/shared/generated/api';
 import { loadAuthExtras } from '@/lib/api';
-import { persistSessionWithRetry } from '@/lib/storage-health';
+import { hasStorageHeadroom, persistSessionWithRetry, purgeRebuildableCaches } from '@/lib/storage-health';
 import { loginWithTokens, useAuthStore, getAccessToken, isValidRedirect, initiateOAuthLogin, extractSlugFromPath, getPortalUrl, API_BASE_URL, crossAppUrl, TRUST_CENTER_URL } from '@autional/shared';
 import { useResolvedTenantSlug } from '@/hooks/use-tenant-slug';
 import { createLoginSchema } from '@/lib/validators';
@@ -479,6 +479,15 @@ export default function LoginPage() {
 
 	const onSubmit = async (data: FormData) => {
 		debug('onSubmit: START, captchaStatus=', captchaStatus, 'rateLimitStep=', rateLimitStep);
+		// R1 前置闸：存储写不下时，请求前的指纹/缓存写入会抛异常并被兜底成「网络连接失败」，
+		// 误导用户。先探测空间：不够就清缓存，仍不够直接给明确文案（不发起请求）。
+		if (!hasStorageHeadroom()) {
+			purgeRebuildableCaches();
+			if (!hasStorageHeadroom()) {
+				setError(t('auth.login.storageFull'));
+				return;
+			}
+		}
 
 		// P0: 等待租户认证配置加载完成后再提交，防止 transmissionMode=undefined→plain→401
 		if (slugConfigLoading) {
