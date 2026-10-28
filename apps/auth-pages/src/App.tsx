@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useParams } from 'react-router';
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router';
 import { useAuthStore, RequireAuth, TenantIndexGuard, useLogout, OAuthCallbackPage as OAuthLoginCallbackPage, useBranding } from '@autional/shared';
 import { useEffect, lazy, Suspense } from 'react';
 import { I18nProvider, useI18n } from '@/lib/i18n';
@@ -136,7 +136,10 @@ function AppHeader() {
 }
 
 function AppContent() {
-	useBranding();
+	const { pathname } = useLocation();
+	// MFA 页面不接受租户自定义 CSS（凭证输入面，防视觉覆盖/外链请求）。
+	const isMfa = pathname.includes('/mfa-challenge') || pathname.includes('/mfa-setup');
+	useBranding({ applyCustomCss: !isMfa });
 	return null;
 }
 
