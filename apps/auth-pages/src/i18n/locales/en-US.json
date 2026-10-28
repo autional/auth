@@ -547,6 +547,7 @@
   "auth.common.skipToMain": "Skip to main content",
   "auth.login.title": "Welcome back to Autional",
   "auth.login.subtitle": "Enter your account information to continue",
+  "auth.login.storageFull": "Browser storage is full, so the session could not be saved. Clear site storage (or use a private window) and try again.",
   "auth.login.identityLabel": "Username / Email / Phone",
   "auth.login.identityPlaceholder": "user@example.com / 13800138000",
   "auth.login.passwordLabel": "Password",

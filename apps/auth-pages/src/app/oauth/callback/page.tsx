@@ -10,6 +10,7 @@ import {
 	usePublicTenantSlugs,
 } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
+import { persistSessionWithRetry } from '@/lib/storage-health';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { exchangeCodeForToken } from '@/lib/api.generated';
 import { oauthErrorText } from '@/lib/oauth-error-text';
@@ -119,11 +120,19 @@ function OAuthCallbackContent() {
 						};
 					}
 
-					loginWithTokens(
-						data.accessToken,
-						data.refreshToken || '',
-						(user || { id: '', username: '', email: '', status: 'active' }) as any,
+					// 同 R1：存储满时 persist 会失败（联邦回调尤为常见，此前已累积多租户缓存）
+					const persisted = persistSessionWithRetry(() =>
+						loginWithTokens(
+							data.accessToken,
+							data.refreshToken || '',
+							(user || { id: '', username: '', email: '', status: 'active' }) as any,
+						),
 					);
+					if (!persisted) {
+						setMessage(t('auth.login.storageFull'));
+						setStatus('error');
+						return;
+					}
 
 					// AUTH-53 约束⑤：会话建立即锚定租户（JWT tenant_id + 名单解析 slug），
 					// 防从旧租户上下文发起的 OAuth 新会话被跨租户守卫误清

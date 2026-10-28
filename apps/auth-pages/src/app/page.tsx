@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { Button, Input, Label } from '@autional/ui';
 import { authLoginPost, authCaptchaChallenge, authMe } from '@autional/shared/generated/api';
 import { loadAuthExtras } from '@/lib/api';
+import { persistSessionWithRetry } from '@/lib/storage-health';
 import { loginWithTokens, useAuthStore, getAccessToken, isValidRedirect, initiateOAuthLogin, extractSlugFromPath, getPortalUrl, API_BASE_URL, crossAppUrl, TRUST_CENTER_URL } from '@autional/shared';
 import { useResolvedTenantSlug } from '@/hooks/use-tenant-slug';
 import { createLoginSchema } from '@/lib/validators';
@@ -657,11 +658,20 @@ export default function LoginPage() {
 				return;
 			}
 
-			loginWithTokens(
-				loginResult.accessToken || loginResult.data?.accessToken,
-				loginResult.refreshToken || loginResult.data?.refreshToken,
-				loginResult.user || loginResult.data?.user,
+			// R1（实测）：存储写满时 persist 会失败，会话只剩内存态 —— 清可重建缓存重试一次，
+			// 仍失败则明确提示，绝不静默停在登录页。
+			const persisted = persistSessionWithRetry(() =>
+				loginWithTokens(
+					loginResult.accessToken || loginResult.data?.accessToken,
+					loginResult.refreshToken || loginResult.data?.refreshToken,
+					loginResult.user || loginResult.data?.user,
+				),
 			);
+			if (!persisted) {
+				setError(t('auth.login.storageFull'));
+				setLoading(false);
+				return;
+			}
 
 			// Device fingerprint mismatch detection (R4 audit)
 			if (deviceFP) {

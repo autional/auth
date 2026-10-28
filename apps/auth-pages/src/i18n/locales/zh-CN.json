@@ -552,6 +552,7 @@
   "auth.common.skipToMain": "跳到主要内容",
   "auth.login.title": "欢迎回到 Autional",
   "auth.login.subtitle": "请输入您的账号信息以继续",
+  "auth.login.storageFull": "浏览器存储空间已满，无法保存登录状态。请清理浏览器存储（或使用无痕窗口）后重试。",
   "auth.login.identityLabel": "用户名 / 邮箱 / 手机号",
   "auth.login.identityPlaceholder": "user@example.com / 13800138000",
   "auth.login.passwordLabel": "密码",
