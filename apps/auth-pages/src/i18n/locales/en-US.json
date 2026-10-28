@@ -160,6 +160,7 @@
   "mfa.challenge.exhaustedDesc": "This verification session is no longer valid. Please sign in again.",
   "mfa.challenge.codeUsed": "This code has already been used. Wait for the next code.",
   "mfa.challenge.throttled": "Too many attempts. Please try again later.",
+  "mfa.challenge.authenticatorDisabled": "This verification method has been disabled after too many failed attempts. Use another method or rebind it.",
   "dashboard.title": "Welcome Back",
   "dashboard.loggedIn": "Logged In",
   "dashboard.tabs.label": "Account navigation",

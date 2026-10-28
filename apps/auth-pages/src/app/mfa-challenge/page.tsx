@@ -47,6 +47,8 @@ function challengeFatalOf(err: unknown): 'expired' | 'used' | 'exhausted' | null
 	if (code === ERROR_CODES.MFA_CHALLENGE_USED) return 'used';
 	if (code === ERROR_CODES.MFA_CHALLENGE_REQUIRED) return 'expired';
 	if (code === ERROR_CODES.MFA_CHALLENGE_ATTEMPTS_EXCEEDED) return 'exhausted';
+	// 61000411（验证器已禁用）也是 403，但不是挑战失效：留在本页让用户切换方式/重绑。
+	if (code === 61000411) return null;
 	const status = (err as { response?: { status?: number } })?.response?.status;
 	if (semanticsOfError(err)?.uiObservation === 'reauth_required' || status === 403) return 'expired';
 	return null;
@@ -54,6 +56,11 @@ function challengeFatalOf(err: unknown): 'expired' | 'used' | 'exhausted' | null
 
 function isReusedCode(err: unknown): boolean {
 	return errorCodeOf(err) === ERROR_CODES.MFA_CODE_ALREADY_USED;
+}
+
+function isAuthenticatorDisabled(err: unknown): boolean {
+	// 61000411：NIST 连续失败上限触发后禁用该验证器（403，不可重试；改用其他方式/重新绑定）
+	return errorCodeOf(err) === 61000411;
 }
 
 function isThrottled(err: unknown): boolean {
@@ -230,6 +237,10 @@ export default function MFAChallengePage() {
 				setError(t('mfa.challenge.codeUsed'));
 				return;
 			}
+			if (isAuthenticatorDisabled(err)) {
+				setError(t('mfa.challenge.authenticatorDisabled'));
+				return;
+			}
 			if (isThrottled(err)) {
 				setError(t('mfa.challenge.throttled'));
 				return;
@@ -264,6 +275,10 @@ export default function MFAChallengePage() {
 				sessionStorage.removeItem('mfa_pre_auth');
 				setPreAuth(null);
 				setFatal(fatalReason);
+				return;
+			}
+			if (isAuthenticatorDisabled(err)) {
+				setError(t('mfa.challenge.authenticatorDisabled'));
 				return;
 			}
 			if (isThrottled(err)) {

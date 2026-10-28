@@ -160,6 +160,7 @@
   "mfa.challenge.exhaustedDesc": "本次验证已失效。请重新登录后再试。",
   "mfa.challenge.codeUsed": "该验证码已使用，请等待下一个验证码。",
   "mfa.challenge.throttled": "尝试过于频繁，请稍后再试。",
+  "mfa.challenge.authenticatorDisabled": "该验证方式因失败次数过多已被停用。请改用其他方式，或重新绑定。",
   "dashboard.title": "欢迎回来",
   "dashboard.loggedIn": "已登录",
   "dashboard.tabs.label": "账户导航",
