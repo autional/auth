@@ -399,12 +399,12 @@ describe('MFAChallengePage', () => {
 		expect(sessionStorage.getItem('mfa_pre_auth')).toBeNull();
 	});
 
-	it('shows already-completed screen when 61000403 says token already used', async () => {
+	it('shows already-completed screen on 61000404 (challenge used)', async () => {
 		seedPreAuth({ requiredMfaMethods: ['totp'] });
 		mockVerifyMFAChallenge.mockRejectedValue({
 			response: {
 				status: 403,
-				data: { code: 61000403, message: 'challenge token already used' },
+				data: { code: 61000404, message: 'challenge token already used' },
 			},
 		});
 
@@ -546,7 +546,7 @@ describe('MFAChallengePage', () => {
 		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
 
 		await waitFor(() => {
-			expect(screen.getByText('mfa.challenge.rateLimited')).toBeInTheDocument();
+			expect(screen.getByText('mfa.challenge.throttled')).toBeInTheDocument();
 		});
 	});
 });

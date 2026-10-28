@@ -22,7 +22,7 @@ import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
-import { semanticsOfError } from '@/lib/error-semantics';
+import { ERROR_CODES, errorCodeOf, semanticsOfError } from '@/lib/error-semantics';
 
 type CodeMethod = 'totp' | 'sms' | 'email';
 type VerifyMethod = CodeMethod | 'backup';
@@ -36,6 +36,29 @@ interface PreAuthData {
 	enrolledMfaMethods?: string[];
 	email?: string;
 	phone?: string;
+}
+
+/**
+ * 把服务端错误归一为挑战页的终态。
+ * 只消费契约常量（ERROR_CODES）与 ui_observation，不读 message 文案。
+ */
+function challengeFatalOf(err: unknown): 'expired' | 'used' | 'exhausted' | null {
+	const code = errorCodeOf(err);
+	if (code === ERROR_CODES.MFA_CHALLENGE_USED) return 'used';
+	if (code === ERROR_CODES.MFA_CHALLENGE_REQUIRED) return 'expired';
+	if (code === ERROR_CODES.MFA_CHALLENGE_ATTEMPTS_EXCEEDED) return 'exhausted';
+	const status = (err as { response?: { status?: number } })?.response?.status;
+	if (semanticsOfError(err)?.uiObservation === 'reauth_required' || status === 403) return 'expired';
+	return null;
+}
+
+function isReusedCode(err: unknown): boolean {
+	return errorCodeOf(err) === ERROR_CODES.MFA_CODE_ALREADY_USED;
+}
+
+function isThrottled(err: unknown): boolean {
+	if (errorCodeOf(err) === ERROR_CODES.MFA_ATTEMPTS_THROTTLED) return true;
+	return (err as { response?: { status?: number } })?.response?.status === 429;
 }
 
 const CODE_METHOD_ORDER: CodeMethod[] = ['totp', 'sms', 'email'];
@@ -105,7 +128,7 @@ export default function MFAChallengePage() {
 	);
 
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
-	const [fatal, setFatal] = useState<'' | 'expired' | 'used'>('');
+	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
@@ -196,25 +219,23 @@ export default function MFAChallengePage() {
 			}
 			navigate(dashboardPath);
 		} catch (err) {
-			const status = (err as any)?.response?.status;
-			const ui = semanticsOfError(err)?.uiObservation;
-			// 挑战令牌已失效（服务端复验口径）→ 清会话，引导重新登录。
-			// 契约优先；未收录码回落「403」状态判定（保持原行为，不漏判）。
-			if (ui === 'reauth_required' || (ui === undefined && status === 403)) {
-				// 61000403 同时覆盖「令牌过期」与「令牌已被使用」：后者通常是另一标签页已成功，
-				// 不应误导为过期（2026-10-27 线上实证：先 200 成功，后同一令牌 403 already used）。
-				const detail = extractApiError(err, '').message || '';
+			const fatalReason = challengeFatalOf(err);
+			if (fatalReason) {
 				sessionStorage.removeItem('mfa_pre_auth');
 				setPreAuth(null);
-				setFatal(/already used/i.test(detail) ? 'used' : 'expired');
+				setFatal(fatalReason);
 				return;
 			}
-			if (ui === 'form_error') {
+			if (isReusedCode(err)) {
+				setError(t('mfa.challenge.codeUsed'));
+				return;
+			}
+			if (isThrottled(err)) {
+				setError(t('mfa.challenge.throttled'));
+				return;
+			}
+			if (semanticsOfError(err)?.uiObservation === 'form_error') {
 				setError(t('mfa.challenge.verifyFailed'));
-				return;
-			}
-			if (status === 429) {
-				setError(t('mfa.challenge.rateLimited'));
 				return;
 			}
 			setError(extractApiError(err, t('mfa.challenge.verifyFailed')).message);
@@ -238,20 +259,15 @@ export default function MFAChallengePage() {
 			setCooldown((c) => ({ ...c, [method]: RESEND_COOLDOWN_SECONDS }));
 			setAnnouncement(t('mfa.challenge.codeSentLive'));
 		} catch (err) {
-			const status = (err as any)?.response?.status;
-			const ui = semanticsOfError(err)?.uiObservation;
-			// 挑战令牌失效（与验证同口径：契约优先，未收录码回落 403）
-			if (ui === 'reauth_required' || (ui === undefined && status === 403)) {
-				// 61000403 同时覆盖「令牌过期」与「令牌已被使用」：后者通常是另一标签页已成功，
-				// 不应误导为过期（2026-10-27 线上实证：先 200 成功，后同一令牌 403 already used）。
-				const detail = extractApiError(err, '').message || '';
+			const fatalReason = challengeFatalOf(err);
+			if (fatalReason) {
 				sessionStorage.removeItem('mfa_pre_auth');
 				setPreAuth(null);
-				setFatal(/already used/i.test(detail) ? 'used' : 'expired');
+				setFatal(fatalReason);
 				return;
 			}
-			if (status === 429) {
-				setError(t('mfa.challenge.rateLimited'));
+			if (isThrottled(err)) {
+				setError(t('mfa.challenge.throttled'));
 				return;
 			}
 			setError(extractApiError(err, t('mfa.challenge.sendFailed')).message);
@@ -350,6 +366,26 @@ export default function MFAChallengePage() {
 							{t('mfa.challenge.sessionExpiredAction')}
 						</button>
 					)}
+				</div>
+			</AuthCard>
+		);
+	}
+
+	// 本挑战尝试次数用尽——只能重新登录
+	if (fatal === 'exhausted') {
+		return (
+			<AuthCard>
+				<div className="text-center space-y-6">
+					<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-3xl">
+						⏱️
+					</div>
+					<AuthHeader
+						title={t('mfa.challenge.exhaustedTitle')}
+						subtitle={t('mfa.challenge.exhaustedDesc')}
+					/>
+					<Button fullWidth onClick={() => navigate(loginPathWithRedirect, { replace: true })}>
+						{t('mfa.challenge.sessionExpiredAction')}
+					</Button>
 				</div>
 			</AuthCard>
 		);
