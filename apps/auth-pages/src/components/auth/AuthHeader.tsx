@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 
 interface AuthHeaderProps {
@@ -18,11 +18,19 @@ interface AuthHeaderProps {
  */
 export function AuthHeader({ title, subtitle, logoUrl }: AuthHeaderProps) {
 	const { t } = useI18n();
+	// U447：Logo 是横版字标，保持原比例；加载失败时整块隐藏，不留碎图占位。
+	const [logoBroken, setLogoBroken] = useState(false);
+	useEffect(() => setLogoBroken(false), [logoUrl]);
 	return (
 		<div className="text-center">
-			{logoUrl && (
+			{logoUrl && !logoBroken && (
 				<div className="mb-4 flex justify-center">
-					<img src={logoUrl} alt={t('login.logoAlt')} className="h-12 w-auto object-contain" />
+					<img
+						src={logoUrl}
+						alt={t('login.logoAlt')}
+						className="h-12 w-auto object-contain"
+						onError={() => setLogoBroken(true)}
+					/>
 				</div>
 			)}
 			<h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">

@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { Avatar } from '@autional/ui';
 import { useI18n } from '@/lib/i18n';
 import { safeExternalUrl } from '@/lib/safe-url';
 
@@ -32,24 +33,20 @@ export function AppTile({ name, href, icon, logoUrl }: AppTileProps) {
 	const body = (
 		<>
 			<span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[var(--color-bg-surface)] text-[var(--color-brand)]">
-				{safeLogo ? (
-					<img
-						src={safeLogo}
-						alt=""
-						aria-hidden="true"
-						width={44}
-						height={44}
-						loading="lazy"
-						referrerPolicy="no-referrer"
-						className="h-11 w-11 object-cover"
-					/>
-				) : icon ? (
-					icon
-				) : (
-					<span className="text-base font-semibold" aria-hidden="true">
-						{name.trim().charAt(0).toUpperCase() || '?'}
-					</span>
-				)}
+				{/* U447：Logo 404 时回落图标/首字母，不落碎图 */}
+				<Avatar
+					src={safeLogo}
+					size={44}
+					referrerPolicy="no-referrer"
+					fallback={
+						icon ?? (
+							<span className="text-base font-semibold">
+								{name.trim().charAt(0).toUpperCase() || '?'}
+							</span>
+						)
+					}
+					className="text-[var(--color-brand)]"
+				/>
 			</span>
 			<span className="line-clamp-2 text-sm font-medium leading-tight text-[var(--color-text-primary)]">
 				{name}

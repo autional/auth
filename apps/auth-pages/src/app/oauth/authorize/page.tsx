@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'react-router';
-import { Button } from '@autional/ui';
+import { Avatar, Button } from '@autional/ui';
 import { getAccessToken, apiClient, extractItem, decodeJwtPayload, useAuthStore } from '@autional/shared';
 import { getOAuthClient } from '@/lib/api.generated';
 import { authMe, PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
@@ -310,17 +310,14 @@ function OAuthAuthorizeContent() {
 		<AuthCard>
 			<div className="text-center">
 				<div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-bg-muted)] text-2xl">
-					{safeClientLogo ? (
-						<img
-							src={safeClientLogo}
-							alt={clientName}
-							loading="lazy"
-							referrerPolicy="no-referrer"
-							className="h-10 w-10 rounded-full object-cover"
-						/>
-					) : (
-						'\uD83D\uDD10'
-					)}
+					{/* U447：客户端图标缺失/失效回落锁形图标，不留碎图 */}
+					<Avatar
+						src={safeClientLogo}
+						alt={clientName}
+						size={40}
+						referrerPolicy="no-referrer"
+						fallback={<span className="text-2xl">{'\uD83D\uDD10'}</span>}
+					/>
 				</div>
 				<AuthHeader
 					title={t('auth.oauth.authorizeTitle')}
@@ -328,17 +325,14 @@ function OAuthAuthorizeContent() {
 				/>
 				{tenantBranding && (
 					<div className="mt-3 flex items-center justify-center gap-2 text-xs text-[var(--color-text-muted)]">
-						{safeTenantLogo ? (
-							<img
-								src={safeTenantLogo}
-								alt={tenantBranding.name}
-								loading="lazy"
-								referrerPolicy="no-referrer"
-								className="h-5 w-5 rounded-full object-cover"
-							/>
-						) : (
-							<span className="text-lg">{'\uD83C\uDFE2'}</span>
-						)}
+						{/* U447：租户 Logo 缺失/失效回落楼宇图标 */}
+						<Avatar
+							src={safeTenantLogo}
+							alt={tenantBranding.name}
+							size={20}
+							referrerPolicy="no-referrer"
+							fallback={<span className="text-lg">{'\uD83C\uDFE2'}</span>}
+						/>
 						<span>{t('auth.oauth.underTenant', { tenant: tenantBranding.name })}</span>
 					</div>
 				)}

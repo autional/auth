@@ -773,14 +773,23 @@ export default function LoginPage() {
 	);
 
 	const logoUrl = useTenantBrandingStore((s) => s.branding?.logoUrl);
+	// U447：Logo 加载失败标记；换租户/换 logo 时重置重试
+	const [logoBroken, setLogoBroken] = useState(false);
+	useEffect(() => setLogoBroken(false), [logoUrl]);
 	const brandingTitle = useTenantBrandingStore((s) => s.branding?.loginPageTitle);
 	const brandingDesc = useTenantBrandingStore((s) => s.branding?.loginPageDescription);
 
 	const cardHeader = (
 		<div className="text-center">
-			{logoUrl && (
+			{/* U447：租户字标 Logo，保持原比例；加载失败隐藏，不留碎图 */}
+			{logoUrl && !logoBroken && (
 				<div className="mb-4 flex justify-center">
-					<img src={logoUrl} alt={t('login.tenantLogoAlt')} className="h-12 w-auto object-contain" />
+					<img
+						src={logoUrl}
+						alt={t('login.tenantLogoAlt')}
+						className="h-12 w-auto object-contain"
+						onError={() => setLogoBroken(true)}
+					/>
 				</div>
 			)}
 			<h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
