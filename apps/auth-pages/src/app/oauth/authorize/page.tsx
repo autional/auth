@@ -68,6 +68,8 @@ function OAuthAuthorizeContent() {
 	const [error, setError] = useState('');
 	const [userId, setUserId] = useState('');
 	const [tenantId, setTenantId] = useState('');
+	// client 所属租户：用于「会话租户 ≠ RP 租户」守卫（union 联邦防错人）。
+	const [clientTenantId, setClientTenantId] = useState('');
 	// AUTH-03：会话未确认（无 token 时 redirectToLogin 的异步 slug 解析在途）不渲染
 	// 同意界面——原实现先渲染完整表单 ~0.5s 再跳走，未登录用户看到同意页闪烁。
 	const [sessionState, setSessionState] = useState<'checking' | 'ready'>('checking');
@@ -114,6 +116,18 @@ function OAuthAuthorizeContent() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	// 会话租户 ≠ client 所属租户 → 清会话、以 RP 租户身份重登。
+	// 后端对 kind=idp 已有硬门（403），这里给用户可执行路径（否则只会停在错误卡上）。
+	useEffect(() => {
+		if (sessionState !== 'ready') return;
+		if (!clientTenantId || !tenantId) return;
+		if (tenantId !== clientTenantId) {
+			useAuthStore.getState().clearAuth();
+			void redirectToLogin();
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [sessionState, clientTenantId, tenantId]);
+
 	useEffect(() => {
 		if (!clientId) return;
 		getOAuthClient(clientId)
@@ -126,6 +140,7 @@ function OAuthAuthorizeContent() {
 				setClientLogo(d?.logoUri || d?.logo_uri || '');
 				const tenantID = d?.tenantId || d?.tenant_id;
 				if (tenantID) {
+					setClientTenantId(String(tenantID));
 					PublicAuthConfigByAuthConfig(tenantID)
 						.then((configRes: any) => {
 							const dd = configRes?.data ?? configRes;

@@ -103,11 +103,6 @@ export function isAdminRedirect(redirect: string | null): boolean {
 	return false;
 }
 
-interface OAuthProviderItem {
-	type: string;
-	name: string;
-}
-
 export default function LoginPage() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
@@ -200,19 +195,11 @@ export default function LoginPage() {
 		}
 	}, [loginMethods, loginMethod]);
 
-	// Determine OAuth providers from auth config (filter available providers)
-	const oauthProviders = useMemo<OAuthProviderItem[]>(() => {
-		const configProviders = authConfig?.oauthProviders;
-		if (configProviders && configProviders.length > 0) {
-			// Filter available providers against config
-			const enabledTypes = new Set(
-				configProviders.map((p: any) => (typeof p === 'string' ? p : p.type)),
-			);
-			return availableOAuthProviders.filter((p) => enabledTypes.has(p.type));
-		}
-		// No config: show all available
-		return availableOAuthProviders;
-	}, [authConfig, availableOAuthProviders]);
+	// OAuth providers 的**唯一真源** = 服务端 `/auth/oauth/providers`
+	// （已含租户三态过滤、runtime 可用性过滤、union 自环过滤）。
+	// 不再用 `authConfig.oauthProviders` 二次过滤：该字段在生产读链恒为空（历史死字段），
+	// 二次过滤会造成「服务端已关闭但前端仍显示」或反之。
+	const oauthProviders = availableOAuthProviders;
 
 	// 守卫只跑一次：等 slug 配置探测有结果后再判定（AUTH-04 骨架态语义 ——
 	// slugConfigLoading 期间 autoRedirectChecking 恒真，页面停留 spinner，
