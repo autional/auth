@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,11 +11,13 @@ import {
 	decodeJwtPayload,
 	extractApiError,
 	getAccessToken,
+	getPortalUrl,
 	usePublicTenantSlugs,
 } from '@autional/shared';
 import { createMfaTOTPSchema, createMfaSMSSchema } from '@/lib/validators';
 import type { MFATOTPFormData, MFASMSFormData } from '@/lib/validators';
 import { verifyMFAChallenge, sendMFAChallengeCode } from '@/lib/api.generated';
+import { authQrLoginInitiatePost, authQrLoginStatus } from '@autional/shared/generated/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { resolvePostLoginRedirect } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
@@ -137,6 +139,11 @@ export default function MFAChallengePage() {
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
+	// 本机一键批准（复用扫码登录底座：认证器 App 内确认，无需输入验证码）
+	const [localApprove, setLocalApprove] = useState<'idle' | 'waiting' | 'error'>('idle');
+	const [localNumber, setLocalNumber] = useState('');
+	const [localLink, setLocalLink] = useState('');
+	const localPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -197,6 +204,81 @@ export default function MFAChallengePage() {
 	const smsForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const emailForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const backupForm = useForm<BackupFormData>({ resolver: zodResolver(backupSchema) });
+
+	const finishLogin = (accessToken: string, refreshToken: string) => {
+		loginWithTokens(accessToken, refreshToken, null as any);
+		anchorSessionFromToken(accessToken, {
+			slug: tenantSlug || null,
+			tenantId: preAuth?.tenantId || null,
+			knownTenants,
+		});
+		sessionStorage.removeItem('mfa_pre_auth');
+		const postLoginRedirect = resolvePostLoginRedirect(redirect, tenantSlug || null);
+		if (postLoginRedirect) {
+			window.location.href = postLoginRedirect;
+			return;
+		}
+		navigate(dashboardPath);
+	};
+
+	const stopLocalPolling = () => {
+		if (localPollRef.current) {
+			clearInterval(localPollRef.current);
+			localPollRef.current = null;
+		}
+	};
+
+	const startLocalPolling = (token: string) => {
+		stopLocalPolling();
+		localPollRef.current = setInterval(async () => {
+			try {
+				const data = await authQrLoginStatus({ token });
+				const st = data?.status || '';
+				if (st === 'confirmed' && data?.accessToken) {
+					stopLocalPolling();
+					finishLogin(data.accessToken, data.refreshToken || '');
+				} else if (st === 'cancelled' || st === 'expired') {
+					stopLocalPolling();
+					setLocalApprove('error');
+				}
+			} catch {
+				// 轮询错误静默；由用户取消或超时收敛
+			}
+		}, 2000);
+	};
+
+	const startLocalApprove = async () => {
+		setError('');
+		setLocalApprove('waiting');
+		try {
+			const data = await authQrLoginInitiatePost(
+				preAuth?.tenantId ? { tenantId: preAuth.tenantId } : undefined,
+			);
+			const token = data?.sessionToken || '';
+			const nm = data?.numberMatching || '';
+			if (!token) throw new Error('empty session token');
+			setLocalNumber(nm);
+			// 区域自愈：认证器门户按当前站点根域派生（.cn/.com 各自正确），不硬编码域名
+			const appBase = getPortalUrl('authenticator', tenantSlug || undefined).replace(/\/+$/, '');
+			const url = `${appBase}/login-approve?token=${encodeURIComponent(token)}&nm=${encodeURIComponent(nm)}`;
+			setLocalLink(url);
+			window.open(url, '_blank', 'noopener');
+			startLocalPolling(token);
+		} catch {
+			setLocalApprove('error');
+		}
+	};
+
+	const cancelLocalApprove = () => {
+		stopLocalPolling();
+		setLocalApprove('idle');
+		setLocalNumber('');
+		setLocalLink('');
+	};
+
+	useEffect(() => {
+		return () => stopLocalPolling();
+	}, []);
 
 	const handleSubmit = async (code: string, type: VerifyMethod) => {
 		if (!preAuth) return;
@@ -447,6 +529,46 @@ export default function MFAChallengePage() {
 	return (
 		<AuthCard>
 			<AuthHeader title={t('mfa.challenge.title')} subtitle={t('mfa.challenge.subtitle')} />
+
+			{localApprove === 'idle' && (
+				<Button variant="outline" fullWidth onClick={startLocalApprove}>
+					{t('mfa.challenge.localApprove')}
+				</Button>
+			)}
+			{localApprove === 'waiting' && (
+				<div className="space-y-2 rounded-md border border-brand/30 bg-brand/5 p-3 text-center">
+					<p className="text-sm text-[var(--color-text-secondary)]">
+						{t('mfa.challenge.localApproveWaiting')}
+					</p>
+					{localNumber && (
+						<p className="text-xs text-[var(--color-text-muted)]">
+							{t('mfa.challenge.localApproveNumber')}{' '}
+							<span className="text-xl font-bold tracking-widest text-brand-text">{localNumber}</span>
+						</p>
+					)}
+					{localLink && (
+						<a
+							href={localLink}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="block text-xs text-primary-400 underline"
+						>
+							{t('mfa.challenge.localApproveOpen')}
+						</a>
+					)}
+					<Button variant="ghost" size="sm" onClick={cancelLocalApprove}>
+						{t('mfa.challenge.localApproveCancel')}
+					</Button>
+				</div>
+			)}
+			{localApprove === 'error' && (
+				<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
+					{t('mfa.challenge.localApproveFailed')}
+					<Button variant="ghost" size="sm" className="ml-2" onClick={() => setLocalApprove('idle')}>
+						{t('common.retry')}
+					</Button>
+				</div>
+			)}
 
 			{tabs.length > 1 && (
 				<div
