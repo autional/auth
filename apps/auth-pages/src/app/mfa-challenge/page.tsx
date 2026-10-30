@@ -25,6 +25,7 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import { ERROR_CODES, errorCodeOf, semanticsOfError } from '@/lib/error-semantics';
+import { userFromAccessToken } from '@/lib/session-user';
 
 type CodeMethod = 'totp' | 'sms' | 'email';
 type VerifyMethod = CodeMethod | 'backup';
@@ -210,7 +211,7 @@ export default function MFAChallengePage() {
 		preAuth?.tenantId || knownTenants?.find((t) => t.slug === tenantSlug)?.id || undefined;
 
 	const finishLogin = (accessToken: string, refreshToken: string) => {
-		loginWithTokens(accessToken, refreshToken, null as any);
+		loginWithTokens(accessToken, refreshToken, userFromAccessToken(accessToken));
 		anchorSessionFromToken(accessToken, {
 			slug: tenantSlug || null,
 			tenantId: tenantIdForApprove || null,
