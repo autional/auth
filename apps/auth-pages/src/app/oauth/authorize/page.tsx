@@ -74,11 +74,40 @@ function OAuthAuthorizeContent() {
 	// 同意界面——原实现先渲染完整表单 ~0.5s 再跳走，未登录用户看到同意页闪烁。
 	const [sessionState, setSessionState] = useState<'checking' | 'ready'>('checking');
 
-	// 无会话时的出口：`<slug>/login?redirect=<本 authorize URL>`（TASK-07，短路 brand）。
+	
+/**
+ * 无会话时的登录租户选择：
+ * 1) 优先取 OAuth state.redirect（发起方原始 URL，如 /acme-corp/...）的首段，
+ *    且必须是公开租户 slug（避免把 /cloud-backup、/login 等路由误当租户）；
+ * 2) 回落 client 所属租户（平台门户客户端 → platform）。
+ * 多租户门户必需：否则 acme 用户会被送到 platform 登录页（租户不匹配，必然登录失败）。
+ */
+async function resolveLoginSlug(clientId: string, state: string): Promise<string | null> {
+	try {
+		const parsed = JSON.parse(state) as { redirect?: string };
+		const target = parsed?.redirect;
+		if (target) {
+			const seg = new URL(target).pathname.split('/').filter(Boolean)[0] || '';
+			if (seg && /^[a-z0-9][a-z0-9-]*$/i.test(seg)) {
+				const res = await fetch('/bff/tenant/api/v1/tenant/public/tenants');
+				if (res.ok) {
+					const j: any = await res.json();
+					const list = Array.isArray(j?.items) ? j.items : Array.isArray(j?.data) ? j.data : [];
+					if (list.some((t: any) => t?.slug === seg)) return seg;
+				}
+			}
+		}
+	} catch {
+		/* 解析失败走回落 */
+	}
+	return clientId ? fetchTenantSlugByClientId(clientId) : null;
+}
+
+// 无会话时的出口：`<slug>/login?redirect=<本 authorize URL>`（TASK-07，短路 brand）。
 	// slug 解析失败回退旧交棒链（由 EntryRouter 决定落点），不白屏。
 	const redirectToLogin = async (): Promise<void> => {
 		const authorizeUrl = window.location.pathname + window.location.search;
-		const slug = clientId ? await fetchTenantSlugByClientId(clientId) : null;
+		const slug = await resolveLoginSlug(clientId, state);
 		if (slug) {
 			window.location.replace(buildTenantLoginUrl(slug, authorizeUrl));
 			return;
