@@ -166,10 +166,16 @@ describe('OAuthAuthorizePage 授权决定并发锁', () => {
 				resolveConsentCheck = resolve;
 			}),
 		);
-		const fetchMock = vi.fn();
+		let resolveAuthorize!: (v: any) => void;
+		const fetchMock = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					resolveAuthorize = resolve;
+				}),
+		);
 		vi.stubGlobal('fetch', fetchMock);
 
-		// 拒绝出口是整页跳转：stub window.location.href（沿用既有成功链测试的写法）
+		// 拒绝出口 = 服务端 POST 返回 redirect_to → 整页跳转（05121ab 起）
 		const hrefSetter = vi.fn();
 		const originalLocation = window.location;
 		delete (window as any).location;
@@ -188,13 +194,24 @@ describe('OAuthAuthorizePage 授权决定并发锁', () => {
 			});
 
 			await user.click(screen.getByRole('button', { name: 'auth.oauth.deny' }));
-			expect(hrefSetter).toHaveBeenCalledTimes(1);
+			// 拒绝也走服务端校验：先发一次 authorize POST
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+
+			resolveAuthorize({
+				ok: true,
+				redirected: false,
+				url: '',
+				json: async () => ({
+					redirect_to: 'https://example.com/callback?error=access_denied&state=random-state',
+				}),
+			});
+			await waitFor(() => expect(hrefSetter).toHaveBeenCalledTimes(1));
 
 			// 自动同意晚到：决定已作出，不得再发 authorize（否则拒绝被授权覆盖）
 			resolveConsentCheck({ data: { hasConsent: true } });
 			await waitFor(() => expect(mockConsentCheck).toHaveBeenCalled());
 			await new Promise((r) => setTimeout(r, 0));
-			expect(fetchMock).not.toHaveBeenCalled();
+			expect(fetchMock).toHaveBeenCalledTimes(1);
 		} finally {
 			Object.defineProperty(window, 'location', { value: originalLocation, writable: true });
 		}

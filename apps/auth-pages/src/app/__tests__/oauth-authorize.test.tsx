@@ -212,8 +212,9 @@ describe('OAuthAuthorizePage', () => {
 
 		await user.click(screen.getByRole('button', { name: 'auth.oauth.deny' }));
 
+		// 05121ab：拒绝改为服务端校验；缺参预校验错误键 = oauth.authorize.missingParams
 		await waitFor(() => {
-			expect(screen.getByText('auth.oauth.missingRedirect')).toBeInTheDocument();
+			expect(screen.getByText('oauth.authorize.missingParams')).toBeInTheDocument();
 		});
 	});
 
