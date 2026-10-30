@@ -162,7 +162,7 @@ function OAuthAuthorizeContent() {
 	// login_required 拒绝（W1 后端半）；fetch 提交由 oauth 服务 OptionalAuth 解析
 	// Bearer 得到 user_id，与 body 断言交叉校验。Accept: application/json 时服务端回
 	// 200 {redirect_to}（fetch 读不到 302 的 Location），前端整页跳转。
-	const submitConsent = async (): Promise<void> => {
+	const submitDecision = async (approved: boolean): Promise<void> => {
 		// AUTH-46①：缺参预校验——client_id/redirect_uri 缺失时不再发起注定失败的 POST
 		// （此前打到后端收 Gin binding 原文并落屏）
 		if (!clientId || !redirectUri) {
@@ -192,7 +192,7 @@ function OAuthAuthorizeContent() {
 				scope,
 				state,
 				nonce,
-				approved: 'true',
+				approved: approved ? 'true' : 'false',
 				response_type: 'code',
 				code_challenge: codeChallenge,
 				code_challenge_method: codeChallengeMethod,
@@ -300,19 +300,17 @@ function OAuthAuthorizeContent() {
 		);
 	}
 
-	const handleDeny = () => {
-		if (!redirectUri) {
-			setError(t('auth.oauth.missingRedirect'));
-			return;
-		}
-		const url = new URL(redirectUri);
-		url.searchParams.set('error', 'access_denied');
-		if (state) url.searchParams.set('state', state);
-		// 同意与拒绝竞争同一出口：一方已作出决定后另一方不得改判——否则「拒绝」会被
-		// 随后到达的自动同意覆盖（自动提交已发出授权码，用户看到的是拒绝还是授权取决于时序）。
-		if (decisionRef.current) return;
-		decisionRef.current = true;
-		window.location.href = url.toString();
+	const submitConsent = (): Promise<void> => submitDecision(true);
+
+	// 拒绝（access_denied）也必须走**服务端校验**：redirect_uri 只有在客户端注册白名单内
+	// 才允许跳转（RFC 6749 §4.1.2.1）。历史实现在前端直接 new URL(redirectUri) 整页跳转，
+	// 未做任何注册校验 = 开放重定向；而本页正被广播为对外 authorization_endpoint，
+	// 该旁路可被任意 redirect_uri 参数直接利用（26-endpoint-domain-matrix T0.5）。
+	// 现改为与「同意」同一条服务端链路（POST approved=false）：
+	//   - redirect_uri 已注册 → 服务端返回 {redirect_to: <uri>?error=access_denied&state=...}
+	//   - 未注册 → 400 invalid_request，页面提示错误，绝不跳外域
+	const handleDeny = (): void => {
+		void submitDecision(false);
 	};
 
 	// 图标来自客户端元数据（应用方填写）：只放行绝对 http/https，
