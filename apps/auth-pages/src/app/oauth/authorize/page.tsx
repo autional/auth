@@ -93,7 +93,7 @@ async function resolveLoginSlug(clientId: string, state: string): Promise<string
 				if (res.ok) {
 					const j: any = await res.json();
 					const list = Array.isArray(j?.items) ? j.items : Array.isArray(j?.data) ? j.data : [];
-					if (list.some((t: any) => t?.slug === seg)) return seg;
+					if (list.some((t: any) => (t?.slug || t?.name) === seg)) return seg;
 				}
 			}
 		}
