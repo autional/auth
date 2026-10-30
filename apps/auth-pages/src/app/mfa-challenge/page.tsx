@@ -144,6 +144,7 @@ export default function MFAChallengePage() {
 	const [localApprove, setLocalApprove] = useState<'idle' | 'waiting' | 'error'>('idle');
 	const [localNumber, setLocalNumber] = useState('');
 	const [localLink, setLocalLink] = useState('');
+	const [localError, setLocalError] = useState('');
 	const localPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
@@ -254,11 +255,15 @@ export default function MFAChallengePage() {
 
 	const startLocalApprove = async () => {
 		setError('');
+		if (!tenantIdForApprove) {
+			setLocalError(t('mfa.challenge.localApproveNoTenant'));
+			setLocalApprove('error');
+			return;
+		}
 		setLocalApprove('waiting');
+		setLocalError('');
 		try {
-			const data = await authQrLoginInitiatePost(
-				tenantIdForApprove ? { tenantId: tenantIdForApprove } : undefined,
-			);
+			const data = await authQrLoginInitiatePost({ tenantId: tenantIdForApprove });
 			const token = data?.sessionToken || '';
 			const nm = data?.numberMatching || '';
 			if (!token) throw new Error('empty session token');
@@ -267,7 +272,6 @@ export default function MFAChallengePage() {
 			const appBase = getPortalUrl('authenticator', tenantSlug || undefined).replace(/\/+$/, '');
 			const url = `${appBase}/login-approve?token=${encodeURIComponent(token)}&nm=${encodeURIComponent(nm)}`;
 			setLocalLink(url);
-			window.open(url, '_blank', 'noopener');
 			startLocalPolling(token);
 		} catch {
 			setLocalApprove('error');
@@ -279,6 +283,7 @@ export default function MFAChallengePage() {
 		setLocalApprove('idle');
 		setLocalNumber('');
 		setLocalLink('');
+		setLocalError('');
 	};
 
 	useEffect(() => {
@@ -541,24 +546,19 @@ export default function MFAChallengePage() {
 				</Button>
 			)}
 			{localApprove === 'waiting' && (
-				<div className="space-y-2 rounded-md border border-brand/30 bg-brand/5 p-3 text-center">
+				<div className="space-y-3 rounded-lg border border-primary-500/30 bg-primary-500/5 p-4 text-center">
 					<p className="text-sm text-[var(--color-text-secondary)]">
 						{t('mfa.challenge.localApproveWaiting')}
 					</p>
 					{localNumber && (
-						<p className="text-xs text-[var(--color-text-muted)]">
-							{t('mfa.challenge.localApproveNumber')}{' '}
-							<span className="text-xl font-bold tracking-widest text-brand-text">{localNumber}</span>
-						</p>
+						<div>
+							<p className="text-xs text-[var(--color-text-muted)]">{t('mfa.challenge.localApproveNumber')}</p>
+							<p className="mt-1 text-2xl font-bold tracking-[0.3em] text-primary-500">{localNumber}</p>
+						</div>
 					)}
 					{localLink && (
-						<a
-							href={localLink}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="block text-xs text-primary-400 underline"
-						>
-							{t('mfa.challenge.localApproveOpen')}
+						<a href={localLink} target="_blank" rel="noopener noreferrer" className="block">
+							<Button fullWidth>{t('mfa.challenge.localApproveOpen')}</Button>
 						</a>
 					)}
 					<Button variant="ghost" size="sm" onClick={cancelLocalApprove}>
@@ -567,9 +567,9 @@ export default function MFAChallengePage() {
 				</div>
 			)}
 			{localApprove === 'error' && (
-				<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
-					{t('mfa.challenge.localApproveFailed')}
-					<Button variant="ghost" size="sm" className="ml-2" onClick={() => setLocalApprove('idle')}>
+				<div role="alert" className="space-y-2 rounded-md bg-danger/10 p-3 text-sm text-danger-text">
+					<p>{localError || t('mfa.challenge.localApproveFailed')}</p>
+					<Button variant="ghost" size="sm" onClick={() => setLocalApprove('idle')}>
 						{t('common.retry')}
 					</Button>
 				</div>
