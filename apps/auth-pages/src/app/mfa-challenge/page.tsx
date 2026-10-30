@@ -205,11 +205,15 @@ export default function MFAChallengePage() {
 	const emailForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const backupForm = useForm<BackupFormData>({ resolver: zodResolver(backupSchema) });
 
+	// 本机批准的租户来源：登录挑战写入值优先，slug 名单兜底（公开 API 无租户头）
+	const tenantIdForApprove =
+		preAuth?.tenantId || knownTenants?.find((t) => t.slug === tenantSlug)?.id || undefined;
+
 	const finishLogin = (accessToken: string, refreshToken: string) => {
 		loginWithTokens(accessToken, refreshToken, null as any);
 		anchorSessionFromToken(accessToken, {
 			slug: tenantSlug || null,
-			tenantId: preAuth?.tenantId || null,
+			tenantId: tenantIdForApprove || null,
 			knownTenants,
 		});
 		sessionStorage.removeItem('mfa_pre_auth');
@@ -252,7 +256,7 @@ export default function MFAChallengePage() {
 		setLocalApprove('waiting');
 		try {
 			const data = await authQrLoginInitiatePost(
-				preAuth?.tenantId ? { tenantId: preAuth.tenantId } : undefined,
+				tenantIdForApprove ? { tenantId: tenantIdForApprove } : undefined,
 			);
 			const token = data?.sessionToken || '';
 			const nm = data?.numberMatching || '';
