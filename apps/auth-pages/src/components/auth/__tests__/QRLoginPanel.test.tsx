@@ -94,7 +94,10 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 			},
 			{ timeout: 8000 },
 		);
-		expect(vi.mocked(loginWithTokens)).toHaveBeenCalledWith('at-1', 'rt-1', null);
+		// 75242d9 起扫码登录会带上 user（store 拒绝空 user），第 3 参不断言具体形状
+		const [[at, rt]] = vi.mocked(loginWithTokens).mock.calls;
+		expect(at).toBe('at-1');
+		expect(rt).toBe('rt-1');
 	}, 10000);
 
 	// 地址栏租户是发起会话与会话锚定两处的权威（Wave 1）。
