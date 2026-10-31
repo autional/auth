@@ -60,6 +60,9 @@ function OAuthAuthorizeContent() {
 
 	const [clientName, setClientName] = useState('');
 	const [clientLogo, setClientLogo] = useState('');
+	// U555：client 类型（portal/idp/空）。仅用于把「回调未登记」细分成
+	// 「用错了门户客户端」——不在页面上暴露 redirect_uris 或其它元数据。
+	const [clientKind, setClientKind] = useState('');
 	const [tenantBranding, setTenantBranding] = useState<{ name: string; logo: string } | null>(null);
 	const [loading, setLoading] = useState(false);
 	// 授权决定锁：同意（含自动同意）与拒绝共用出口，同一时刻只允许一方生效
@@ -167,6 +170,7 @@ async function resolveLoginSlug(clientId: string, state: string): Promise<string
 				// apiClient interceptor 将后端 client_name (snake_case) 转成 clientName (camelCase)
 				setClientName(d?.clientName || d?.client_name || t('oauth.authorize.unknownApp'));
 				setClientLogo(d?.logoUri || d?.logo_uri || '');
+				setClientKind(typeof d?.kind === 'string' ? d.kind : '');
 				const tenantID = d?.tenantId || d?.tenant_id;
 				if (tenantID) {
 					setClientTenantId(String(tenantID));
@@ -250,6 +254,7 @@ async function resolveLoginSlug(clientId: string, state: string): Promise<string
 								code: redirectErr,
 								description: q.get('error_description'),
 								fallback,
+								clientKind,
 							}),
 						);
 						return;
@@ -277,7 +282,7 @@ async function resolveLoginSlug(clientId: string, state: string): Promise<string
 					typeof payload?.error === 'object' ? payload.error : null,
 					code ? null : payload?.message,
 				);
-				setError(oauthErrorText(t, { code, description, fallback }));
+				setError(oauthErrorText(t, { code, description, fallback, clientKind }));
 				return;
 			}
 			const target = payload?.redirect_to || payload?.data?.redirect_to;

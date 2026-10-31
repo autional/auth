@@ -521,6 +521,7 @@
   "oauth.error.pkceRequired": "The authorization request is missing a required security parameter (PKCE). Please update the application and try again",
   "oauth.error.pkceMethod": "The application uses an unsupported PKCE method. Please update the application and try again",
   "oauth.error.redirectNotRegistered": "The callback URL is not registered for this application. Please contact the application",
+  "oauth.error.redirectNotRegisteredPortal": "The callback URL is not registered. This application is using the tenant portal client, which cannot be used as a third-party app — please ask the app owner to create a dedicated OAuth client",
   "qrLogin.initError": "Failed to get login QR code",
   "qrLogin.expired": "QR code expired. Please refresh",
   "qrLogin.cancelled": "Login cancelled",

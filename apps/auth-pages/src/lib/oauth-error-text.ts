@@ -37,15 +37,24 @@ const DESC_PATTERNS: Array<[RegExp, string]> = [
 	[/redirect_uri not registered/i, 'oauth.error.redirectNotRegistered'],
 ];
 
+// U555：`redirect_uri not registered` 有两个成因，用户可采取的动作不同——
+// ① 应用回调没登记（找应用方补登记）；② 应用把「租户门户客户端」当成了自己的 appId
+// （找应用方新建独立应用客户端）。后端自 ddc7f2f 起会按 `kind=portal` 在描述里追加提示，
+// 但本模块命中正则后会丢弃原文；因此这里用同意页已取到的 client `kind` 分流子型。
+const PORTAL_REDIRECT_KEY = 'oauth.error.redirectNotRegisteredPortal';
+
 export function oauthErrorText(
 	t: Translate,
-	opts: { code?: string | null; description?: string | null; fallback: string },
+	opts: { code?: string | null; description?: string | null; fallback: string; clientKind?: string | null },
 ): string {
 	const code = (opts.code || '').trim();
 	const description = (opts.description || '').trim();
+	const isPortal = (opts.clientKind || '').trim().toLowerCase() === 'portal';
 	if (description) {
 		for (const [pattern, key] of DESC_PATTERNS) {
-			if (pattern.test(description)) return t(key);
+			if (!pattern.test(description)) continue;
+			if (key === 'oauth.error.redirectNotRegistered' && isPortal) return t(PORTAL_REDIRECT_KEY);
+			return t(key);
 		}
 	}
 	const key = CODE_KEYS[code];

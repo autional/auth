@@ -526,6 +526,7 @@
   "oauth.error.pkceRequired": "授权请求缺少必要的安全校验参数（PKCE），请更新应用后重试",
   "oauth.error.pkceMethod": "应用使用了不支持的 PKCE 校验方式，请更新应用后重试",
   "oauth.error.redirectNotRegistered": "回调地址未在应用中登记，请联系应用方",
+  "oauth.error.redirectNotRegisteredPortal": "回调地址未在应用中登记。该应用使用的是租户门户客户端，无法作为第三方应用使用——请联系应用方新建独立的应用客户端",
   "qrLogin.initError": "获取登录二维码失败",
   "qrLogin.expired": "二维码已过期，请刷新",
   "qrLogin.cancelled": "登录已取消",
