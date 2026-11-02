@@ -63,6 +63,7 @@ export function resolvePostLoginRedirect(
 			'trust',
 			'platform',
 			'authenticator',
+			'developer',
 		];
 		const slugRoot =
 			hostParts.length >= 3 && knownPrefixes.includes(hostParts[0])
