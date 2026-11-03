@@ -3,8 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { readFileSync } from 'node:fs';
 import path from 'path';
-import { CDN_PIN, readBuildEnv } from '../../scripts/env.mjs';
-import { cdnHeadPlugin } from '../../scripts/vite-cdn.mjs';
+import { readBuildEnv } from '../../scripts/env.mjs';
 import { REGION_COPY } from '../../scripts/region-copy.mjs';
 
 function normalizeViteBase(p: string | undefined): string {
@@ -19,7 +18,6 @@ const API_PROXY_TARGET = process.env.VITE_API_PROXY_URL || 'http://localhost:110
 
 const buildEnv = readBuildEnv();
 const copy = REGION_COPY[buildEnv.defaultLang];
-const CDN_ASSET_BASE = `${buildEnv.cdnHost}/ui/${CDN_PIN}`;
 
 /**
  * index.html 区域占位符（{{TOKEN}}）替换单点——值全部来自 scripts/env.mjs + region-copy.mjs。
@@ -30,7 +28,6 @@ function regionPlugin(): Plugin {
     LANG: copy.locale,
     TITLE: copy.title,
     DESCRIPTION: copy.description,
-    CDN_ASSET_BASE,
   };
   return {
     name: 'region-plugin',
@@ -74,7 +71,6 @@ function inlineEnvPlugin(): Plugin {
 export default defineConfig({
   plugins: [
     react(),
-    cdnHeadPlugin({ cdnHost: buildEnv.cdnHost }),
     inlineEnvPlugin(),
     regionPlugin(),
     VitePWA({

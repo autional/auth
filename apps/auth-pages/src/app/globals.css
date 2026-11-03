@@ -1,4 +1,6 @@
-/* 令牌由 <head> 的 CDN <link> 提供（单一来源），不再在这里 @import。 */
+/* 令牌随应用打包（同源、带 hash）：2026-11-03 起不再从 CDN 运行期加载。
+   CDN 被安全策略 challenge 时 <link> 子资源无法自解 → 全站 var(--color-*) 失效。 */
+@import '@autional/tokens/tokens.css';
 
 @tailwind base;
 @tailwind components;
