@@ -13,7 +13,7 @@ import {
 	tenantPublicTenants,
 	authCaptchaChallenge,
 } from '@autional/shared/generated/api';
-import { checkEmailAvailability, registerAccount } from '@/lib/api-tenant';
+import { registerAccount } from '@/lib/api-tenant';
 import { checkPasswordBreached } from '@/lib/breach-check';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
 import { loadAuthExtras } from '@/lib/api';
@@ -159,9 +159,7 @@ export default function RegisterPage() {
 		'password' | 'magic_link' | 'email_code' | 'phone_code'
 	>('password');
 
-	const [usernameStatus, setUsernameStatus] = useState<CheckStatus>('idle');
-	const [emailStatus, setEmailStatus] = useState<CheckStatus>('idle');
-	const [registrationSuccess, setRegistrationSuccess] = useState(false);
+	const [usernameStatus, setUsernameStatus] = useState<CheckStatus>('idle');	const [registrationSuccess, setRegistrationSuccess] = useState(false);
 	// WS-G / AUTH-02：审批制租户新注册 → membership_status=pending；不建会话、不跳转。
 	const [pendingApproval, setPendingApproval] = useState(false);
 	// 注册成功后的 Passkey 登记需要原口令重认证（begin 端点 password 必填）
@@ -170,7 +168,6 @@ export default function RegisterPage() {
 	const turnstileTokenRef = useRef<string>('');
 
 	const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const emailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const prevTenantIdRef = useRef(''); // AUTH-04: 上次选中的租户 id（检测真实切换以清字段）
 
 	// Tenant loading
@@ -244,7 +241,6 @@ export default function RegisterPage() {
 	} = useForm<FormData>({ resolver: zodResolver(registerSchema) });
 
 	const watchedUsername = watch('username');
-	const watchedEmail = watch('email');
 	const watchedAgreeTerms = watch('agreeTerms');
 	const watchedPassword = watch('password');
 
@@ -282,27 +278,6 @@ export default function RegisterPage() {
 			if (usernameTimer.current) clearTimeout(usernameTimer.current);
 		};
 	}, [watchedUsername, checkTenantId]);
-
-	useEffect(() => {
-		if (emailTimer.current) clearTimeout(emailTimer.current);
-		if (!watchedEmail || !/^\S+@\S+\.\S+$/.test(watchedEmail)) {
-			setEmailStatus('idle');
-			return;
-		}
-		setEmailStatus('checking');
-		emailTimer.current = setTimeout(async () => {
-			try {
-				// 地址栏租户优先：查重与注册必须落在同一租户（AUTH-01/04）。
-				const res = await checkEmailAvailability(watchedEmail, checkTenantId);
-				setEmailStatus(res.available ? 'available' : 'taken');
-			} catch {
-				setEmailStatus('idle');
-			}
-		}, 500);
-		return () => {
-			if (emailTimer.current) clearTimeout(emailTimer.current);
-		};
-	}, [watchedEmail, checkTenantId]);
 
 	const onSubmit = async (data: FormData) => {
 		setError('');
@@ -386,7 +361,6 @@ export default function RegisterPage() {
 
 			const payload: Record<string, any> = {
 				username: data.username,
-				email: data.email,
 				password: transmissionResult.password,
 				passwordTransmission: transmissionResult.passwordTransmission,
 			};
@@ -535,27 +509,12 @@ export default function RegisterPage() {
 		}
 	}
 
-	function renderEmailHint() {
-		if (errors.email) return null;
-		switch (emailStatus) {
-			case 'checking':
-				return <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{t('register.hintChecking')}</p>;
-			case 'available':
-				return <p className="mt-1 text-xs text-success-text">{t('register.hintEmailAvailable')}</p>;
-			case 'taken':
-				return <p className="mt-1 text-xs text-danger-text">{t('register.hintEmailTaken')}</p>;
-			default:
-				return null;
-		}
-	}
-
 	const handleTenantChange = useCallback(
 		(tenantId: string) => {
 			// AUTH-04/H5：实际切换租户时清空已填字段（同值重选不动），防前租户输入残留
 			if (tenantId !== prevTenantIdRef.current) {
 				prevTenantIdRef.current = tenantId;
 				setValue('username', '');
-				setValue('email', '');
 				setValue('password', '');
 			}
 			setSelectedTenantId(tenantId);
@@ -738,19 +697,6 @@ export default function RegisterPage() {
 							error={errors.username?.message}
 						/>
 						{renderUsernameHint()}
-					</div>
-
-					<div className="space-y-2">
-						<Label htmlFor="email">{t('register.email')}</Label>
-						<Input
-							id="email"
-							type="email"
-							autoComplete="email"
-							placeholder={t('register.emailPlaceholder')}
-							{...register('email')}
-							error={errors.email?.message}
-						/>
-						{renderEmailHint()}
 					</div>
 
 					<div className="space-y-2">

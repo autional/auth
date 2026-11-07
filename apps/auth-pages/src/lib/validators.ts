@@ -42,7 +42,6 @@ export function createRegisterSchema(t: TFunction, policy?: PasswordPolicy, mode
 			.min(3, t('validation.usernameMinLength', { min: 3 }))
 			.max(32, t('validation.usernameMaxLength', { max: 32 }))
 			.regex(/^[a-zA-Z0-9_]+$/, t('validation.usernamePattern')),
-		email: z.string().min(1, t('validation.emailRequired')).email(t('validation.emailInvalid')),
 		password: createPasswordSchema(t, policy),
 		confirmPassword: z.string().min(1, t('validation.confirmPassword')),
 		agreeTerms: z.literal(true, {
