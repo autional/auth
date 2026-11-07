@@ -502,6 +502,7 @@
   "oauth.authorize.missingParams": "缺少必要的授权参数",
   "oauth.authorize.invalidResponse": "授权响应异常，未获取到跳转地址",
   "oauth.authorize.authorizeFailed": "授权失败，请稍后重试",
+  "oauth.authorize.tenantMismatchLoop": "当前账号与目标应用所属租户不一致，请使用该租户的账号登录",
   "oauth.error.invalidRequest": "请求参数无效，请返回应用重试",
   "oauth.error.invalidClient": "应用身份校验失败，请联系应用方",
   "oauth.error.unauthorizedClient": "该应用无权使用此授权方式",

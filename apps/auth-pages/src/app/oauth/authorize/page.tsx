@@ -7,6 +7,7 @@ import { getAccessToken, apiClient, extractItem, decodeJwtPayload, useAuthStore 
 import { getOAuthClient } from '@/lib/api.generated';
 import { authMe, PublicAuthConfigByAuthConfig } from '@autional/shared/generated/api';
 import { buildTenantLoginUrl, fetchTenantSlugByClientId } from '@/lib/oauth-cold-start';
+import { bumpRequireAuthLoop } from '@/lib/requireauth-loop-guard';
 import { oauthErrorText } from '@/lib/oauth-error-text';
 import { safeExternalUrl } from '@/lib/safe-url';
 import { useI18n } from '@/lib/i18n';
@@ -148,17 +149,32 @@ async function resolveLoginSlug(clientId: string, state: string): Promise<string
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// 会话租户 ≠ client 所属租户 → 清会话、以 RP 租户身份重登。
-	// 后端对 kind=idp 已有硬门（403），这里给用户可执行路径（否则只会停在错误卡上）。
+	// 跨租户会话守卫（2026-11-07 根因修复）。
+	//
+	// 是否允许「会话租户 ≠ 客户端租户」由服务端 CrossTenantAuthorizeBlocked 统一裁决：
+	//   - kind=idp（第一方联邦 RP）→ 严格同租户；
+	//   - 其它 kind → 仅当客户端注册回调不全在平台家族域时才拦截。
+	// 前端**不能**用裸 tenant 比较复刻该策略：第一方门户客户端（如用户中心）登记在平台
+	// 租户，而登录用户属于各自租户，裸比较会把正常登录判成跨租户 → 清会话 → 回登录页 →
+	// 再授权，形成无限往返（2026-11-07 线上实证，acme / beta 均复现）。
+	// 因此这里只对可判定的 kind=idp 提前引导（避免先看同意页再吃 403），其余交给服务端；
+	// 并用与 from_requireauth 相同的限次断路器兜底，任何策略漂移都不会变成静默死循环。
 	useEffect(() => {
 		if (sessionState !== 'ready') return;
+		if (clientKind !== 'idp') return;
 		if (!clientTenantId || !tenantId) return;
-		if (tenantId !== clientTenantId) {
-			useAuthStore.getState().clearAuth();
-			void redirectToLogin();
+		if (tenantId === clientTenantId) return;
+		const target = `authorize-tenant:${clientId}:${window.location.pathname}${window.location.search}`;
+		if (bumpRequireAuthLoop(target)) {
+			setError(
+				t('oauth.authorize.tenantMismatchLoop', '当前账号与目标应用所属租户不一致，请使用该租户的账号登录'),
+			);
+			return;
 		}
+		useAuthStore.getState().clearAuth();
+		void redirectToLogin();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [sessionState, clientTenantId, tenantId]);
+	}, [sessionState, clientTenantId, tenantId, clientKind, clientId]);
 
 	useEffect(() => {
 		if (!clientId) return;

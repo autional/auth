@@ -497,6 +497,7 @@
   "oauth.authorize.missingParams": "Missing required authorization parameters",
   "oauth.authorize.invalidResponse": "Authorization response error",
   "oauth.authorize.authorizeFailed": "Authorization failed. Please try again.",
+  "oauth.authorize.tenantMismatchLoop": "This account belongs to a different tenant than the requesting app. Sign in with an account from that tenant.",
   "oauth.error.invalidRequest": "Invalid request parameters. Please return to the application and try again",
   "oauth.error.invalidClient": "Application identity verification failed. Please contact the application",
   "oauth.error.unauthorizedClient": "This application is not allowed to use this authorization method",
