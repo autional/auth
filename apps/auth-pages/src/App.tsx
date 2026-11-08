@@ -9,6 +9,7 @@ import { AuthCard } from '@/components/auth/AuthCard';
 import { EntryRouter } from '@/components/EntryRouter';
 import { TenantIndexRedirect } from '@/components/TenantIndexRedirect';
 import { TenantSwitchChip } from '@/components/TenantSwitchChip';
+import { BareActivityRedirect } from '@/components/BareActivityRedirect';
 
 // Pages — route-level code splitting via React.lazy
 const LoginPage = lazy(() => import('./app/page'));
@@ -287,9 +288,11 @@ export default function App() {
 								<Route
 									path="/activity"
 									element={
-										<RequireAuth>
-											<ActivityPage />
-										</RequireAuth>
+										<BareActivityRedirect>
+											<RequireAuth>
+												<ActivityPage />
+											</RequireAuth>
+										</BareActivityRedirect>
 									}
 								/>
 								<Route
@@ -304,9 +307,11 @@ export default function App() {
 								<Route
 									path="/security"
 									element={
-										<RequireAuth>
-											<Navigate to="/activity" replace />
-										</RequireAuth>
+										<BareActivityRedirect>
+											<RequireAuth>
+												<Navigate to="/activity" replace />
+											</RequireAuth>
+										</BareActivityRedirect>
 									}
 								/>
 								<Route
