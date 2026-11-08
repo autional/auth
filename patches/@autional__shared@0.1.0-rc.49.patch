@@ -1,0 +1,15 @@
+diff --git a/src/auth/roles.ts b/src/auth/roles.ts
+index 9714a74137c4ac058e0b17c7519b1f32a96c6483..4655c5bba387cc376d4ea1f23421cab1bfeb9c49 100644
+--- a/src/auth/roles.ts
++++ b/src/auth/roles.ts
+@@ -36,6 +36,10 @@ const AUTH_ROUTE_RESERVED = new Set([
+ 	'recover-account',
+ 	'account-deletion',
+ 	'verify-identity',
++	// auth 站裸路由：/activity（原 /security 改名的活动页）与 /security（旧路径重定向）。
++	// 缺这两段会把首段当租户 slug，生成 /activity/login、/security/login → 未知租户页。
++	'activity',
++	'security',
+ ]);
+ 
+ /**

@@ -11,6 +11,9 @@ overrides:
 
 packageExtensionsChecksum: sha256-uSt4CA8OBbjAXZtRdRtmFVURmLPASsR7UPD1Q1WDGDs=
 
+patchedDependencies:
+  '@autional/shared@0.1.0-rc.49': 8c9f39380583d1004e0b0de520228ae4b6b01e21e4dd671ca3e9253fbacd4421
+
 importers:
 
   .:
@@ -53,7 +56,7 @@ importers:
     dependencies:
       '@autional/shared':
         specifier: 0.1.0-rc.49
-        version: 0.1.0-rc.49(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))
+        version: 0.1.0-rc.49(patch_hash=8c9f39380583d1004e0b0de520228ae4b6b01e21e4dd671ca3e9253fbacd4421)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))
       '@autional/tailwind-preset':
         specifier: 0.1.0-rc.10
         version: 0.1.0-rc.10(tailwindcss@3.4.19)
@@ -3489,7 +3492,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@autional/shared@0.1.0-rc.49(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))':
+  '@autional/shared@0.1.0-rc.49(patch_hash=8c9f39380583d1004e0b0de520228ae4b6b01e21e4dd671ca3e9253fbacd4421)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@tanstack/react-query': 5.100.9(react@19.2.5)
