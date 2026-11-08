@@ -9,6 +9,7 @@ import { loginWithTokens } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
+import { processPasswordForTransmission } from '@/lib/password-transmission';
 import { useI18n } from '@/lib/i18n';
 import { useCountdown } from '@/hooks/use-countdown';
 import type { AuthConfig } from '@/hooks/use-tenant-auth-config';
@@ -84,10 +85,28 @@ export default function PhoneCodeLoginForm({
 			let res: any;
 
 			if (mode === 'register') {
+				const transmissionMode = authConfig?.passwordPolicy?.passwordTransmission;
+				const tenantIdForTransmission = authConfig?.tenantId || tenantId || '';
+				const serverNonce = (authConfig as any)?.transmissionNonce;
+				const publicKey = (authConfig as any)?.transmissionPublicKey;
+				const serverData = transmissionMode === 'asymmetric' ? publicKey : serverNonce;
+				let transmissionResult;
+				try {
+					transmissionResult = await processPasswordForTransmission(
+						password,
+						transmissionMode,
+						tenantIdForTransmission,
+						serverData,
+					);
+				} catch {
+					setError(t('register.passwordPrepFailed') || '密码预处理失败');
+					return;
+				}
 				const registerPayload: Record<string, unknown> = {
 					phone: normalizedPhone,
 					code: code.trim(),
-					password,
+					password: transmissionResult.password,
+					passwordTransmission: transmissionResult.passwordTransmission,
 					tenantId,
 				};
 				// P0-05: Include captcha fields if provided
@@ -101,7 +120,8 @@ export default function PhoneCodeLoginForm({
 				const loginPayload: Record<string, unknown> = {
 					phone: normalizedPhone,
 					code: code.trim(),
-					registerIfNew: true,
+					// 新用户走显式 code 注册（带 username/password）；登录失败返回 can_register，不静默建号。
+					registerIfNew: false,
 					tenantId,
 				};
 				// P0-05: Include captcha fields if provided
