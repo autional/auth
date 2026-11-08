@@ -24,6 +24,20 @@ const ORIGIN = rawOrigin.replace(/\/+$/, '');
 const NO_CACHE = 'public, max-age=0, must-revalidate';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
+/**
+ * 基础安全响应头（与 sites/secret 等门户同款最小集）。
+ *
+ * 暂不加 CSP：vite 的 inlineEnvPlugin 会把 env.js 内联成内联 <script>，
+ * 严格 script-src 'self' 会直接打挂首屏；要加 CSP 需先改 nonce/hash 或外链，
+ * 单独排期（见 auth-portal RCA §4）。
+ */
+const SECURITY_HEADERS = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },
+];
+
 const spaFallback: Rewrite = {
   source: '/(.*)',
   destination: '/index.html',
@@ -36,6 +50,7 @@ export const config: VercelConfig = {
   buildCommand: 'pnpm --filter @autional/auth-pages... build',
   outputDirectory: 'apps/auth-pages/dist',
   headers: [
+    routes.header('/(.*)', SECURITY_HEADERS),
     routes.header('/assets/(.*)', [{ key: 'Cache-Control', value: IMMUTABLE }]),
     routes.header('/workbox-(.*).js', [{ key: 'Cache-Control', value: IMMUTABLE }]),
     routes.header('/', [{ key: 'Cache-Control', value: NO_CACHE }]),
