@@ -18,6 +18,7 @@ import { registerNonTenantSegments } from '@autional/shared';
 export const NON_TENANT_SEGMENTS = [
 	'account',
 	'account-deletion',
+	'activity',
 	'dashboard',
 	'error',
 	'login',
@@ -31,6 +32,7 @@ export const NON_TENANT_SEGMENTS = [
 	'privacy',
 	'reapply',
 	'reset-password',
+	'security',
 	'terms',
 	'verify-email',
 	'verify-identity',
