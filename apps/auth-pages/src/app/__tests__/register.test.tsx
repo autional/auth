@@ -64,6 +64,7 @@ const mockAuthRegisterCheckUsername = vi.fn();
 const mockAuthRegisterCheckEmail = vi.fn();
 const mockAuthLoginPost = vi.fn();
 const mockAuthMeConsentPost = vi.fn();
+const mockAuthMagicLinkRequestPost = vi.fn();
 const mockCompliancePublicLegalDocuments = vi.fn();
 
 vi.mock('@autional/shared/generated/api', async (importOriginal) => {
@@ -75,6 +76,7 @@ vi.mock('@autional/shared/generated/api', async (importOriginal) => {
 		authRegisterCheckEmailPost: (...args: any[]) => mockAuthRegisterCheckEmail(...args),
 		authLoginPost: (...args: any[]) => mockAuthLoginPost(...args),
 		authMeConsentPost: (...args: any[]) => mockAuthMeConsentPost(...args),
+		authMagicLinkRequestPost: (...args: any[]) => mockAuthMagicLinkRequestPost(...args),
 		compliancePublicLegalDocuments: (...args: any[]) => mockCompliancePublicLegalDocuments(...args),
 	};
 });
@@ -121,10 +123,11 @@ describe('RegisterPage', () => {
 	it('renders registration form fields', () => {
 		renderRegister();
 		expect(screen.getByPlaceholderText('register.usernamePlaceholder')).toBeInTheDocument();
-		expect(screen.getByPlaceholderText('register.emailPlaceholder')).toBeInTheDocument();
 		expect(screen.getByPlaceholderText('register.passwordPlaceholder')).toBeInTheDocument();
 		expect(screen.getByPlaceholderText('register.confirmPasswordPlaceholder')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'register.submit' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'auth.register.passwordTab' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'auth.register.emailCodeTab' })).toBeInTheDocument();
 	});
 
 	it('shows validation error for short password', async () => {
@@ -169,7 +172,6 @@ describe('RegisterPage', () => {
 		const user = userEvent.setup();
 		renderRegister();
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
-		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
@@ -191,7 +193,6 @@ describe('RegisterPage', () => {
 		const user = userEvent.setup();
 		renderRegister();
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
-		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
@@ -226,7 +227,6 @@ describe('RegisterPage', () => {
 		const user = userEvent.setup();
 		renderRegister();
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
-		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
@@ -277,7 +277,6 @@ describe('RegisterPage', () => {
 		const user = userEvent.setup();
 		renderRegister();
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
-		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
@@ -307,7 +306,6 @@ describe('RegisterPage', () => {
 		const user = userEvent.setup();
 		renderRegister();
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
-		await user.type(screen.getByPlaceholderText('register.emailPlaceholder'), 'new@example.com');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
 		await user.click(screen.getByRole('checkbox'));
@@ -320,12 +318,15 @@ describe('RegisterPage', () => {
 		expect(screen.queryByText('invitation invalid')).toBeNull();
 	});
 
-	// WS-G AC-G4（AUTH-01）：email 查重必须带地址栏租户，与注册同租户。
-	it('AC-G4: check-email carries the address-bar tenant', async () => {
+	// WS-G AC-G4（AUTH-01）：邮箱注册链路必须带地址栏租户。
+	// 2026-11-08：密码注册改为 username-first（无 email 字段），邮箱链路移到 magic-link 页签；
+	// 原 check-email 断言随字段移除，改为验证 magic-link 请求的 tenant_id。
+	it('AC-G4: magic-link request carries the address-bar tenant', async () => {
 		mockUseTenantAuthConfigBySlug.mockReturnValue({
 			data: { tenantId: 'tenant-slug-1' },
 			isLoading: false,
 		});
+		mockAuthMagicLinkRequestPost.mockResolvedValue({});
 
 		render(
 			<QueryClientProvider client={queryClient}>
@@ -337,14 +338,16 @@ describe('RegisterPage', () => {
 			</QueryClientProvider>,
 		);
 
-		fireEvent.change(screen.getByPlaceholderText('register.emailPlaceholder'), {
+		fireEvent.click(screen.getByRole('button', { name: 'auth.register.magicLinkTab' }));
+		fireEvent.change(screen.getByPlaceholderText('user@example.com'), {
 			target: { value: 'slug@example.com' },
 		});
+		fireEvent.click(screen.getByRole('button', { name: 'magicLink.send' }));
 
 		await waitFor(() => {
-			expect(mockAuthRegisterCheckEmail).toHaveBeenCalledWith({
+			expect(mockAuthMagicLinkRequestPost).toHaveBeenCalledWith({
 				email: 'slug@example.com',
-				tenantId: 'tenant-slug-1',
+				tenant_id: 'tenant-slug-1',
 			});
 		});
 	});

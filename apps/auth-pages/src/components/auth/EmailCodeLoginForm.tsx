@@ -73,6 +73,7 @@ export default function EmailCodeLoginForm({
 			return;
 		}
 		if (mode === 'register' && password.length < 8) {
+			// i18n-exempt: validation.passwordMinLength 在 zh/en bundle 齐备；fallback 防失键（插值形态不被默认值正则识别）
 			setError(t('validation.passwordMinLength', { min: 8 }) || '密码至少 8 位');
 			return;
 		}
