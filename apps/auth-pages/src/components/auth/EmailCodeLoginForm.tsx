@@ -9,6 +9,7 @@ import { loginWithTokens } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
+import { processPasswordForTransmission } from '@/lib/password-transmission';
 import { useI18n } from '@/lib/i18n';
 import { useCountdown } from '@/hooks/use-countdown';
 import type { AuthConfig } from '@/hooks/use-tenant-auth-config';
@@ -39,6 +40,7 @@ export default function EmailCodeLoginForm({
 	const redirect = searchParams.get('redirect');
 	const [email, setEmail] = useState('');
 	const [code, setCode] = useState('');
+	const [password, setPassword] = useState('');
 	const [step, setStep] = useState<'email' | 'code'>('email');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
@@ -70,15 +72,38 @@ export default function EmailCodeLoginForm({
 			setError(t('auth.emailCode.codeRequired') || '请输入验证码');
 			return;
 		}
+		if (mode === 'register' && password.length < 8) {
+			setError(t('validation.passwordMinLength', { min: 8 }) || '密码至少 8 位');
+			return;
+		}
 		setLoading(true);
 		setError('');
 		try {
 			let res: any;
 
 			if (mode === 'register') {
+				const transmissionMode = authConfig?.passwordPolicy?.passwordTransmission;
+				const tenantIdForTransmission = authConfig?.tenantId || tenantId || '';
+				const serverNonce = (authConfig as any)?.transmissionNonce;
+				const publicKey = (authConfig as any)?.transmissionPublicKey;
+				const serverData = transmissionMode === 'asymmetric' ? publicKey : serverNonce;
+				let transmissionResult;
+				try {
+					transmissionResult = await processPasswordForTransmission(
+						password,
+						transmissionMode,
+						tenantIdForTransmission,
+						serverData,
+					);
+				} catch {
+					setError(t('register.passwordPrepFailed') || '密码预处理失败');
+					return;
+				}
 				const registerPayload: Record<string, unknown> = {
 					email: email.trim(),
 					code: code.trim(),
+					password: transmissionResult.password,
+					passwordTransmission: transmissionResult.passwordTransmission,
 					tenantId,
 				};
 				// P0-05: Include captcha fields if provided
@@ -92,7 +117,8 @@ export default function EmailCodeLoginForm({
 				const loginPayload: Record<string, unknown> = {
 					email: email.trim(),
 					code: code.trim(),
-					registerIfNew: true,
+					// 新用户走显式 code 注册（带 username/password）；登录失败返回 can_register，不静默建号。
+					registerIfNew: false,
 					tenantId,
 				};
 				// P0-05: Include captcha fields if provided
@@ -191,6 +217,19 @@ export default function EmailCodeLoginForm({
 							onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
 						/>
 					</div>
+					{mode === 'register' && (
+						<div className="space-y-2">
+							<Label htmlFor="email-code-password">{t('register.password') || '密码'}</Label>
+							<Input
+								id="email-code-password"
+								type="password"
+								autoComplete="new-password"
+								placeholder={t('register.passwordPlaceholder') || '设置密码'}
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+							/>
+						</div>
+					)}
 					<div className="flex gap-2">
 						<Button variant="outline" onClick={handleSendCode} disabled={isActive} fullWidth>
 							{isActive
