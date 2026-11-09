@@ -527,6 +527,8 @@
   "qrLogin.steps": "Open Authenticator App → Scan QR code → Confirm sign in",
   "qrLogin.scanned": "QR code scanned",
   "qrLogin.scannedHint": "Confirm the match number on your phone to approve",
+  "qrLogin.mobileHint": "You can't scan this screen with the same phone. Use password sign-in, or open this page on a computer.",
+  "qrLogin.networkRetry": "Network issue, retrying…",
   "qrLogin.cancel": "Cancel",
   "qrLogin.success": "Sign in successful. Redirecting...",
   "qrLogin.retry": "Retry",

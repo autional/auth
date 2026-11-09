@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import React from 'react';
 
@@ -167,6 +167,44 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 		// 撤销失败（网络）也照常回到 init
 		expect(screen.getByRole('button', { name: 'qrLogin.getCode' })).toBeInTheDocument();
 	}, 10000);
+
+	it('小屏提示：面板给出「手机扫不了自己」的替代路径', () => {
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+		expect(screen.getByText('qrLogin.mobileHint')).toBeInTheDocument();
+	});
+
+	it('轮询连续失败 3 次 → 显示网络重试提示', async () => {
+		vi.useFakeTimers();
+		try {
+			vi.mocked(authQrLoginStatus).mockRejectedValue(new Error('net'));
+
+			render(
+				<MemoryRouter initialEntries={['/demo/login']}>
+					<Routes>
+						<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+					</Routes>
+				</MemoryRouter>,
+			);
+
+			fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(0);
+			});
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(7000);
+			});
+
+			expect(screen.getByText('qrLogin.networkRetry')).toBeInTheDocument();
+		} finally {
+			vi.useRealTimers();
+		}
+	}, 15000);
 
 	it('带 tenantId prop：发起 body 与锚定租户均取地址栏租户', async () => {
 		render(

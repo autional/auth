@@ -532,6 +532,8 @@
   "qrLogin.steps": "打开 Authenticator App → 扫描登录二维码 → 确认登录",
   "qrLogin.scanned": "二维码已扫描",
   "qrLogin.scannedHint": "请在手机上确认匹配数字后批准登录",
+  "qrLogin.mobileHint": "手机无法扫描本机屏幕；请改用密码登录，或在电脑上打开本页扫码",
+  "qrLogin.networkRetry": "网络异常，正在重试…",
   "qrLogin.cancel": "取消",
   "qrLogin.success": "登录成功，正在跳转...",
   "qrLogin.retry": "重新获取",

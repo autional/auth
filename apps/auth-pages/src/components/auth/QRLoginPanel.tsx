@@ -39,6 +39,8 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const [numberMatching, setNumberMatching] = useState('');
 	const [status, setStatus] = useState<'init' | 'pending' | 'scanned' | 'success' | 'error'>('init');
 	const [error, setError] = useState('');
+	/** 轮询连续失败（网络抖动）→ 给可见提示，而不是静默等到过期。 */
+	const [pollError, setPollError] = useState(false);
 	const {
 		seconds,
 		start: startCountdown,
@@ -56,6 +58,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 				});
 		}
 		setStatus('init');
+		setPollError(false);
 		if (pollRef.current) clearInterval(pollRef.current);
 		resetCountdown();
 	};
@@ -63,6 +66,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const initiateQR = async () => {
 		setLoading(true);
 		setError('');
+		setPollError(false);
 		try {
 			const data = await authQrLoginInitiatePost(tenantId ? { tenantId } : undefined);
 			// 拦截器已解包信封并转 camelCase（AUTH-17 同族）
@@ -85,10 +89,13 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 
 	const startPolling = (token: string) => {
 		if (pollRef.current) clearInterval(pollRef.current);
+		let failures = 0;
 		pollRef.current = setInterval(async () => {
 			try {
 				const data = await authQrLoginStatus({ token });
 				const st = data?.status || '';
+				failures = 0;
+				setPollError(false);
 
 				if (st === 'confirmed' && data?.accessToken) {
 					loginWithTokens(
@@ -120,7 +127,9 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					if (pollRef.current) clearInterval(pollRef.current);
 				}
 			} catch {
-				// 静默忽略轮询错误
+				// 连续失败（≥3 次 ≈ 6s）才提示，避免瞬时抖动闪烁
+				failures += 1;
+				if (failures >= 3) setPollError(true);
 			}
 		}, 2000);
 	};
@@ -142,6 +151,12 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 
 	return (
 		<div className="space-y-4">
+			{status !== 'success' && (
+				<div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-warning-text sm:hidden">
+					{t('qrLogin.mobileHint')}
+				</div>
+			)}
+
 			{status === 'init' && (
 				<div className="text-center space-y-4">
 					<p className="text-sm text-[var(--color-text-secondary)]">{t('qrLogin.instruction')}</p>
@@ -187,6 +202,10 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 						{t('qrLogin.cancel')}
 					</Button>
 				</div>
+			)}
+
+			{(status === 'pending' || status === 'scanned') && pollError && (
+				<p className="text-center text-xs text-danger-text">{t('qrLogin.networkRetry')}</p>
 			)}
 
 			{status === 'success' && (
