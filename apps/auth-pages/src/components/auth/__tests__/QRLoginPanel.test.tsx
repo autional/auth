@@ -22,9 +22,12 @@ vi.mock('@/lib/post-login-redirect', () => ({
 	getPostLoginTarget: vi.fn(() => '/demo/dashboard'),
 }));
 
+const { mockApiPost } = vi.hoisted(() => ({ mockApiPost: vi.fn() }));
+
 vi.mock('@autional/shared', async (importOriginal) => ({
 	...(await importOriginal<typeof import('@autional/shared')>()),
 	loginWithTokens: vi.fn(),
+	apiClient: { post: (...args: unknown[]) => mockApiPost(...args) },
 }));
 
 vi.mock('@autional/shared/generated/api', () => ({
@@ -58,6 +61,8 @@ import {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	mockApiPost.mockReset();
+	mockApiPost.mockResolvedValue({});
 	vi.mocked(authQrLoginInitiatePost).mockResolvedValue({
 		sessionToken: 'tok-1',
 		numberMatching: '42',
@@ -130,6 +135,38 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 			{ timeout: 8000 },
 		);
 	}, 12000);
+
+	it('点取消 → 调用公开 revoke；撤销请求失败也照常本地取消', async () => {
+		vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'pending' } as any);
+		mockApiPost.mockRejectedValue(new Error('network'));
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+		await waitFor(
+			() => {
+				expect(screen.getByRole('button', { name: 'qrLogin.cancel' })).toBeInTheDocument();
+			},
+			{ timeout: 5000 },
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.cancel' }));
+
+		await waitFor(() => {
+			expect(mockApiPost).toHaveBeenCalledWith(
+				'/identity/api/v1/auth/qr-login/revoke',
+				{ token: 'tok-1' },
+			);
+		});
+		// 撤销失败（网络）也照常回到 init
+		expect(screen.getByRole('button', { name: 'qrLogin.getCode' })).toBeInTheDocument();
+	}, 10000);
 
 	it('带 tenantId prop：发起 body 与锚定租户均取地址栏租户', async () => {
 		render(

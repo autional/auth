@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
-import { loginWithTokens } from '@autional/shared';
+import { apiClient, loginWithTokens } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { authQrLoginInitiatePost, authQrLoginStatus } from '@autional/shared/generated/api';
@@ -39,8 +39,26 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const [numberMatching, setNumberMatching] = useState('');
 	const [status, setStatus] = useState<'init' | 'pending' | 'scanned' | 'success' | 'error'>('init');
 	const [error, setError] = useState('');
-	const { seconds, start: startCountdown, reset: resetCountdown } = useCountdown({ duration: 300 });
+	const {
+		seconds,
+		start: startCountdown,
+		reset: resetCountdown,
+	} = useCountdown({ duration: 300 });
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+	/** 取消 = 本地复位 + 通知服务端撤销（公开接口，token 即能力；失败静默兼容旧后端）。 */
+	const cancelSession = () => {
+		if (sessionToken) {
+			void apiClient
+				.post('/identity/api/v1/auth/qr-login/revoke', { token: sessionToken })
+				.catch(() => {
+					/* 撤销失败不阻断本地取消：会话仍受 5 分钟 TTL 约束 */
+				});
+		}
+		setStatus('init');
+		if (pollRef.current) clearInterval(pollRef.current);
+		resetCountdown();
+	};
 
 	const initiateQR = async () => {
 		setLoading(true);
@@ -145,15 +163,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 						<MatchNumberCard label={t('qrLogin.matchNumber')} value={numberMatching} />
 					)}
 					<p className="text-sm text-[var(--color-text-secondary)]">{t('qrLogin.steps')}</p>
-					<Button
-						variant="outline"
-						fullWidth
-						onClick={() => {
-							setStatus('init');
-							if (pollRef.current) clearInterval(pollRef.current);
-							resetCountdown();
-						}}
-					>
+					<Button variant="outline" fullWidth onClick={cancelSession}>
 						{t('qrLogin.cancel')}
 					</Button>
 				</div>
@@ -173,15 +183,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					<p className="text-xs text-[var(--color-text-muted)]">
 						{t('qrLogin.countdown', { countdown: seconds })}
 					</p>
-					<Button
-						variant="outline"
-						fullWidth
-						onClick={() => {
-							setStatus('init');
-							if (pollRef.current) clearInterval(pollRef.current);
-							resetCountdown();
-						}}
-					>
+					<Button variant="outline" fullWidth onClick={cancelSession}>
 						{t('qrLogin.cancel')}
 					</Button>
 				</div>
