@@ -250,6 +250,7 @@
   "error.sso_provider_not_configured": "SSO sign-in is not configured for this organization yet",
   "error.invalid_request": "Invalid request parameters. Please try again",
   "error.unauthorized": "Unauthorized. Please sign in first",
+  "error.auth.identity_not_verified": "Your email or phone number is not verified yet. Verify it first, then sign in",
   "error.membership_pending": "Your membership request is awaiting administrator approval",
   "error.invitation_invalid": "The invitation is invalid or has expired",
   "error.tenant_inactive": "This tenant is inactive. Please contact your administrator",

@@ -255,6 +255,7 @@
   "error.sso_provider_not_configured": "该企业尚未配置 SSO 登录方式",
   "error.invalid_request": "请求参数无效，请重试",
   "error.unauthorized": "未授权，请先登录",
+  "error.auth.identity_not_verified": "该账号的邮箱或手机号尚未完成验证，请先验证后再登录",
   "error.membership_pending": "您的加入申请正在等待管理员审批",
   "error.invitation_invalid": "邀请无效或已过期",
   "error.tenant_inactive": "该租户已停用，请联系管理员",
