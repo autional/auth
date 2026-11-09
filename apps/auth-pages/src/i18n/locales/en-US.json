@@ -525,6 +525,8 @@
   "qrLogin.countdown": "Scan within {{countdown}}s",
   "qrLogin.matchNumber": "Match Number",
   "qrLogin.steps": "Open Authenticator App → Scan QR code → Confirm sign in",
+  "qrLogin.scanned": "QR code scanned",
+  "qrLogin.scannedHint": "Confirm the match number on your phone to approve",
   "qrLogin.cancel": "Cancel",
   "qrLogin.success": "Sign in successful. Redirecting...",
   "qrLogin.retry": "Retry",

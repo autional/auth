@@ -100,7 +100,37 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 		expect(rt).toBe('rt-1');
 	}, 10000);
 
-	// 地址栏租户是发起会话与会话锚定两处的权威（Wave 1）。
+	it('手机已扫码（scanned）→ 桌面切到「已扫描」提示，并继续轮询到成功', async () => {
+		vi.mocked(authQrLoginStatus)
+			.mockResolvedValueOnce({ status: 'scanned', numberMatching: '42' } as any)
+			.mockResolvedValue({ status: 'confirmed', accessToken: 'at-9', refreshToken: 'rt-9' } as any);
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+
+		await waitFor(
+			() => {
+				expect(screen.getByText('qrLogin.scanned')).toBeInTheDocument();
+			},
+			{ timeout: 5000 },
+		);
+
+		// scanned 不是终态：轮询继续，confirmed 后进入成功态
+		await waitFor(
+			() => {
+				expect(screen.getByText('qrLogin.success')).toBeInTheDocument();
+			},
+			{ timeout: 8000 },
+		);
+	}, 12000);
+
 	it('带 tenantId prop：发起 body 与锚定租户均取地址栏租户', async () => {
 		render(
 			<MemoryRouter initialEntries={['/demo/login']}>

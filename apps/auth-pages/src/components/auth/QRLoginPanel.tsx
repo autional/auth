@@ -18,6 +18,16 @@ interface QRLoginPanelProps {
 	tenantId?: string;
 }
 
+/** 数字匹配卡片（pending / scanned 两个状态共用）。 */
+function MatchNumberCard({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded-lg border border-brand/30 bg-brand/10 p-3">
+			<p className="text-xs text-[var(--color-text-secondary)] mb-1">{label}</p>
+			<span className="text-2xl font-bold tracking-widest text-brand-text">{value}</span>
+		</div>
+	);
+}
+
 export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const { t } = useI18n();
 	const { tenantSlug } = useParams();
@@ -27,7 +37,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const [qrCode, setQrCode] = useState('');
 	const [sessionToken, setSessionToken] = useState('');
 	const [numberMatching, setNumberMatching] = useState('');
-	const [status, setStatus] = useState<'init' | 'pending' | 'success' | 'error'>('init');
+	const [status, setStatus] = useState<'init' | 'pending' | 'scanned' | 'success' | 'error'>('init');
 	const [error, setError] = useState('');
 	const { seconds, start: startCountdown, reset: resetCountdown } = useCountdown({ duration: 300 });
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -79,6 +89,9 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					setTimeout(() => {
 						window.location.href = getPostLoginTarget({ tenantSlug, redirect });
 					}, 500);
+				} else if (st === 'scanned') {
+					// 手机已扫码待确认（认证器进入审批页即标记）：给桌面端明确反馈
+					setStatus('scanned');
 				} else if (st === 'cancelled') {
 					setStatus('error');
 					setError(t('qrLogin.cancelled'));
@@ -102,7 +115,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 
 	// QR code expired: countdown reached 0
 	useEffect(() => {
-		if (seconds <= 0 && status === 'pending') {
+		if (seconds <= 0 && (status === 'pending' || status === 'scanned')) {
 			setStatus('error');
 			setError(t('qrLogin.expired'));
 			if (pollRef.current) clearInterval(pollRef.current);
@@ -129,16 +142,37 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 						</p>
 					</div>
 					{numberMatching && (
-						<div className="rounded-lg border border-brand/30 bg-brand/10 p-3">
-							<p className="text-xs text-[var(--color-text-secondary)] mb-1">
-								{t('qrLogin.matchNumber')}
-							</p>
-							<span className="text-2xl font-bold tracking-widest text-brand-text">
-								{numberMatching}
-							</span>
-						</div>
+						<MatchNumberCard label={t('qrLogin.matchNumber')} value={numberMatching} />
 					)}
 					<p className="text-sm text-[var(--color-text-secondary)]">{t('qrLogin.steps')}</p>
+					<Button
+						variant="outline"
+						fullWidth
+						onClick={() => {
+							setStatus('init');
+							if (pollRef.current) clearInterval(pollRef.current);
+							resetCountdown();
+						}}
+					>
+						{t('qrLogin.cancel')}
+					</Button>
+				</div>
+			)}
+
+			{status === 'scanned' && (
+				<div className="text-center space-y-4">
+					<div className="rounded-lg border border-success/30 bg-success/10 p-4">
+						<p className="text-sm font-medium text-success-text">{t('qrLogin.scanned')}</p>
+						<p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+							{t('qrLogin.scannedHint')}
+						</p>
+					</div>
+					{numberMatching && (
+						<MatchNumberCard label={t('qrLogin.matchNumber')} value={numberMatching} />
+					)}
+					<p className="text-xs text-[var(--color-text-muted)]">
+						{t('qrLogin.countdown', { countdown: seconds })}
+					</p>
 					<Button
 						variant="outline"
 						fullWidth

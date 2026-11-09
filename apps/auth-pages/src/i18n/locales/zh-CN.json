@@ -530,6 +530,8 @@
   "qrLogin.countdown": "请在 {{countdown}}s 内扫描",
   "qrLogin.matchNumber": "匹配数字",
   "qrLogin.steps": "打开 Authenticator App → 扫描登录二维码 → 确认登录",
+  "qrLogin.scanned": "二维码已扫描",
+  "qrLogin.scannedHint": "请在手机上确认匹配数字后批准登录",
   "qrLogin.cancel": "取消",
   "qrLogin.success": "登录成功，正在跳转...",
   "qrLogin.retry": "重新获取",
