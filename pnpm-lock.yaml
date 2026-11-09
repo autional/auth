@@ -52,8 +52,8 @@ importers:
   apps/auth-pages:
     dependencies:
       '@autional/shared':
-        specifier: 0.1.0-rc.50
-        version: 0.1.0-rc.50(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))
+        specifier: 0.1.0-rc.51
+        version: 0.1.0-rc.51(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))
       '@autional/tailwind-preset':
         specifier: 0.1.0-rc.10
         version: 0.1.0-rc.10(tailwindcss@3.4.19)
@@ -200,8 +200,8 @@ packages:
       eslint: '>=9.0.0'
       typescript-eslint: '>=8.0.0'
 
-  '@autional/shared@0.1.0-rc.50':
-    resolution: {integrity: sha512-BB5Ga0CCPPexGECpl2jNh7Z3syoy3X+SP6bBfTbFfJx8YGCthk5LV/PmaNxGDh8B3yNGDQwW0/pC4PD7OaFGbw==}
+  '@autional/shared@0.1.0-rc.51':
+    resolution: {integrity: sha512-IUJWBUdlDPENDbzJ67eGsE+df2dR5MhV6DMJZWkx7WQGXjUl0mi0uP8RjsKJFcSkK7puvZRchTJEzUxjmzCjoQ==}
     peerDependencies:
       react: 19.2.5
       react-dom: 19.2.5
@@ -1696,10 +1696,6 @@ packages:
     resolution: {integrity: sha512-mCuXncKXk5iCLhfhwTc0izo0gtEmpz5CtG2y8GiOINBlMVS6v8TMRc5TaLWKS6692m9+dVVfzgeVxR5UxWHTYw==}
     engines: {node: '>=12'}
 
-  chalk@4.0.0:
-    resolution: {integrity: sha512-N9oWFcegS0sFr9oh1oz2d7Npos6vNoWW9HvtCg5N1KRFpUhaAhvTv5Y58g880fZaEYSNm3qDz8SU1UrGvp+n7A==}
-    engines: {node: '>=10'}
-
   chalk@4.1.0:
     resolution: {integrity: sha512-qwx12AxXe2Q5xQ43Ac//I6v5aXTipYrSESdOgzrN+9XjgEpyjpKuvSGaN4qE93f7TQTlerQQ8S+EQ0EyDoVL1A==}
     engines: {node: '>=10'}
@@ -2116,6 +2112,7 @@ packages:
   glob@11.0.1:
     resolution: {integrity: sha512-zrQDm8XPnYEKawJScsnM0QzobJxlT/kHOOlRTio8IH/GrmxRE5fjllkzdaHclIuNjUQTJYH2xHNIGfdpJkDJUw==}
     engines: {node: 20 || >=22}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@13.0.6:
@@ -3489,7 +3486,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@autional/shared@0.1.0-rc.50(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))':
+  '@autional/shared@0.1.0-rc.51(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(use-sync-external-store@1.7.0(react@19.2.5))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@tanstack/react-query': 5.100.9(react@19.2.5)
@@ -4383,7 +4380,7 @@ snapshots:
       '@types/istanbul-reports': 3.0.4
       '@types/node': 26.1.2
       '@types/yargs': 16.0.11
-      chalk: 4.0.0
+      chalk: 4.1.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -4460,7 +4457,7 @@ snapshots:
   '@rollup/plugin-replace@6.0.3(rollup@4.63.5)':
     dependencies:
       '@rollup/pluginutils': 5.4.0(rollup@4.63.5)
-      magic-string: 0.30.17
+      magic-string: 0.30.21
     optionalDependencies:
       rollup: 4.63.5
 
@@ -5070,11 +5067,6 @@ snapshots:
       deep-eql: 5.0.2
       loupe: 3.2.1
       pathval: 2.0.1
-
-  chalk@4.0.0:
-    dependencies:
-      ansi-styles: 4.3.0
-      supports-color: 7.2.0
 
   chalk@4.1.0:
     dependencies:
