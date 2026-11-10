@@ -1,5 +1,10 @@
 # Autional 身份认证
 
+> 🚨 **2026-11-10 托管变更**：`*.autional.cn` **已迁出 Vercel** —— 改为 mf01 构建（node:24-alpine + 钉版 pnpm）→ 香港自建托管。
+> `.cn` 的构建 env 由 workspace `shared/infra-ops/sites/sites.manifest.json` 注入；push 后由 mf01 cron（约 10 分钟）构建发布，不经 Vercel。
+> `*.autional.com` 仍在 Vercel —— 本文中涉及 Vercel 的构建/部署描述对 `.com` 仍然成立。
+> 现行口径：workspace `docs/AUTIONAL-CN-SITES-SELF-HOST.md`。
+
 **域名**：[auth.autional.cn](https://auth.autional.cn)（cn）· [auth.autional.com](https://auth.autional.com)（com）
 **技术栈**：Vite + React 19 + TypeScript + Tailwind CSS
 **仓库**：[github.com/autional/auth](https://github.com/autional/auth)
@@ -17,8 +22,8 @@ pnpm test     # Vitest 单元测试
 
 ## 部署（单源双区）
 
-`main` → `auth`（com）自动部署；`main` → `cn-auth`（cn）自动部署。两区**同一份源码**，
-区域差异全部由 Vercel 项目环境变量在构建期注入（见 `docs/positioning/24`）：
+`main` → `auth`（com）自动部署（Vercel）；`main` → `cn-auth`（cn）由 mf01 cron 构建发布（约 10 分钟，不经 Vercel）。两区**同一份源码**，
+区域差异全部由**构建期环境变量**注入（`.com` 来自 Vercel 项目 env；`.cn` 来自 `shared/infra-ops/sites/sites.manifest.json`）（见 `docs/positioning/24`）：
 
 | 变量 | com | cn |
 | --- | --- | --- |
