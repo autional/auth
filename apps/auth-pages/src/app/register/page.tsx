@@ -13,10 +13,10 @@ import {
 	tenantPublicTenants,
 	authCaptchaChallenge,
 } from '@autional/shared/generated/api';
-import { registerAccount } from '@/lib/api-tenant';
+import { registerAccount, sendVerificationEmail } from '@/lib/api-tenant';
 import { checkPasswordBreached } from '@/lib/breach-check';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
-import { loadAuthExtras } from '@/lib/api';
+import { loadAuthExtras, registerByInvitation } from '@/lib/api';
 import { loginWithTokens, bffLogin, isBFFAvailable, useAuthStore, navigateTo } from '@autional/shared';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { processPasswordForTransmission } from '@/lib/password-transmission';
@@ -162,6 +162,10 @@ export default function RegisterPage() {
 	const [usernameStatus, setUsernameStatus] = useState<CheckStatus>('idle');	const [registrationSuccess, setRegistrationSuccess] = useState(false);
 	// WS-G / AUTH-02：审批制租户新注册 → membership_status=pending；不建会话、不跳转。
 	const [pendingApproval, setPendingApproval] = useState(false);
+	// 邀请邮箱绑定（A 方案）：发送邮箱验证码的状态与冷却（60s）
+	const [inviteCodeSending, setInviteCodeSending] = useState(false);
+	const [inviteCodeSent, setInviteCodeSent] = useState(false);
+	const [inviteCodeCooldown, setInviteCodeCooldown] = useState(0);
 	// 注册成功后的 Passkey 登记需要原口令重认证（begin 端点 password 必填）
 	const [registeredPassword, setRegisteredPassword] = useState('');
 	const [rateLimitStep, setRateLimitStep] = useState(0);
@@ -243,6 +247,34 @@ export default function RegisterPage() {
 	const watchedUsername = watch('username');
 	const watchedAgreeTerms = watch('agreeTerms');
 	const watchedPassword = watch('password');
+	const watchedInviteEmail = watch('email' as any) as string | undefined;
+
+	useEffect(() => {
+		if (inviteCodeCooldown <= 0) return;
+		const timer = setTimeout(() => setInviteCodeCooldown((n) => n - 1), 1000);
+		return () => clearTimeout(timer);
+	}, [inviteCodeCooldown]);
+
+	// 邀请邮箱绑定（A 方案）：向后端触发一次邮箱验证码（OTPTypeEmailVerification），
+	// 与 /auth/register/invitation 的校验码同源。
+	const handleSendInviteCode = useCallback(async () => {
+		const email = String(watchedInviteEmail || '').trim();
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			setError(t('validation.emailInvalid'));
+			return;
+		}
+		setInviteCodeSending(true);
+		try {
+			await sendVerificationEmail(email, selectedTenantId || slugAuthConfig?.tenantId || undefined);
+			setInviteCodeSent(true);
+			setInviteCodeCooldown(60);
+			setError('');
+		} catch {
+			setError(t('register.invitationEmailSendFailed'));
+		} finally {
+			setInviteCodeSending(false);
+		}
+	}, [watchedInviteEmail, selectedTenantId, slugAuthConfig?.tenantId, t]);
 
 	// Auto-set tenantId when slug path
 	useEffect(() => {
@@ -383,7 +415,19 @@ export default function RegisterPage() {
 				payload.captchaChallengeId = captchaChallengeId;
 			}
 
-			const regRes = await registerAccount(payload);
+			// 邀请邮箱绑定（A 方案）：填了邮箱验证码就走专用邀请注册端点；
+			// 未填则保持原通用注册（内部无邮箱邀请不受影响）。
+			const invitationCode = String((data as any).invitation_code || '').trim();
+			const inviteEmail = String((data as any).email || '').trim();
+			const inviteEmailCode = String((data as any).email_code || '').trim();
+			const regRes =
+				invitationCode && inviteEmailCode
+					? await registerByInvitation({
+							...payload,
+							email: inviteEmail,
+							emailCode: inviteEmailCode,
+						})
+					: await registerAccount(payload);
 
 			// WS-G / AUTH-02（R3 M-7）：审批制租户 → 服务端 200 + membership_status=pending，
 			// 且不签发 token。此时禁止自动登录/写 token/跳转，只展示待审页。
@@ -469,12 +513,18 @@ export default function RegisterPage() {
 			// 注册未开放 / 待审批）时优先本地化，不直出服务端英文细节。
 			const i18nKey = err?.response?.data?.i18n_key || err?.response?.data?.i18nKey;
 			const localized = i18nKey ? t(i18nKey, '') : '';
+			// 邀请邮箱绑定（A 方案）：后端开关打开且邮箱缺失/不一致时，给出可执行的本地化提示
+			const inviteEmailIssue = /invitation email verification required|email does not match invitation/i.test(
+				String(message || ''),
+			);
 			// 409 = 账号已存在（ErrCodeUserAlreadyExists 61000102）→ 给「去登录」指路，而非笼统失败
 			setError(
 				localized ||
-					(status === 409
-						? message || t('auth.register.conflict')
-						: message || t('register.genericError')),
+					(inviteEmailIssue
+						? t('register.invitationEmailVerificationRequired')
+						: status === 409
+							? message || t('auth.register.conflict')
+							: message || t('register.genericError')),
 			);
 			const step = parseInt(err?.response?.headers?.['x-ratelimit-step'] || '0', 10);
 			if (step >= 1) {
@@ -667,6 +717,56 @@ export default function RegisterPage() {
 								{...register('invitation_code' as any)}
 								error={(errors as any).invitation_code?.message}
 							/>
+						</div>
+					)}
+
+					{/* 邀请邮箱绑定（A 方案）：开关打开且邀请带邮箱时必填；无邮箱内部邀请可留空 */}
+					{membershipMode === 'invitation_only' && (
+						<div className="space-y-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+							<p className="text-xs text-neutral-600">{t('auth.register.invitationEmailHint')}</p>
+							<div className="space-y-2">
+								<Label htmlFor="invitationEmail">{t('auth.register.invitationEmail')}</Label>
+								<div className="flex items-start gap-2">
+									<div className="flex-1">
+										<Input
+											id="invitationEmail"
+											type="email"
+											autoComplete="email"
+											placeholder={t('auth.register.invitationEmailPlaceholder')}
+											{...register('email' as any)}
+											error={(errors as any).email?.message}
+										/>
+									</div>
+									<Button
+										type="button"
+										variant="outline"
+										onClick={handleSendInviteCode}
+										disabled={inviteCodeSending || inviteCodeCooldown > 0}
+									>
+										{inviteCodeCooldown > 0
+											? `${inviteCodeCooldown}s`
+											: inviteCodeSent
+												? t('auth.register.resendCode')
+												: inviteCodeSending
+													? t('auth.register.sendingCode')
+													: t('auth.register.sendCode')}
+									</Button>
+								</div>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="invitationEmailCode">
+									{t('auth.register.invitationEmailCode')}
+								</Label>
+								<Input
+									id="invitationEmailCode"
+									inputMode="numeric"
+									maxLength={6}
+									autoComplete="one-time-code"
+									placeholder={t('auth.register.invitationEmailCodePlaceholder')}
+									{...register('email_code' as any)}
+									error={(errors as any).email_code?.message}
+								/>
+							</div>
 						</div>
 					)}
 

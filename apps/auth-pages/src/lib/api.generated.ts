@@ -29,6 +29,9 @@ export const verifyMFAChallenge = Generated.authMfaVerifyChallengePost;
 // @generated-api-exempt: 新端点（与 identity auth_mfa_send.go 同批提交），待 OpenAPI 重新生成后替换
 export const sendMFAChallengeCode = (data: { challengeToken: string; mfaMethod: string }) =>
 	apiClient.post('/identity/api/v1/auth/mfa/send-code', data).then((res) => res.data);
+// @generated-api-exempt: 新端点（identity 5a647fc 邀请邮箱绑定 / A 方案），待 OpenAPI 重新生成后替换
+export const registerByInvitation = (data: Record<string, unknown>) =>
+	apiClient.post('/identity/api/v1/auth/register/invitation', data).then((res) => res.data);
 export const getOAuthClient = Generated.oauthClientByClient;
 
 // @generated-api-exempt: uses raw fetch() for redirect:manual handling (not supported by axios)

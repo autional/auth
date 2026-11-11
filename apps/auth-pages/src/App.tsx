@@ -35,6 +35,7 @@ const MagicLinkConfirmPage = lazy(() => import('./app/magic-link/confirm/page'))
 const VerifyIdentityPage = lazy(() => import('./app/verify-identity/page'));
 const TermsPage = lazy(() => import('./app/terms/page'));
 const PrivacyPage = lazy(() => import('./app/privacy/page'));
+const TrialPage = lazy(() => import('./app/trial/page'));
 // TASK-LS-06 登出确认页：oauth 无 hint 无会话浏览器支 302 的承接面（裸段，与 /logout 同族）
 const LogoutConfirmPage = lazy(() => import('./app/logout-confirm/page'));
 // CookieConsentBanner — 已隐藏 (2026-07-29)
@@ -191,6 +192,8 @@ export default function App() {
 								<Route path="/logout-confirm" element={<LogoutConfirmPage />} />
 								<Route path="/terms" element={<TermsPage />} />
 								<Route path="/privacy" element={<PrivacyPage />} />
+								{/* 自助试用（Trial UI）：公开注册试用租户，不建会话 */}
+								<Route path="/trial" element={<TrialPage />} />
 
 								{/* Protected routes */}
 								<Route path="/mfa-challenge" element={<MFAChallengePage />} />

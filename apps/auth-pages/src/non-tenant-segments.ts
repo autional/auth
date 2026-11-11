@@ -34,6 +34,7 @@ export const NON_TENANT_SEGMENTS = [
 	'reset-password',
 	'security',
 	'terms',
+	'trial',
 	'verify-email',
 	'verify-identity',
 	'verify-phone',

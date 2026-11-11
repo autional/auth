@@ -58,17 +58,55 @@ export function createRegisterSchema(t: TFunction, policy?: PasswordPolicy, mode
 	if (mode === 'invitation_only') {
 		schema = schema.extend({
 			invitation_code: z.string().min(1, t('validation.invitationCodeRequired')),
+			// 邀请邮箱绑定（A 方案）：后端开关打开且邀请带邮箱时，必须提交「邀请邮箱 + 邮箱验证码」。
+			// 保持可选 —— 无邮箱的内部邀请仍走原 username 路径。
+			email: z
+				.string()
+				.optional()
+				.refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), t('validation.emailInvalid')),
+			email_code: z
+				.string()
+				.optional()
+				.refine((v) => !v || /^\d{6}$/.test(v), t('validation.emailCodeInvalid')),
 		});
 	}
 
-	return schema.refine((data) => data.password === data.confirmPassword, {
-		message: t('validation.passwordsMatch'),
-		path: ['confirmPassword'],
+	return schema
+		.refine((data) => data.password === data.confirmPassword, {
+			message: t('validation.passwordsMatch'),
+			path: ['confirmPassword'],
+		})
+		.superRefine((data, ctx) => {
+			const d = data as { email?: string; email_code?: string };
+			if (d.email_code && !d.email) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ['email'],
+					message: t('validation.invitationEmailRequired'),
+				});
+			}
+		});
+}
+
+// 自助试用租户（公开注册）：tenant 名即 URL slug，必须是小写字母/数字/连字符。
+export function createTrialSchema(t: TFunction, policy?: PasswordPolicy) {
+	return z.object({
+		name: z
+			.string()
+			.min(3, t('validation.tenantNameMinLength', { min: 3 }))
+			.max(32, t('validation.tenantNameMaxLength', { max: 32 }))
+			.regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, t('validation.tenantNamePattern')),
+		displayName: z.string().max(64).optional(),
+		adminEmail: z.string().email(t('validation.emailInvalid')),
+		adminPassword: createPasswordSchema(t, policy),
+		invitationCode: z.string().optional(),
+		agreeTerms: z.literal(true, {
+			errorMap: () => ({ message: t('validation.agreeTerms') }),
+		}),
 	});
 }
 
-// 表单类型一律从 factory 推导（create*Schema(t)）；历史上并存的模块级中文 schema 已删。
-export type LoginFormData = z.infer<ReturnType<typeof createLoginSchema>>;
+// 表单类型一律从 factory 推导（create*Schema(t)）；历史上并存的模块级中文 schema 已删。export type LoginFormData = z.infer<ReturnType<typeof createLoginSchema>>;
 export type RegisterFormData = z.infer<ReturnType<typeof createRegisterSchema>>;
 export type ForgotPasswordFormData = z.infer<ReturnType<typeof createForgotPasswordSchema>>;
 export type ResetPasswordFormData = z.infer<ReturnType<typeof createResetPasswordSchema>>;
@@ -80,6 +118,7 @@ export type MFAPhoneSetupFormData = z.infer<ReturnType<typeof createMfaPhoneSetu
 export type MFAEmailSetupFormData = z.infer<ReturnType<typeof createMfaEmailSetupSchema>>;
 export type AccountDeletionFormData = z.infer<ReturnType<typeof createAccountDeletionSchema>>;
 export type ReapplyFormData = z.infer<ReturnType<typeof createReapplySchema>>;
+export type TrialFormData = z.infer<ReturnType<typeof createTrialSchema>>;
 
 export function createLoginSchema(t: TFunction) {
 	return z.object({
