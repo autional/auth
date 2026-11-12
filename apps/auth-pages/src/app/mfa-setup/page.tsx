@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -71,10 +71,12 @@ export default function MFASetupPage() {
 	const [step, setStep] = useState<Step>(1);
 	const [method, setMethod] = useState<MFAMethod>('totp');
 	// 切换验证方式时聚焦该方式的验证码输入（替代 autoFocus：jsx-a11y/no-autofocus）。
-	const codeRef = useRef<HTMLInputElement>(null);
+	// 用 RHF 的 setFocus 而不是自建 ref：输入框 ref 由 register() 接管，另加 ref 会被覆盖。
 	useEffect(() => {
-		codeRef.current?.focus();
-	}, [method]);
+		if (method === 'totp') totpForm.setFocus('code');
+		else if (method === 'sms') phoneForm.setFocus('code');
+		else emailForm.setFocus('code');
+	}, [method, totpForm, phoneForm, emailForm]);
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(false);
 
@@ -402,7 +404,6 @@ export default function MFASetupPage() {
 							<Label htmlFor="totp-code">{t('auth.mfa.setupVerifyCodeLabel')}</Label>
 							<Input
 								id="totp-code"
-								ref={codeRef}
 								type="text"
 								inputMode="numeric"
 								maxLength={6}
@@ -454,7 +455,6 @@ export default function MFASetupPage() {
 							<Label htmlFor="sms-code">{t('auth.mfa.codeLabel')}</Label>
 							<Input
 								id="sms-code"
-								ref={codeRef}
 								type="text"
 								inputMode="numeric"
 								maxLength={6}
@@ -506,7 +506,6 @@ export default function MFASetupPage() {
 						<Label htmlFor="email-code">{t('auth.mfa.codeLabel')}</Label>
 						<Input
 							id="email-code"
-							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}

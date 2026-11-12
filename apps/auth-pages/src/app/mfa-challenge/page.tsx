@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -138,11 +138,6 @@ export default function MFAChallengePage() {
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
-	// 切到某个验证方式时聚焦其验证码输入框（替代 autoFocus：jsx-a11y/no-autofocus）。
-	const codeRef = useRef<HTMLInputElement>(null);
-	useEffect(() => {
-		codeRef.current?.focus();
-	}, [activeTab]);
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -203,6 +198,14 @@ export default function MFAChallengePage() {
 	const smsForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const emailForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const backupForm = useForm<BackupFormData>({ resolver: zodResolver(backupSchema) });
+
+	// 切到某个验证方式时聚焦其验证码输入框（替代 autoFocus：jsx-a11y/no-autofocus）。
+	// 用 RHF 的 setFocus 而不是自建 ref：输入框 ref 由 register() 接管，另加 ref 会被覆盖。
+	useEffect(() => {
+		if (activeTab === 'totp') totpForm.setFocus('code');
+		else if (activeTab === 'sms') smsForm.setFocus('code');
+		else emailForm.setFocus('code');
+	}, [activeTab, totpForm, smsForm, emailForm]);
 
 	// 会话租户：登录挑战写入值优先，slug 名单兜底（公开 API 无租户头）
 	const tenantIdForSession =
@@ -544,7 +547,6 @@ export default function MFAChallengePage() {
 						<Label htmlFor="totp-code">{t('mfa.challenge.totpLabel')}</Label>
 						<Input
 							id="totp-code"
-							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
@@ -582,7 +584,6 @@ export default function MFAChallengePage() {
 						<Label htmlFor="sms-code">{t('mfa.challenge.smsLabel')}</Label>
 						<Input
 							id="sms-code"
-							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
@@ -617,7 +618,6 @@ export default function MFAChallengePage() {
 						<Label htmlFor="email-code">{t('mfa.challenge.emailLabel')}</Label>
 						<Input
 							id="email-code"
-							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
@@ -652,7 +652,6 @@ export default function MFAChallengePage() {
 						<Label htmlFor="backup-code">{t('mfa.challenge.backupLabel')}</Label>
 						<Input
 							id="backup-code"
-							ref={codeRef}
 							type="text"
 							maxLength={8}
 							placeholder={t('mfa.challenge.backupPlaceholder')}
