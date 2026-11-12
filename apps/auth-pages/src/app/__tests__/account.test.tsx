@@ -113,9 +113,9 @@ describe('AccountPage（设置分区）', () => {
 	it('links point to correct URLs', () => {
 		renderPage();
 
-		// 只数第一组「登录方式」卡内的链接（5）：全页计数会把顶层导航、页脚内链与其他分组算进来。
+		// 只数第一组「登录方式」卡内的链接（6）：全页计数会把顶层导航、页脚内链与其他分组算进来。
 		const card = screen.getByText('account.changePassword').closest('a')!.parentElement!;
-		expect(within(card).getAllByRole('link')).toHaveLength(5);
+		expect(within(card).getAllByRole('link')).toHaveLength(6);
 
 		// 本仓页面：带租户 slug（AUTH-45①）
 		expect(screen.getByText('account.changePassword').closest('a')).toHaveAttribute(

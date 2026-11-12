@@ -59,6 +59,13 @@ const GROUPS: Group[] = [
 				local: true,
 			},
 			{
+				path: '/recovery-codes',
+				labelKey: 'account.recoveryCodes',
+				descKey: 'account.recoveryCodesDesc',
+				icon: KeyRound,
+				local: true,
+			},
+			{
 				path: '/mfa-setup',
 				labelKey: 'security.mfa',
 				descKey: 'security.mfaDesc',

@@ -30,6 +30,7 @@ export const NON_TENANT_SEGMENTS = [
 	'mfa-setup',
 	'passkey',
 	'privacy',
+	'recovery-codes',
 	'reapply',
 	'reset-password',
 	'security',

@@ -7,6 +7,7 @@ import { AuthHeader } from '@/components/auth/AuthHeader';
 import { Button, Input, Label } from '@autional/ui';
 import { PublicAuthConfigBySlugByBySlug } from '@autional/shared/generated/api';
 import { requestAccountRecovery, resetAccountRecovery } from '@/lib/api-tenant';
+import { completeAccountRecovery, verifyRecoveryCode } from '@/lib/api';
 import { useTenantAuthConfigBySlug } from '@/hooks/use-tenant-auth-config';
 import { processPasswordForTransmission } from '@autional/shared';
 import { useI18n } from '@/lib/i18n';
@@ -20,6 +21,8 @@ export default function RecoverAccountPage() {
 	const logoUrl = useTenantBrandingStore((s) => s.branding?.logoUrl);
 
 	const [step, setStep] = useState<'request' | 'reset' | 'success'>('request');
+	// 找回方式：邮箱/短信验证码（默认）或账号级一次性恢复码
+	const [mode, setMode] = useState<'code' | 'recovery-code'>('code');
 	const [identity, setIdentity] = useState('');
 	const [maskedTarget, setMaskedTarget] = useState('');
 	const [code, setCode] = useState('');
@@ -48,6 +51,57 @@ export default function RecoverAccountPage() {
 			setStep('reset');
 		} catch (err: any) {
 			setError(err?.response?.data?.message || t('auth.recoverAccount.requestFailed'));
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	// 恢复码方式：verify 换 token → complete 改密（与 OTP 找回共用 complete 端点）
+	const handleRecoveryCodeReset = async () => {
+		if (!identity.trim() || !code.trim() || newPassword.length < 8) return;
+		setLoading(true);
+		setError('');
+		try {
+			if (!tenantSlug) {
+				throw new Error('recover-account tenant context missing');
+			}
+			const authConfig = await PublicAuthConfigBySlugByBySlug(tenantSlug);
+			const transmissionMode = authConfig?.passwordPolicy?.passwordTransmission;
+			if (transmissionMode === undefined || transmissionMode === '' || transmissionMode === null) {
+				throw new Error('password transmission mode is missing from tenant auth-config');
+			}
+			const resolvedTenantId =
+				(authConfig as any)?.tenantId || (authConfig as any)?.tenant_id || tenantId;
+			if (!resolvedTenantId) {
+				throw new Error('tenant id missing from auth-config');
+			}
+			const transmissionResult = await processPasswordForTransmission(
+				newPassword,
+				transmissionMode,
+				resolvedTenantId,
+				undefined,
+			);
+			const normalizedCode = code.trim().toUpperCase();
+			const verified: any = await verifyRecoveryCode({
+				identity: identity.trim(),
+				code: normalizedCode,
+				tenantId: resolvedTenantId,
+			});
+			const recoveryToken =
+				verified?.recoveryToken || verified?.recovery_token || verified?.data?.recoveryToken;
+			if (!recoveryToken) {
+				throw new Error('recovery token missing from response');
+			}
+			await completeAccountRecovery({
+				recoveryToken,
+				code: normalizedCode,
+				newPassword: transmissionResult.password,
+				passwordTransmission: transmissionResult.passwordTransmission,
+				tenantId: resolvedTenantId,
+			});
+			setStep('success');
+		} catch (err: any) {
+			setError(err?.response?.data?.message || t('auth.recoverAccount.recoveryCodeFailed'));
 		} finally {
 			setLoading(false);
 		}
@@ -107,10 +161,37 @@ export default function RecoverAccountPage() {
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
-						handleRequestRecovery();
+						if (mode === 'recovery-code') {
+							handleRecoveryCodeReset();
+						} else {
+							handleRequestRecovery();
+						}
 					}}
 					className="space-y-4"
 				>
+					<div className="grid grid-cols-2 gap-2">
+						<Button
+							type="button"
+							variant={mode === 'code' ? undefined : 'outline'}
+							onClick={() => {
+								setMode('code');
+								setError('');
+							}}
+						>
+							{t('auth.recoverAccount.modeCode')}
+						</Button>
+						<Button
+							type="button"
+							variant={mode === 'recovery-code' ? undefined : 'outline'}
+							onClick={() => {
+								setMode('recovery-code');
+								setError('');
+							}}
+						>
+							{t('auth.recoverAccount.modeRecoveryCode')}
+						</Button>
+					</div>
+
 					<div className="space-y-2">
 						<Label htmlFor="identity">{t('auth.recoverAccount.identityLabel')}</Label>
 						<Input
@@ -121,13 +202,42 @@ export default function RecoverAccountPage() {
 							onChange={(e) => setIdentity(e.target.value)}
 						/>
 					</div>
+
+					{mode === 'recovery-code' && (
+						<>
+							<div className="space-y-2">
+								<Label htmlFor="recoveryCode">{t('auth.recoverAccount.recoveryCodeLabel')}</Label>
+								<Input
+									id="recoveryCode"
+									type="text"
+									placeholder={t('auth.recoverAccount.recoveryCodePlaceholder')}
+									maxLength={11}
+									value={code}
+									onChange={(e) => setCode(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="recoveryNewPassword">{t('auth.recoverAccount.newPasswordLabel')}</Label>
+								<PasswordInput
+									id="recoveryNewPassword"
+									autoComplete="new-password"
+									showStrength
+									value={newPassword}
+									onChange={(e) => setNewPassword(e.target.value)}
+								/>
+							</div>
+						</>
+					)}
+
 					{error && (
 						<div className="rounded-md bg-danger/10 p-3 text-sm text-danger-text">
 							{error}
 						</div>
 					)}
 					<Button type="submit" fullWidth isLoading={loading}>
-						{t('auth.recoverAccount.sendCode')}
+						{mode === 'recovery-code'
+							? t('auth.recoverAccount.resetPassword')
+							: t('auth.recoverAccount.sendCode')}
 					</Button>
 				</form>
 			)}

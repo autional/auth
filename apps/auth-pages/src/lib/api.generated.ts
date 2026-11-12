@@ -32,6 +32,18 @@ export const sendMFAChallengeCode = (data: { challengeToken: string; mfaMethod: 
 // @generated-api-exempt: 新端点（identity 5a647fc 邀请邮箱绑定 / A 方案），待 OpenAPI 重新生成后替换
 export const registerByInvitation = (data: Record<string, unknown>) =>
 	apiClient.post('/identity/api/v1/auth/register/invitation', data).then((res) => res.data);
+// @generated-api-exempt: Recovery Code Phase 3（identity 5ea2bc6），待 OpenAPI 重新生成后替换
+export const generateRecoveryCodes = () =>
+	apiClient.post('/identity/api/v1/auth/recovery-codes/regenerate').then((res) => res.data);
+export const verifyRecoveryCode = (data: { identity: string; code: string; tenantId?: string }) =>
+	apiClient.post('/identity/api/v1/auth/recovery-codes/verify', data).then((res) => res.data);
+export const completeAccountRecovery = (data: {
+	recoveryToken: string;
+	code: string;
+	newPassword: string;
+	passwordTransmission?: string;
+	tenantId?: string;
+}) => apiClient.post('/identity/api/v1/auth/recovery/complete', data).then((res) => res.data);
 export const getOAuthClient = Generated.oauthClientByClient;
 
 // @generated-api-exempt: uses raw fetch() for redirect:manual handling (not supported by axios)

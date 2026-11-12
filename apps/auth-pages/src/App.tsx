@@ -27,6 +27,7 @@ const PasskeyPage = lazy(() => import('./app/passkey/page'));
 const ErrorPage = lazy(() => import('./app/error/page'));
 const AccountDeletionPage = lazy(() => import('./app/account-deletion/page'));
 const AccountPage = lazy(() => import('./app/account/page'));
+const RecoveryCodesPage = lazy(() => import('./app/recovery-codes/page'));
 const ActivityPage = lazy(() => import('./app/activity/page'));
 const DashboardPage = lazy(() => import('./app/dashboard/page'));
 const ReapplyPage = lazy(() => import('./app/reapply/page'));
@@ -284,6 +285,23 @@ export default function App() {
 									element={
 										<RequireAuth>
 											<AccountPage />
+										</RequireAuth>
+									}
+								/>
+								{/* 恢复码（Phase 3）：需登录；明文只展示一次 */}
+								<Route
+									path="/recovery-codes"
+									element={
+										<RequireAuth>
+											<RecoveryCodesPage />
+										</RequireAuth>
+									}
+								/>
+								<Route
+									path="/:tenantSlug/recovery-codes"
+									element={
+										<RequireAuth>
+											<RecoveryCodesPage />
 										</RequireAuth>
 									}
 								/>
