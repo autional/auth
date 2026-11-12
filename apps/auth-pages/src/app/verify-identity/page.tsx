@@ -488,7 +488,16 @@ function VerifyIdentityContent() {
 				<div className="space-y-2">
 					<Label>{t('auth.verifyIdentity.uploadFront')}</Label>
 					<div
+						role="button"
+						tabIndex={0}
+						aria-label={t('auth.verifyIdentity.uploadFront')}
 						onClick={() => frontInputRef.current?.click()}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								frontInputRef.current?.click();
+							}
+						}}
 						className={`group relative flex aspect-[3/2] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
 							frontPreview
 								? 'border-transparent'
@@ -543,7 +552,16 @@ function VerifyIdentityContent() {
 				<div className="space-y-2">
 					<Label>{t('auth.verifyIdentity.uploadBack')}</Label>
 					<div
+						role="button"
+						tabIndex={0}
+						aria-label={t('auth.verifyIdentity.uploadBack')}
 						onClick={() => backInputRef.current?.click()}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								backInputRef.current?.click();
+							}
+						}}
 						className={`group relative flex aspect-[3/2] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
 							backPreview
 								? 'border-transparent'
@@ -692,11 +710,9 @@ function VerifyIdentityContent() {
 							onChange={() => toggleConsent(key)}
 							className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-strong)] text-[var(--color-brand)] focus:ring-[var(--color-brand)]"
 						/>
-						<div>
-							<p className="text-sm font-medium text-[var(--color-text-primary)]">
-								{t('auth.verifyIdentity.consentAgreeLabel')}
-								{label}
-							</p>
+						<div className="text-sm font-medium text-[var(--color-text-primary)]">
+							{t('auth.verifyIdentity.consentAgreeLabel')}
+							{label}
 							<p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{desc}</p>
 						</div>
 					</label>

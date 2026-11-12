@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -70,6 +70,11 @@ export default function MFASetupPage() {
 	const emailForm = useForm<MFAEmailSetupFormData>({ resolver: zodResolver(emailSetupSchema) });
 	const [step, setStep] = useState<Step>(1);
 	const [method, setMethod] = useState<MFAMethod>('totp');
+	// 切换验证方式时聚焦该方式的验证码输入（替代 autoFocus：jsx-a11y/no-autofocus）。
+	const codeRef = useRef<HTMLInputElement>(null);
+	useEffect(() => {
+		codeRef.current?.focus();
+	}, [method]);
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(false);
 
@@ -397,11 +402,11 @@ export default function MFASetupPage() {
 							<Label htmlFor="totp-code">{t('auth.mfa.setupVerifyCodeLabel')}</Label>
 							<Input
 								id="totp-code"
+								ref={codeRef}
 								type="text"
 								inputMode="numeric"
 								maxLength={6}
 								placeholder={t('auth.mfa.codePlaceholder')}
-								autoFocus
 								{...totpForm.register('code')}
 								error={totpForm.formState.errors.code?.message}
 							/>
@@ -449,11 +454,11 @@ export default function MFASetupPage() {
 							<Label htmlFor="sms-code">{t('auth.mfa.codeLabel')}</Label>
 							<Input
 								id="sms-code"
+								ref={codeRef}
 								type="text"
 								inputMode="numeric"
 								maxLength={6}
 								placeholder={t('auth.mfa.codePlaceholder')}
-								autoFocus
 								{...phoneForm.register('code')}
 								error={phoneForm.formState.errors.code?.message}
 							/>
@@ -501,11 +506,11 @@ export default function MFASetupPage() {
 						<Label htmlFor="email-code">{t('auth.mfa.codeLabel')}</Label>
 						<Input
 							id="email-code"
+							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
 							placeholder={t('auth.mfa.codePlaceholder')}
-							autoFocus
 							{...emailForm.register('code')}
 							error={emailForm.formState.errors.code?.message}
 						/>

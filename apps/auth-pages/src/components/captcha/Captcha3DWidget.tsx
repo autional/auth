@@ -43,6 +43,11 @@ export function Captcha3DWidget({
 	const [message, setMessage] = useState('');
 	const [poWAttempts, setPoWAttempts] = useState(0);
 	const captchaIdRef = useRef<string>('');
+	// 答题框出现时聚焦它（替代 autoFocus：jsx-a11y/no-autofocus）。
+	const answerRef = useRef<HTMLInputElement>(null);
+	useEffect(() => {
+		if (step === 'solved') answerRef.current?.focus();
+	}, [step]);
 	const [captchaId, setCaptchaId] = useState('');
 
 	const run = useCallback(async () => {
@@ -133,6 +138,7 @@ export function Captcha3DWidget({
 				<div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
 					<input
 						type="text"
+						ref={answerRef}
 						maxLength={4}
 						value={input}
 						onChange={(e) => setInput(e.target.value.toUpperCase())}
@@ -150,7 +156,6 @@ export function Captcha3DWidget({
 							outline: 'none',
 							fontFamily: 'monospace',
 						}}
-						autoFocus
 					/>
 					<button
 						onClick={handleSubmit}

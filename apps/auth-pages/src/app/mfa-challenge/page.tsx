@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -138,6 +138,11 @@ export default function MFAChallengePage() {
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
 	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
+	// 切到某个验证方式时聚焦其验证码输入框（替代 autoFocus：jsx-a11y/no-autofocus）。
+	const codeRef = useRef<HTMLInputElement>(null);
+	useEffect(() => {
+		codeRef.current?.focus();
+	}, [activeTab]);
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -539,11 +544,11 @@ export default function MFAChallengePage() {
 						<Label htmlFor="totp-code">{t('mfa.challenge.totpLabel')}</Label>
 						<Input
 							id="totp-code"
+							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
 							placeholder={t('mfa.challenge.codePlaceholder')}
-							autoFocus
 							{...totpForm.register('code')}
 							error={totpForm.formState.errors.code?.message}
 						/>
@@ -577,11 +582,11 @@ export default function MFAChallengePage() {
 						<Label htmlFor="sms-code">{t('mfa.challenge.smsLabel')}</Label>
 						<Input
 							id="sms-code"
+							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
 							placeholder={t('mfa.challenge.codePlaceholder')}
-							autoFocus
 							{...smsForm.register('code')}
 							error={smsForm.formState.errors.code?.message}
 						/>
@@ -612,11 +617,11 @@ export default function MFAChallengePage() {
 						<Label htmlFor="email-code">{t('mfa.challenge.emailLabel')}</Label>
 						<Input
 							id="email-code"
+							ref={codeRef}
 							type="text"
 							inputMode="numeric"
 							maxLength={6}
 							placeholder={t('mfa.challenge.codePlaceholder')}
-							autoFocus
 							{...emailForm.register('code')}
 							error={emailForm.formState.errors.code?.message}
 						/>
@@ -647,10 +652,10 @@ export default function MFAChallengePage() {
 						<Label htmlFor="backup-code">{t('mfa.challenge.backupLabel')}</Label>
 						<Input
 							id="backup-code"
+							ref={codeRef}
 							type="text"
 							maxLength={8}
 							placeholder={t('mfa.challenge.backupPlaceholder')}
-							autoFocus
 							{...backupForm.register('code')}
 							error={backupForm.formState.errors.code?.message}
 						/>

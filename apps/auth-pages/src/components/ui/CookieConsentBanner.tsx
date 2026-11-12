@@ -159,9 +159,10 @@ function CookieSettingsPanel({
 							</p>
 							<p className="mt-0.5 text-xs text-neutral-500">{t('cookie.necessaryDesc')}</p>
 						</div>
-						<label className="relative inline-flex cursor-not-allowed items-center">
+						<span className="relative inline-flex cursor-not-allowed items-center">
 							<input
 								id="cookie-necessary"
+								aria-label={t('cookie.necessary')}
 								name="cookie_necessary"
 								type="checkbox"
 								checked
@@ -169,7 +170,7 @@ function CookieSettingsPanel({
 								className="peer sr-only"
 							/>
 							<div className="h-5 w-9 rounded-full bg-[var(--color-brand)] opacity-60 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition" />
-						</label>
+						</span>
 					</div>
 
 					<div className="flex items-center justify-between">
