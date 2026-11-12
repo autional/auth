@@ -37,6 +37,7 @@ const VerifyIdentityPage = lazy(() => import('./app/verify-identity/page'));
 const TermsPage = lazy(() => import('./app/terms/page'));
 const PrivacyPage = lazy(() => import('./app/privacy/page'));
 const TrialPage = lazy(() => import('./app/trial/page'));
+const InvitePage = lazy(() => import('./app/invite/page'));
 // TASK-LS-06 登出确认页：oauth 无 hint 无会话浏览器支 302 的承接面（裸段，与 /logout 同族）
 const LogoutConfirmPage = lazy(() => import('./app/logout-confirm/page'));
 // CookieConsentBanner — 已隐藏 (2026-07-29)
@@ -195,6 +196,8 @@ export default function App() {
 								<Route path="/privacy" element={<PrivacyPage />} />
 								{/* 自助试用（Trial UI）：公开注册试用租户，不建会话 */}
 								<Route path="/trial" element={<TrialPage />} />
+								{/* 邀请深链落地：/invite/:token → 预览后跳 /:tenantSlug/register?invitation_code=... */}
+								<Route path="/invite/:token" element={<InvitePage />} />
 
 								{/* Protected routes */}
 								<Route path="/mfa-challenge" element={<MFAChallengePage />} />
@@ -288,9 +291,11 @@ export default function App() {
 										</RequireAuth>
 									}
 								/>
-								{/* 恢复码（Phase 3）：需登录；明文只展示一次 */}
+								{/* 恢复码（Phase 3）：需登录；明文只展示一次。
+								    裸路径放在 /account/ 下：首段 account 属保留段，未认证跳登录不会
+								    被当成租户 slug（/recovery-codes/login 会落未知租户页）。 */}
 								<Route
-									path="/recovery-codes"
+									path="/account/recovery-codes"
 									element={
 										<RequireAuth>
 											<RecoveryCodesPage />

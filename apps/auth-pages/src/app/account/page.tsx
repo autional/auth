@@ -26,6 +26,8 @@ type AccountLink = {
 	icon: LucideIcon;
 	/** true = 本仓页面（auth-pages 路由）；未设 = 用户门户深链（AUTH-45①） */
 	local?: boolean;
+	/** 无租户 slug 时的裸路径（默认 = path；首段须是保留段，避免被当成租户） */
+	barePath?: string;
 };
 
 type Group = { titleKey: string; links: AccountLink[] };
@@ -60,6 +62,7 @@ const GROUPS: Group[] = [
 			},
 			{
 				path: '/recovery-codes',
+				barePath: '/account/recovery-codes',
 				labelKey: 'account.recoveryCodes',
 				descKey: 'account.recoveryCodesDesc',
 				icon: KeyRound,
@@ -157,7 +160,7 @@ export default function AccountPage() {
 						{group.links.map((link) => (
 							<a
 								key={link.path}
-								href={link.local ? (slug ? `/${slug}${link.path}` : link.path) : userPortalUrl(slug, link.path)}
+								href={link.local ? (slug ? `/${slug}${link.path}` : (link.barePath || link.path)) : userPortalUrl(slug, link.path)}
 								className="flex items-start gap-4 p-4 hover:bg-[var(--color-bg-muted)] transition-colors group"
 							>
 								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[var(--color-bg-muted)] group-hover:bg-brand-soft/20 transition-colors">
