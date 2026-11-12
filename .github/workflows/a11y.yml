@@ -1,0 +1,33 @@
+name: A11y
+
+# 无障碍闸门（AC C-28 / ui-denominator U4）：jsx-a11y recommended，0 error/warn 才算过。
+# 只跑 a11y，不重复其它仓已有/待建的整条流水线。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: a11y-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm 版本由根 package.json 的 packageManager 提供（唯一真源），此处不再指定。
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: A11y lint
+        run: pnpm --filter @autional/auth-pages run lint:a11y
