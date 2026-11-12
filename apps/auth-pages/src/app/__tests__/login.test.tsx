@@ -111,11 +111,24 @@ vi.mock('@/lib/api', () => ({
 let mockLoginMethods: string[] | undefined;
 let mockOAuthProviders: any[] = [];
 let mockConfigTenantId: string | undefined = 't-test';
+let mockDeviceFingerprintEnabled = false;
+
+// 设备指纹模块：默认关闭（与租户策略默认 false 一致）；用例可开门控并断言登录体。
+const mockComputeDeviceFingerprint = vi.fn(async () => 'dfp_0123456789abcdef');
+vi.mock('@/lib/device-fingerprint', () => ({
+	isDeviceFingerprintEnabled: (cfg?: { deviceFingerprintEnabled?: boolean }) =>
+		cfg?.deviceFingerprintEnabled ?? false,
+	computeDeviceFingerprint: () => mockComputeDeviceFingerprint(),
+}));
 
 vi.mock('@/hooks/use-auth-page-init', () => ({
 	useAuthPageInit: () => ({
 		authConfig: {
-			data: { tenantId: mockConfigTenantId, loginMethods: mockLoginMethods },
+			data: {
+				tenantId: mockConfigTenantId,
+				loginMethods: mockLoginMethods,
+				deviceFingerprintEnabled: mockDeviceFingerprintEnabled,
+			},
 			isLoading: false,
 			isError: false,
 		},
@@ -138,6 +151,7 @@ beforeEach(() => {
 	mockLoginMethods = undefined;
 	mockOAuthProviders = [];
 	mockConfigTenantId = 't-test';
+	mockDeviceFingerprintEnabled = false;
 });
 
 afterEach(() => {
@@ -262,6 +276,50 @@ describe('LoginPage', () => {
 			expect(mockLoginWithTokens).toHaveBeenCalled();
 		});
 		expect(screen.queryByText('login.error.credentials')).toBeNull();
+	});
+
+	// P1：device_fingerprint_enabled 打开时，登录体必须带 dfp_ 指纹（identity 用它
+	// 做「可信设备」匹配；axios 拦截器统一 camel→snake）。
+	it('设备指纹开启时登录体携带 deviceFingerprint', async () => {
+		mockDeviceFingerprintEnabled = true;
+		mockAuthLoginPost.mockResolvedValue({
+			accessToken: 'token-abc',
+			refreshToken: 'refresh-abc',
+			user: { id: '1' },
+		});
+		const user = userEvent.setup();
+		renderLogin();
+		await user.type(screen.getByPlaceholderText('auth.login.identityPlaceholder'), 'testuser');
+		await user.type(screen.getByPlaceholderText('auth.login.passwordPlaceholder'), 'pass123');
+		await user.click(screen.getByRole('button', { name: 'login.submit' }));
+
+		await waitFor(() => {
+			expect(mockAuthLoginPost).toHaveBeenCalled();
+		});
+		expect(mockAuthLoginPost.mock.calls[0][0]).toMatchObject({
+			deviceFingerprint: 'dfp_0123456789abcdef',
+		});
+	});
+
+	// 门控默认关闭：不上报指纹（与租户策略默认 false 一致，避免新增采集面）。
+	it('设备指纹关闭时登录体不带 deviceFingerprint', async () => {
+		mockDeviceFingerprintEnabled = false;
+		mockAuthLoginPost.mockResolvedValue({
+			accessToken: 'token-abc',
+			refreshToken: 'refresh-abc',
+			user: { id: '1' },
+		});
+		const user = userEvent.setup();
+		renderLogin();
+		await user.type(screen.getByPlaceholderText('auth.login.identityPlaceholder'), 'testuser');
+		await user.type(screen.getByPlaceholderText('auth.login.passwordPlaceholder'), 'pass123');
+		await user.click(screen.getByRole('button', { name: 'login.submit' }));
+
+		await waitFor(() => {
+			expect(mockAuthLoginPost).toHaveBeenCalled();
+		});
+		expect(mockAuthLoginPost.mock.calls[0][0]).not.toHaveProperty('deviceFingerprint');
+		expect(mockComputeDeviceFingerprint).not.toHaveBeenCalled();
 	});
 
 	// 4247b59 的 enrolled 过滤只在挑战页消费；登录页不转发则派生永远走 required 回落，

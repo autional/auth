@@ -605,6 +605,12 @@ export default function LoginPage() {
 				loginData.captchaProvider = captchaProvider;
 				loginData.captchaChallengeId = captchaChallengeId;
 			}
+			// 设备指纹：受租户 device_fingerprint_enabled 门控（上面已判过），
+			// identity 侧用它在「可信设备」信任期内跳过纯设备信号触发的自适应 MFA。
+			// 客户端 axios 拦截器统一 camel→snake，落 payload 为 device_fingerprint。
+			if (deviceFP) {
+				loginData.deviceFingerprint = deviceFP;
+			}
 			const res = await authLoginPost(loginData as any);
 			loginResult = res;
 
