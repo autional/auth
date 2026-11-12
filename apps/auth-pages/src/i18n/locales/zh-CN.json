@@ -60,6 +60,8 @@
   "selectTenant.organizationCount": "个可用组织",
   "register.approvalNotice": "注册需要管理员审批",
   "register.invitationOnly": "仅限邀请注册",
+  "register.inviteInvalid": "邀请链接已失效或已被使用，请联系邀请人重新发送。",
+  "register.inviteResolving": "正在校验邀请，请稍候…",
   "register.invitationEmailVerificationRequired": "该邀请要求验证邀请邮箱：请填写邀请邮箱并完成验证码校验后重试。",
   "register.invitationEmailSendFailed": "验证码发送失败，请稍后重试。",
   "register.applicationReason": "申请理由",

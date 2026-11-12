@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Link, useLocation, useParams } from 'react-router';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -227,6 +227,10 @@ export default function RegisterPage() {
 
 	// Resolved membership mode
 	const membershipMode = authConfig?.membershipApproval;
+	// 邀请深链：/invite/:token 会跳到 ?invitation_code=...，此处预填并强制进入邀请流程
+	const [searchParams] = useSearchParams();
+	const presetInvitationCode = (searchParams.get('invitation_code') || '').trim();
+	const invitationFlow = membershipMode === 'invitation_only' || presetInvitationCode !== '';
 
 	// Build dynamic schema
 	const registerSchema = useMemo(
@@ -242,7 +246,7 @@ export default function RegisterPage() {
 		watch,
 		setValue,
 		formState: { errors },
-	} = useForm<FormData>({ resolver: zodResolver(registerSchema) });
+	} = useForm<FormData>({ resolver: zodResolver(registerSchema), defaultValues: presetInvitationCode ? ({ invitation_code: presetInvitationCode } as Partial<FormData>) : undefined });
 
 	const watchedUsername = watch('username');
 	const watchedAgreeTerms = watch('agreeTerms');
@@ -702,13 +706,13 @@ export default function RegisterPage() {
 					{membershipMode && (
 						<div className="rounded-md border border-info-soft bg-info-soft p-3 text-xs text-info-text">
 							{membershipMode === 'approval_required' && <p>{t('register.approvalNotice')}</p>}
-							{membershipMode === 'invitation_only' && <p>{t('register.invitationOnly')}</p>}
+							{invitationFlow && <p>{t('register.invitationOnly')}</p>}
 							{membershipMode === 'open' && <p>{t('auth.register.openRegistration')}</p>}
 						</div>
 					)}
 
 					{/* Invitation code field (invitation_only mode) */}
-					{membershipMode === 'invitation_only' && (
+					{invitationFlow && (
 						<div className="space-y-2">
 							<Label htmlFor="invitationCode">{t('auth.register.invitationCode')}</Label>
 							<Input
@@ -721,7 +725,7 @@ export default function RegisterPage() {
 					)}
 
 					{/* 邀请邮箱绑定（A 方案）：开关打开且邀请带邮箱时必填；无邮箱内部邀请可留空 */}
-					{membershipMode === 'invitation_only' && (
+					{invitationFlow && (
 						<div className="space-y-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
 							<p className="text-xs text-neutral-600">{t('auth.register.invitationEmailHint')}</p>
 							<div className="space-y-2">

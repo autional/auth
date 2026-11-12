@@ -60,6 +60,8 @@
   "selectTenant.organizationCount": "organizations available",
   "register.approvalNotice": "Registration requires administrator approval",
   "register.invitationOnly": "Invitation only",
+  "register.inviteInvalid": "This invitation link is invalid or has already been used. Please ask the inviter to resend it.",
+  "register.inviteResolving": "Verifying your invitation…",
   "register.invitationEmailVerificationRequired": "This invitation requires email verification: enter the invited email and its verification code, then retry.",
   "register.invitationEmailSendFailed": "Failed to send the verification code. Please retry later.",
   "register.applicationReason": "Application Reason",
