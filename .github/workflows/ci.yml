@@ -1,0 +1,50 @@
+name: CI
+
+# 单仓唯一流水线：合并原 `a11y.yml`（最小 a11y 闸门）与其余检查（test / typecheck / lint）。
+# 入口：push[main] + 所有 pull_request；同一 ref 串行，新提交取消旧跑。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm 版本由根 package.json 的 packageManager 提供（唯一真源），此处不再指定。
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      # 无障碍闸门（AC C-28 / ui-denominator U4）：jsx-a11y recommended，0 error/warn 才算过。
+      - name: A11y lint
+        run: pnpm --filter @autional/auth-pages run lint:a11y
+
+      # build 暂不接入：`pnpm build` 会先跑 scripts/gen-env.mjs，缺部署 env 直接失败。
+      # 实测（本机）：EXIT=1 `[build-env] 前端 API 模式为 direct 但缺少 API_ORIGIN`。
+      # 待 CI 侧具备部署 env（至少 API_ORIGIN）后再放开下面两行：
+      #
+      # - name: Build
+      #   run: pnpm build
