@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
-import { apiClient, loginWithTokens } from '@autional/shared';
+import { apiClient, loginWithTokens, getPortalUrl } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { authQrLoginInitiatePost, authQrLoginStatus } from '@autional/shared/generated/api';
@@ -75,7 +75,10 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 
 			setSessionToken(token);
 			setNumberMatching(nm);
-			const url = `autional://login?token=${encodeURIComponent(token)}&nm=${encodeURIComponent(nm)}`;
+			// 深链用 https（登录门户的 authenticator 门户地址）：PWA 无法注册自定义 scheme
+			// （autional:// 由系统相机/二维码扫描器打不开），https 才能被浏览器正常承接。
+			// login-approve 属 authenticator 的 non-tenant 段 ⇒ 不拼租户 slug。
+			const url = `${getPortalUrl('authenticator')}/login-approve?token=${encodeURIComponent(token)}&nm=${encodeURIComponent(nm)}`;
 			setQrCode(await QRCode.toDataURL(url, { width: 200, margin: 1 }));
 			setStatus('pending');
 			startCountdown(); // 300s QR code validity

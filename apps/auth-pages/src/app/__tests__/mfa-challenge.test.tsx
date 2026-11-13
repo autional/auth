@@ -148,7 +148,9 @@ describe('MFAChallengePage', () => {
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
-		expect(screen.getAllByRole('tab')).toHaveLength(2);
+		// 「用 App 确认」排在最前（它优先于码方法；无码面）
+		expect(screen.getByRole('tab', { name: 'auth.appApproval.tab' })).toBeInTheDocument();
+		expect(screen.getAllByRole('tab')).toHaveLength(3);
 		expect(screen.getByRole('button', { name: 'mfa.challenge.useBackup' })).toBeInTheDocument();
 
 		// AUTH2-01：标签条具备完整 tab 语义，当前面板与选中标签关联
@@ -171,7 +173,7 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
-		expect(screen.getAllByRole('tab')).toHaveLength(3);
+		expect(screen.getAllByRole('tab')).toHaveLength(4);
 	});
 
 	it('uses enrolledMfaMethods over requiredMfaMethods (only enrolled methods shown)', async () => {
@@ -184,7 +186,7 @@ describe('MFAChallengePage', () => {
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
-		expect(screen.getAllByRole('tab')).toHaveLength(2);
+		expect(screen.getAllByRole('tab')).toHaveLength(3);
 	});
 
 	it('shows a single enrolled method without a tab strip', async () => {

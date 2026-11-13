@@ -22,11 +22,14 @@ import { useI18n } from '@/lib/i18n';
 import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
+import AppApprovalPanel from '@/components/auth/AppApprovalPanel';
 import { ERROR_CODES, errorCodeOf, semanticsOfError } from '@/lib/error-semantics';
 import { userFromAccessToken } from '@/lib/session-user';
 
 type CodeMethod = 'totp' | 'sms' | 'email';
 type VerifyMethod = CodeMethod | 'backup';
+/** 「用 App 确认」不是码方法：它把最后一跳交给已登录的身份验证器（无码面）。 */
+type TabKey = CodeMethod | 'app';
 
 // 登录页/mfa-setup 写入的挑战会话（oauth/callback 写入子集：无 email/phone/riskLevel）
 interface PreAuthData {
@@ -137,7 +140,7 @@ export default function MFAChallengePage() {
 
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
-	const [activeTab, setActiveTab] = useState<CodeMethod>('totp');
+	const [activeTab, setActiveTab] = useState<TabKey>('totp');
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -182,14 +185,17 @@ export default function MFAChallengePage() {
 		setPreAuth(parsed);
 	}, [navigate, loginPath]);
 
-	const tabs = useMemo(
-		() => deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods),
-		[preAuth],
-	);
+	// 「用 App 确认」放在码方法之前，但只在拿到挑战令牌时才出现（无令牌无从 initiate）；
+	// 默认仍停在原 TOTP tab（不改变既有默认行为）。
+	const tabs = useMemo<TabKey[]>(() => {
+		const codeTabs = deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods);
+		return preAuth?.challengeToken ? (['app'] as TabKey[]).concat(codeTabs) : codeTabs;
+	}, [preAuth]);
 
 	useEffect(() => {
 		if (preAuth && !tabs.includes(activeTab)) {
-			setActiveTab(tabs[0]);
+			// 回落时优先码方法：'app' 是需要用户主动点的路径，不能成为默认落点
+			setActiveTab(tabs.find((key) => key !== 'app') || tabs[0]);
 			setTotpFallback(false);
 		}
 	}, [preAuth, tabs, activeTab]);
@@ -204,7 +210,8 @@ export default function MFAChallengePage() {
 	useEffect(() => {
 		if (activeTab === 'totp') totpForm.setFocus('code');
 		else if (activeTab === 'sms') smsForm.setFocus('code');
-		else emailForm.setFocus('code');
+		else if (activeTab === 'email') emailForm.setFocus('code');
+		// 'app' 无输入框：不聚焦（对未注册字段 setFocus 会触发 RHF 告警）
 	}, [activeTab, totpForm, smsForm, emailForm]);
 
 	// 会话租户：登录挑战写入值优先，slug 名单兜底（公开 API 无租户头）
@@ -338,7 +345,7 @@ export default function MFAChallengePage() {
 	};
 
 	// 单方法时无标签条，不声明 tabpanel 语义
-	const tabPanelProps = (key: CodeMethod) =>
+	const tabPanelProps = (key: TabKey) =>
 		tabs.length > 1
 			? {
 					role: 'tabpanel' as const,
@@ -466,12 +473,14 @@ export default function MFAChallengePage() {
 		);
 	}
 
-	const tabLabel = (key: CodeMethod) =>
-		key === 'totp'
-			? t('mfa.challenge.tabTOTP')
-			: key === 'sms'
-				? t('mfa.challenge.tabSMS')
-				: t('mfa.challenge.tabEmail');
+	const tabLabel = (key: TabKey) =>
+		key === 'app'
+			? t('auth.appApproval.tab')
+			: key === 'totp'
+				? t('mfa.challenge.tabTOTP')
+				: key === 'sms'
+					? t('mfa.challenge.tabSMS')
+					: t('mfa.challenge.tabEmail');
 
 	return (
 		<AuthCard>
@@ -534,6 +543,20 @@ export default function MFAChallengePage() {
 					{preAuth.riskLevel === 'low' && t('mfa.riskLevel.low')}
 					{preAuth.riskLevel === 'medium' && t('mfa.riskLevel.medium')}
 					{preAuth.riskLevel === 'high' && t('mfa.riskLevel.high')}
+				</div>
+			)}
+
+			{activeTab === 'app' && (
+				<div {...tabPanelProps('app')}>
+					<AppApprovalPanel
+						challengeToken={preAuth.challengeToken}
+						onFallback={() => {
+							setActiveTab(tabs.find((key) => key !== 'app') || 'totp');
+							setTotpFallback(false);
+							setError('');
+						}}
+						onConfirmed={finishLogin}
+					/>
 				</div>
 			)}
 

@@ -28,6 +28,8 @@ vi.mock('@autional/shared', async (importOriginal) => ({
 	...(await importOriginal<typeof import('@autional/shared')>()),
 	loginWithTokens: vi.fn(),
 	apiClient: { post: (...args: unknown[]) => mockApiPost(...args) },
+	// 深链改 https 的回归锁需要确定性门户地址（jsdom 下真实解析依赖 window.location）
+	getPortalUrl: () => 'https://authenticator.example.test',
 }));
 
 vi.mock('@autional/shared/generated/api', () => ({
@@ -52,6 +54,7 @@ vi.mock('@autional/ui', async () => {
 });
 
 import QRLoginPanel from '@/components/auth/QRLoginPanel';
+import QRCode from 'qrcode';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { loginWithTokens } from '@autional/shared';
 import {
@@ -166,6 +169,30 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 		});
 		// 撤销失败（网络）也照常回到 init
 		expect(screen.getByRole('button', { name: 'qrLogin.getCode' })).toBeInTheDocument();
+	}, 10000);
+
+	it('二维码深链用 https（PWA 无法注册自定义 scheme）', async () => {
+		vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'pending' } as any);
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+
+		await waitFor(() => {
+			expect(vi.mocked(QRCode.toDataURL)).toHaveBeenCalledWith(
+				'https://authenticator.example.test/login-approve?token=tok-1&nm=42',
+				expect.objectContaining({ margin: 1 }),
+			);
+		});
+		const [[payload]] = vi.mocked(QRCode.toDataURL).mock.calls as unknown as [[string]];
+		expect(payload.startsWith('autional://')).toBe(false);
+		expect(payload.startsWith('https://')).toBe(true);
 	}, 10000);
 
 	it('小屏提示：面板给出「手机扫不了自己」的替代路径', () => {

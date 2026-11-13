@@ -14,6 +14,7 @@ import { useResolvedTenantSlug } from '@/hooks/use-tenant-slug';
 import { createLoginSchema } from '@/lib/validators';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import QRLoginPanel from '@/components/auth/QRLoginPanel';
+import InstallAppCard from '@/components/auth/InstallAppCard';
 import EmailCodeLoginForm from '@/components/auth/EmailCodeLoginForm';
 import PhoneCodeLoginForm from '@/components/auth/PhoneCodeLoginForm';
 import IdentifierFirstInput from '@/components/auth/IdentifierFirstInput';
@@ -1000,7 +1001,11 @@ export default function LoginPage() {
 
 				{/* Always show QR panel when qr is the only method OR selected */}
 				{loginMethod === 'qr' && loginMethods.includes('qr') && (
-					<QRLoginPanel tenantId={slugAuthConfig?.tenantId || watch('tenantId')} />
+					<>
+						{/* 未装 App 的用户在扫码面板等于死路：上方先给安装/打开入口 */}
+						<InstallAppCard />
+						<QRLoginPanel tenantId={slugAuthConfig?.tenantId || watch('tenantId')} />
+					</>
 				)}
 
 				{loginMethod === 'magic_link' &&
