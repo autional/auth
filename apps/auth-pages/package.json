@@ -9,7 +9,7 @@
     "build": "node ../../scripts/gen-env.mjs && vite build",
     "prebuild": "node ../../scripts/check-pwa-config.mjs && node ../../scripts/check-non-tenant.mjs",
     "preview": "vite preview --port 13101",
-    "lint": "eslint src/",
+    "lint": "eslint src/ --max-warnings 191",
     "lint:a11y": "eslint -c eslint.a11y.config.mjs --max-warnings 0 \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.sw.json",
     "test": "vitest run",
