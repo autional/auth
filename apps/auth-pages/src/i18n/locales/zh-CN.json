@@ -570,6 +570,7 @@
   "qrLogin.cancel": "取消",
   "qrLogin.success": "登录成功，正在跳转...",
   "qrLogin.retry": "重新获取",
+  "qrLogin.confirmedWithoutToken": "登录已确认，但登录凭证已发放过（可能已被使用或响应丢失），请重新获取二维码登录",
   "auth.install.title": "安装 Autional 身份验证器",
   "auth.install.description": "扫码登录需要手机上的身份验证器。没装也能先装上，装完再回来扫码。",
   "auth.install.hintIos": "iPhone / iPad：用 Safari 打开本页 → 点「分享」→「添加到主屏幕」",

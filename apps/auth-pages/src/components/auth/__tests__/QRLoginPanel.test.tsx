@@ -139,6 +139,51 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 		);
 	}, 12000);
 
+	it('confirmed 但未携带令牌（一次性交付已被消费）→ 终态提示 + 停止轮询', async () => {
+		vi.useFakeTimers();
+		try {
+			// 令牌一次性交付：首次响应丢失后，同 token 再轮询只有 status、无 accessToken
+			vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'confirmed' } as any);
+
+			render(
+				<MemoryRouter initialEntries={['/demo/login']}>
+					<Routes>
+						<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+					</Routes>
+				</MemoryRouter>,
+			);
+
+			fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(0);
+			});
+			// 首个轮询周期（2s）→ 进入终态
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(2100);
+			});
+
+			expect(screen.getByText('qrLogin.confirmedWithoutToken')).toBeInTheDocument();
+			// 不得误建空会话
+			expect(vi.mocked(loginWithTokens)).not.toHaveBeenCalled();
+			// 真实出路：重新获取 + 返回登录
+			expect(screen.getByRole('button', { name: 'qrLogin.retry' })).toBeInTheDocument();
+			expect(screen.getByText('auth.common.backToLogin')).toBeInTheDocument();
+
+			// 停止轮询：再走 3 个周期不再请求
+			const callsAtTerminal = vi.mocked(authQrLoginStatus).mock.calls.length;
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(6000);
+			});
+			expect(vi.mocked(authQrLoginStatus).mock.calls.length).toBe(callsAtTerminal);
+
+			// 「重新获取」复位回 init，可重新发起
+			fireEvent.click(screen.getByRole('button', { name: 'qrLogin.retry' }));
+			expect(screen.getByRole('button', { name: 'qrLogin.getCode' })).toBeInTheDocument();
+		} finally {
+			vi.useRealTimers();
+		}
+	}, 15000);
+
 	it('点取消 → 调用公开 revoke；撤销请求失败也照常本地取消', async () => {
 		vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'pending' } as any);
 		mockApiPost.mockRejectedValue(new Error('network'));

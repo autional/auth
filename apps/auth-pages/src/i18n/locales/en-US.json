@@ -565,6 +565,7 @@
   "qrLogin.cancel": "Cancel",
   "qrLogin.success": "Sign in successful. Redirecting...",
   "qrLogin.retry": "Retry",
+  "qrLogin.confirmedWithoutToken": "Sign-in was confirmed, but the sign-in credential was already issued (possibly used, or the response was lost). Please get a new QR code to sign in.",
   "auth.install.title": "Install Autional Authenticator",
   "auth.install.description": "QR sign-in needs the authenticator app on your phone. Install it first, then come back to scan.",
   "auth.install.hintIos": "iPhone / iPad: open this page in Safari → tap Share → Add to Home Screen",

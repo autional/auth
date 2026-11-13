@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
 import { apiClient, loginWithTokens, getPortalUrl } from '@autional/shared';
 import { loadAuthExtras } from '@/lib/api';
@@ -37,7 +37,9 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const [qrCode, setQrCode] = useState('');
 	const [sessionToken, setSessionToken] = useState('');
 	const [numberMatching, setNumberMatching] = useState('');
-	const [status, setStatus] = useState<'init' | 'pending' | 'scanned' | 'success' | 'error'>('init');
+	const [status, setStatus] = useState<
+		'init' | 'pending' | 'scanned' | 'success' | 'error' | 'confirmed-no-token'
+	>('init');
 	const [error, setError] = useState('');
 	/** 轮询连续失败（网络抖动）→ 给可见提示，而不是静默等到过期。 */
 	const [pollError, setPollError] = useState(false);
@@ -117,6 +119,13 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					setTimeout(() => {
 						window.location.href = getPostLoginTarget({ tenantSlug, redirect });
 					}, 500);
+				} else if (st === 'confirmed') {
+					// 令牌一次性交付（service-identity）：confirmed 的首个响应带令牌，之后同 token 不再返回。
+					// 走到这里 = 首次响应已丢（网络抖动 / 页面刷新）且令牌已被消费 ⇒ 终态，
+					// 不能继续轮询（只会等到 5 分钟过期且用户毫无提示）。
+					if (pollRef.current) clearInterval(pollRef.current);
+					pollRef.current = null;
+					setStatus('confirmed-no-token');
 				} else if (st === 'scanned') {
 					// 手机已扫码待确认（认证器进入审批页即标记）：给桌面端明确反馈
 					setStatus('scanned');
@@ -204,6 +213,32 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					<Button variant="outline" fullWidth onClick={cancelSession}>
 						{t('qrLogin.cancel')}
 					</Button>
+				</div>
+			)}
+
+			{status === 'confirmed-no-token' && (
+				<div className="space-y-3 rounded-lg border border-warning/30 bg-warning/10 p-4 text-center">
+					<p className="text-sm font-medium text-warning-text">
+						{t('qrLogin.confirmedWithoutToken')}
+					</p>
+					<Button
+						fullWidth
+						onClick={() => {
+							// 终态唯一出路：复位面板，重新发起一次扫码会话（旧令牌已消费，无需 revoke）
+							setStatus('init');
+							setError('');
+							setPollError(false);
+							resetCountdown();
+						}}
+					>
+						{t('qrLogin.retry')}
+					</Button>
+					<Link
+						to={tenantSlug ? `/${tenantSlug}/login` : '/login'}
+						className="block text-sm text-brand-text hover:underline"
+					>
+						{t('auth.common.backToLogin')}
+					</Link>
 				</div>
 			)}
 
