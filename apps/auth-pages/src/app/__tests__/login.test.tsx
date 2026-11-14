@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { snakeCaseKeys } from '@autional/shared';
 import LoginPage from '../page';
 
 // 模拟真实 i18next（keySeparator=false）：已登记键命中返回键名；带 defaultValue 且未命中
@@ -441,5 +442,141 @@ describe('LoginPage - passkey 入口', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'auth.login.passkeyTab' }));
 
 		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));
+	});
+});
+
+// ============================================================
+// MFA 票据（URL fragment 交付）：`#mfa_ticket=<opaque>&identity=<email>`
+//   · 挂载即读入内存并剥离 fragment（不落 storage、不打日志、不上报）
+//   · 登录体带票据（拦截器 camel→snake，线上键名 mfa_ticket）
+//   · 票据失效（后端仍 requires_mfa）→ 走既有挑战页回落，不额外报错
+//   · identity 只做预填，不覆盖用户已输入值
+//   · 无 fragment 时行为与旧版完全一致
+// ============================================================
+describe('LoginPage - MFA 票据（fragment）', () => {
+	const identityField = () => screen.getByPlaceholderText('auth.login.identityPlaceholder');
+	const passwordField = () => screen.getByPlaceholderText('auth.login.passwordPlaceholder');
+	const submitButton = () => screen.getByRole('button', { name: 'login.submit' });
+
+	beforeEach(() => {
+		window.history.replaceState(null, '', '/acme-corp/login');
+	});
+
+	afterEach(() => {
+		window.history.replaceState(null, '', '/acme-corp/login');
+		sessionStorage.removeItem('mfa_pre_auth');
+	});
+
+	it('有 #mfa_ticket 时随密码提交，且挂载即清除 fragment', async () => {
+		window.history.replaceState(
+			null,
+			'',
+			'/acme-corp/login#mfa_ticket=mt_opaque_abc&identity=alice%40example.com',
+		);
+		mockAuthLoginPost.mockResolvedValue({
+			accessToken: 'token-abc',
+			refreshToken: 'refresh-abc',
+			user: { id: '1' },
+		});
+		const user = userEvent.setup();
+		renderLoginWithSlug();
+
+		// 挂载即剥离：hash 清空，path/search 保留（历史/截图不再带票据）
+		await waitFor(() => expect(window.location.hash).toBe(''));
+		expect(window.location.pathname).toBe('/acme-corp/login');
+
+		// identity 由 fragment 预填，用户只补密码
+		expect(identityField()).toHaveValue('alice@example.com');
+
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		const body = mockAuthLoginPost.mock.calls[0][0];
+		expect(body).toMatchObject({ identity: 'alice@example.com', mfaTicket: 'mt_opaque_abc' });
+		// 线上键名由 shared 拦截器统一 camel→snake 落定
+		expect(snakeCaseKeys(body)).toMatchObject({ mfa_ticket: 'mt_opaque_abc' });
+
+		// 票据不落任何持久层
+		expect(sessionStorage.getItem('mfa_ticket')).toBeNull();
+		expect(localStorage.getItem('mfa_ticket')).toBeNull();
+	});
+
+	it('无 fragment 时请求体不含 mfa_ticket，且地址栏不被触碰', async () => {
+		mockAuthLoginPost.mockResolvedValue({
+			accessToken: 'token-abc',
+			refreshToken: 'refresh-abc',
+			user: { id: '1' },
+		});
+		const user = userEvent.setup();
+		renderLoginWithSlug();
+
+		await user.type(identityField(), 'testuser');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		const body = mockAuthLoginPost.mock.calls[0][0];
+		expect(body).not.toHaveProperty('mfaTicket');
+		expect(snakeCaseKeys(body)).not.toHaveProperty('mfa_ticket');
+		expect(window.location.hash).toBe('');
+	});
+
+	it('票据失效（后端仍返回 requiresMfa）→ 回落既有 MFA 挑战页，不额外报错', async () => {
+		window.history.replaceState(null, '', '/acme-corp/login#mfa_ticket=mt_expired');
+		mockAuthLoginPost.mockResolvedValue({
+			requiresMfa: true,
+			challengeToken: 'ct-invalid',
+		});
+		const user = userEvent.setup();
+		renderLoginWithSlug();
+
+		await waitFor(() => expect(window.location.hash).toBe(''));
+
+		await user.type(identityField(), 'alice');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		// 票据虽已失效仍照常提交（由后端判定），随后走既有回落
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		expect(mockAuthLoginPost.mock.calls[0][0]).toMatchObject({ mfaTicket: 'mt_expired' });
+
+		await waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith(
+				expect.stringContaining('/acme-corp/mfa-challenge'),
+			);
+		});
+		// 不额外报错、不建会话（行为与无票据时完全一致）
+		expect(screen.queryByText('login.error.credentials')).toBeNull();
+		expect(mockLoginWithTokens).not.toHaveBeenCalled();
+	});
+
+	it('identity 预填不覆盖用户已输入值', async () => {
+		window.history.replaceState(
+			null,
+			'',
+			'/acme-corp/login#mfa_ticket=mt_abc&identity=alice%40example.com',
+		);
+		mockAuthLoginPost.mockResolvedValue({
+			accessToken: 'token-abc',
+			refreshToken: 'refresh-abc',
+			user: { id: '1' },
+		});
+		const user = userEvent.setup();
+		renderLoginWithSlug();
+
+		await waitFor(() => expect(window.location.hash).toBe(''));
+
+		const input = identityField();
+		await user.clear(input);
+		await user.type(input, 'bob@example.com');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		expect(mockAuthLoginPost.mock.calls[0][0]).toMatchObject({
+			identity: 'bob@example.com',
+			mfaTicket: 'mt_abc',
+		});
 	});
 });

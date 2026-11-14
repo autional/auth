@@ -24,6 +24,7 @@ import { useAuthPageInit } from '@/hooks/use-auth-page-init';
 import { resolveClientIdForRequireAuth } from '@/lib/from-requireauth';
 import { bumpRequireAuthLoop } from '@/lib/requireauth-loop-guard';
 import { buildMfaChallengeUrl, resolvePostLoginRedirect } from '@/lib/post-login-redirect';
+import { consumeMfaTicketFragment } from '@/lib/mfa-ticket';
 import { TenantSelector } from '@/components/auth/TenantSelector';
 const DEBUG_TAG = '[captcha]';
 function debug(...args: unknown[]) {
@@ -431,6 +432,7 @@ export default function LoginPage() {
 		handleSubmit,
 		watch,
 		setValue,
+		getValues,
 		formState: { errors },
 	} = useForm<FormData>({
 		resolver: zodResolver(schema),
@@ -451,6 +453,25 @@ export default function LoginPage() {
 			setValue('tenantId', tenants[0].id);
 		}
 	}, [tenants, setValue, tenantSlug]);
+
+	// MFA 票据（URL fragment 交付，见 lib/mfa-ticket）：挂载时一次性读入内存，随后立即
+	// 从地址栏剥离 fragment（不落 sessionStorage/localStorage、不打日志、不上报）。
+	// 票据无效/过期/账号不匹配由后端返回 requires_mfa 表达 → 走既有挑战页回落，本页不判错。
+	const mfaTicketRef = useRef('');
+	const mfaFragmentConsumedRef = useRef(false);
+	useEffect(() => {
+		// 一次性消费：StrictMode 双执行下复跑会读到已剥离的空 fragment
+		if (mfaFragmentConsumedRef.current) return;
+		mfaFragmentConsumedRef.current = true;
+		const { ticket, identity } = consumeMfaTicketFragment();
+		if (ticket) {
+			mfaTicketRef.current = ticket;
+		}
+		// identity 只做预填：用户已输入（含浏览器自动填充）时绝不覆盖
+		if (identity && !getValues('identity')) {
+			setValue('identity', identity);
+		}
+	}, [getValues, setValue]);
 
 	const rememberMe = watch('rememberMe');
 
@@ -611,6 +632,11 @@ export default function LoginPage() {
 			// 客户端 axios 拦截器统一 camel→snake，落 payload 为 device_fingerprint。
 			if (deviceFP) {
 				loginData.deviceFingerprint = deviceFP;
+			}
+			// MFA 票据：仅非空时随密码一起提交（拦截器统一 camel→snake，落 payload 为
+			// mfa_ticket）。票据由 URL fragment 交付、已在挂载时从地址栏剥离。
+			if (mfaTicketRef.current) {
+				loginData.mfaTicket = mfaTicketRef.current;
 			}
 			const res = await authLoginPost(loginData as any);
 			loginResult = res;
