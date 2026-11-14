@@ -38,7 +38,7 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 	const [sessionToken, setSessionToken] = useState('');
 	const [numberMatching, setNumberMatching] = useState('');
 	const [status, setStatus] = useState<
-		'init' | 'pending' | 'scanned' | 'success' | 'error' | 'confirmed-no-token'
+		'init' | 'pending' | 'scanned' | 'success' | 'error' | 'superseded' | 'confirmed-no-token'
 	>('init');
 	const [error, setError] = useState('');
 	/** 轮询连续失败（网络抖动）→ 给可见提示，而不是静默等到过期。 */
@@ -130,8 +130,15 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					// 手机已扫码待确认（认证器进入审批页即标记）：给桌面端明确反馈
 					setStatus('scanned');
 				} else if (st === 'cancelled') {
-					setStatus('error');
-					setError(t('qrLogin.cancelled'));
+					// superseded（被同主体更新请求替代）≠ 被拒绝：前者是用户自己在别处重发，
+					// 给中性文案 + 重新获取；字段缺失/旧后端 → 维持原「登录已取消」行为。
+					if ((data as { superseded?: boolean } | null)?.superseded === true) {
+						setStatus('superseded');
+						setError('');
+					} else {
+						setStatus('error');
+						setError(t('qrLogin.cancelled'));
+					}
 					if (pollRef.current) clearInterval(pollRef.current);
 				} else if (st === 'expired') {
 					setStatus('error');
@@ -212,6 +219,29 @@ export default function QRLoginPanel({ tenantId }: QRLoginPanelProps) {
 					</p>
 					<Button variant="outline" fullWidth onClick={cancelSession}>
 						{t('qrLogin.cancel')}
+					</Button>
+				</div>
+			)}
+
+			{status === 'superseded' && (
+				<div className="space-y-3 rounded-lg border border-brand/30 bg-[var(--color-bg-surface)] p-4 text-center">
+					<p className="text-sm font-medium text-[var(--color-text-primary)]">
+						{t('qrLogin.supersededTitle')}
+					</p>
+					<p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+						{t('qrLogin.supersededDesc')}
+					</p>
+					<Button
+						fullWidth
+						onClick={() => {
+							// 旧令牌已被服务端收敛为终态，无需 revoke；复位后由用户重新发起
+							setStatus('init');
+							setError('');
+							setPollError(false);
+							resetCountdown();
+						}}
+					>
+						{t('qrLogin.retry')}
 					</Button>
 				</div>
 			)}

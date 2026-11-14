@@ -216,6 +216,58 @@ describe('QRLoginPanel - AUTH-53⑤ 会话锚定', () => {
 		expect(screen.getByRole('button', { name: 'qrLogin.getCode' })).toBeInTheDocument();
 	}, 10000);
 
+	it('cancelled + superseded:true → 中性「已被替代」提示（不是被取消/拒绝），可重新获取', async () => {
+		vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'cancelled', superseded: true } as any);
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+
+		await waitFor(
+			() => {
+				expect(screen.getByText('qrLogin.supersededTitle')).toBeInTheDocument();
+			},
+			{ timeout: 8000 },
+		);
+		expect(screen.getByText('qrLogin.supersededDesc')).toBeInTheDocument();
+		// 与普通 cancelled 严格分离：不得落 danger 提示的「登录已取消」
+		expect(screen.queryByText('qrLogin.cancelled')).toBeNull();
+		// 不误建会话
+		expect(vi.mocked(loginWithTokens)).not.toHaveBeenCalled();
+
+		// 重新获取 = 复位回 init
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.retry' }));
+		expect(screen.getByRole('button', { name: 'qrLogin.getCode' })).toBeInTheDocument();
+	}, 10000);
+
+	it('cancelled 且无 superseded 字段（旧后端）→ 行为不变：登录已取消', async () => {
+		vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'cancelled' } as any);
+
+		render(
+			<MemoryRouter initialEntries={['/demo/login']}>
+				<Routes>
+					<Route path=":tenantSlug/login" element={<QRLoginPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'qrLogin.getCode' }));
+
+		await waitFor(
+			() => {
+				expect(screen.getByText('qrLogin.cancelled')).toBeInTheDocument();
+			},
+			{ timeout: 8000 },
+		);
+		expect(screen.queryByText('qrLogin.supersededTitle')).toBeNull();
+	}, 10000);
+
 	it('二维码深链用 https（PWA 无法注册自定义 scheme）', async () => {
 		vi.mocked(authQrLoginStatus).mockResolvedValue({ status: 'pending' } as any);
 

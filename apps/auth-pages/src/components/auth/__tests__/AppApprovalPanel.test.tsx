@@ -136,6 +136,48 @@ describe('AppApprovalPanel', () => {
 		expect(mockGet.mock.calls.length).toBe(callsBefore);
 	});
 
+	it('cancelled + superseded:true → 展示「已被替代」（中性），不落「被拒绝」安全文案', async () => {
+		mockGet.mockResolvedValue({ data: { status: 'cancelled', superseded: true } });
+		const { onConfirmed } = renderPanel();
+
+		fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.start' }));
+
+		await waitFor(
+			() => {
+				expect(
+					screen.getByText('auth.appApproval.supersededTitle'),
+				).toBeInTheDocument();
+			},
+			{ timeout: 8000 },
+		);
+		expect(screen.getByText('auth.appApproval.supersededDesc')).toBeInTheDocument();
+		// 与「被拒绝」严格分离：不得出现 cancelledTitle/Desc（后者含安全告警语义）
+		expect(screen.queryByText('auth.appApproval.cancelledTitle')).toBeNull();
+		expect(screen.queryByText('auth.appApproval.cancelledDesc')).toBeNull();
+		expect(onConfirmed).not.toHaveBeenCalled();
+
+		// 「重新获取」回到初始态（不自动重发）
+		const callsBefore = mockGet.mock.calls.length;
+		fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.retry' }));
+		expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
+		expect(mockGet.mock.calls.length).toBe(callsBefore);
+	});
+
+	it('cancelled 且无 superseded 字段（旧后端）→ 行为不变：仍是被拒绝', async () => {
+		mockGet.mockResolvedValue({ data: { status: 'cancelled' } });
+		renderPanel();
+
+		fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.start' }));
+
+		await waitFor(
+			() => {
+				expect(screen.getByText('auth.appApproval.cancelledTitle')).toBeInTheDocument();
+			},
+			{ timeout: 8000 },
+		);
+		expect(screen.queryByText('auth.appApproval.supersededTitle')).toBeNull();
+	});
+
 	it('卸载时停止轮询并撤销会话（session_token 取自 initiate）', async () => {
 		const { unmount } = renderPanel();
 

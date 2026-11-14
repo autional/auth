@@ -45,6 +45,13 @@ interface StatusResponse {
 	status?: string;
 	accessToken?: string;
 	refreshToken?: string;
+	/**
+	 * 服务端附加语义（additive，旧后端不下发）：
+	 * `status === 'cancelled'` 且 `superseded === true` = 被「同主体更高优先级的更新请求」替代
+	 * （用户自己在别处重新发起了登录），**不是**被人拒绝。
+	 * 缺失/false 时一律按原来的 cancelled（被拒绝）处理，行为零变化。
+	 */
+	superseded?: boolean;
 }
 
 interface AppApprovalPanelProps {
@@ -59,7 +66,14 @@ interface AppApprovalPanelProps {
 	onConfirmed: (accessToken: string, refreshToken: string) => void;
 }
 
-type Phase = 'init' | 'waiting' | 'confirmed' | 'confirmedNoToken' | 'cancelled' | 'expired';
+type Phase =
+	| 'init'
+	| 'waiting'
+	| 'confirmed'
+	| 'confirmedNoToken'
+	| 'cancelled'
+	| 'superseded'
+	| 'expired';
 
 export default function AppApprovalPanel({
 	challengeToken,
@@ -178,7 +192,11 @@ export default function AppApprovalPanel({
 						stopPolling();
 						settledRef.current = true;
 						sessionRef.current = '';
-						setPhase(status === 'cancelled' ? 'cancelled' : 'expired');
+						// superseded（被同主体更新请求替代）与「被拒绝」区分：
+						// 前者是用户自己在别处重发，不含安全风险语义；字段缺失 → 仍按 cancelled。
+						if (status === 'expired') setPhase('expired');
+						else if (data?.superseded === true) setPhase('superseded');
+						else setPhase('cancelled');
 					}
 				} catch {
 					failures += 1;
@@ -257,6 +275,26 @@ export default function AppApprovalPanel({
 				>
 					{t('auth.appApproval.confirmedMissingToken')}
 				</div>
+				{fallbackButton}
+			</div>
+		);
+	}
+
+	// 被「更晚的同主体请求」替代：中性提示，不构成安全告警（无红字/无「请检查账号安全」）
+	if (phase === 'superseded') {
+		return (
+			<div className="space-y-4">
+				<div className="rounded-md border border-brand/30 bg-[var(--color-bg-surface)] p-4 text-center">
+					<p className="text-sm font-medium text-[var(--color-text-primary)]">
+						{t('auth.appApproval.supersededTitle')}
+					</p>
+					<p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+						{t('auth.appApproval.supersededDesc')}
+					</p>
+				</div>
+				<Button fullWidth onClick={retry}>
+					{t('auth.appApproval.retry')}
+				</Button>
 				{fallbackButton}
 			</div>
 		);
