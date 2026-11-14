@@ -117,10 +117,12 @@ describe('MFA 挑战页 · 用 App 确认 → 登录落地', () => {
 			</MemoryRouter>,
 		);
 
-		// 「App 确认」是第一个页签且默认选中：不需要切页签，直接点发起按钮
+		// 「身份验证器」是唯一页签且默认选中：App 审批与手动输入验证码同屏
 		const startButton = await screen.findByRole('button', { name: 'auth.appApproval.start' });
-		// 码面在自己的页签里，默认页签不渲染它
-		expect(document.getElementById('totp-code')).toBeNull();
+		// 同屏宿主：码面就在面板下方，不提供「改用验证码」回落按钮
+		expect(document.getElementById('totp-code')).toBeInTheDocument();
+		expect(screen.getByText('mfa.challenge.orEnterCode')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'auth.appApproval.useCode' })).toBeNull();
 
 		fireEvent.click(startButton);
 

@@ -138,114 +138,86 @@ describe('MFAChallengePage', () => {
 		});
 	});
 
-	it('renders 「App 确认」as the first tab, then the code methods from requiredMfaMethods', async () => {
-		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+	it('renders only code-method tabs (no App tab), ordered by CODE_METHOD_ORDER', async () => {
+		// enrolled 故意乱序：标签顺序由 CODE_METHOD_ORDER 决定（totp 先）
+		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['email', 'totp'] });
 
 		renderMFAChallenge();
 
 		await waitFor(() => {
-			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabApp' })).toBeInTheDocument();
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
 		});
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
-		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
-		// App 确认 + 两个码方法；备用恢复码是 TOTP 的子操作，不占页签
-		expect(screen.getAllByRole('tab')).toHaveLength(3);
+		// 只有码方法页签：「App 确认」不再单列（它是身份验证器面板内的首选路径）
 		expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-			'mfa.challenge.tabApp',
-			'mfa.challenge.tabTOTP',
-			'mfa.challenge.tabSMS',
-		]);
-
-		// AUTH2-01：标签条具备完整 tab 语义，当前面板与选中标签关联
-		expect(
-			screen.getByRole('tablist', { name: 'mfa.challenge.methodLabel' }),
-		).toBeInTheDocument();
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabApp' })).toHaveAttribute(
-			'aria-selected',
-			'true',
-		);
-		expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'mfa-tab-app');
-	});
-
-	it('selects 「App 确认」by default and shows the approval panel (no code form)', async () => {
-		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
-
-		renderMFAChallenge();
-
-		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
-		});
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabApp' })).toHaveAttribute(
-			'aria-selected',
-			'true',
-		);
-		// 码面只在自己的页签里
-		expect(document.getElementById('totp-code')).toBeNull();
-		expect(screen.queryByPlaceholderText('mfa.challenge.codePlaceholder')).toBeNull();
-	});
-
-	it('orders tabs App → authenticator → email when enrolled=[totp,email]', async () => {
-		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['totp', 'email'] });
-
-		renderMFAChallenge();
-
-		await waitFor(() => {
-			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabApp' })).toBeInTheDocument();
-		});
-		expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-			'mfa.challenge.tabApp',
 			'mfa.challenge.tabTOTP',
 			'mfa.challenge.tabEmail',
 		]);
-	});
+		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabApp' })).toBeNull();
+		expect(screen.getAllByRole('tab')).toHaveLength(2);
 
-	it('switches between the approval panel and the authenticator form', async () => {
-		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'], enrolledMfaMethods: ['totp', 'sms'] });
-
-		const user = userEvent.setup();
-		renderMFAChallenge();
-
-		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
-		});
-
-		// 切到「验证器验证码」：码面出现、App 面板消失
-		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
-		expect(await screen.findByText('mfa.challenge.totpLabel')).toBeInTheDocument();
-		expect(document.getElementById('totp-code')).toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: 'auth.appApproval.start' })).toBeNull();
+		// AUTH2-01：标签条具备完整 tab 语义，默认选中首个码方法并与面板关联
+		expect(
+			screen.getByRole('tablist', { name: 'mfa.challenge.methodLabel' }),
+		).toBeInTheDocument();
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toHaveAttribute(
 			'aria-selected',
 			'true',
 		);
 		expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'mfa-tab-totp');
-		// 没点过发起，也不该有审批会话在跑
-		expect(screen.queryByTestId('app-approval-code')).toBeNull();
+	});
 
-		// 点回「App 确认」：面板重新出现、码面消失
-		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabApp' }));
+	it('shows the App approval panel above the code form inside the authenticator tab', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+
+		renderMFAChallenge();
+
+		// 默认选中「身份验证器」：面板与手动输入验证码同屏
 		expect(
 			await screen.findByRole('button', { name: 'auth.appApproval.start' }),
 		).toBeInTheDocument();
-		expect(document.getElementById('totp-code')).toBeNull();
+		expect(screen.getByText('mfa.challenge.orEnterCode')).toBeInTheDocument();
+		expect(screen.getByText('mfa.challenge.totpLabel')).toBeInTheDocument();
+		expect(document.getElementById('totp-code')).toBeInTheDocument();
+
+		// DOM 顺序：App 确认面板在码面之前
+		const startButton = screen.getByRole('button', { name: 'auth.appApproval.start' });
+		const codeInput = document.getElementById('totp-code')!;
+		expect(
+			startButton.compareDocumentPosition(codeInput) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+
+		// 同屏宿主不传 onFallback：没有「改用验证码」按钮（码面本来就在下面）
+		expect(screen.queryByRole('button', { name: 'auth.appApproval.useCode' })).toBeNull();
 	});
 
-	it('falls back to the first code method from the approval panel', async () => {
+	it('keeps the approval panel on the authenticator tab and hides it on the email tab', async () => {
 		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['totp', 'email'] });
 
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 页签式宿主传了 onFallback：面板里有「改用验证码」出口
-		await user.click(await screen.findByRole('button', { name: 'auth.appApproval.useCode' }));
+		expect(
+			await screen.findByRole('button', { name: 'auth.appApproval.start' }),
+		).toBeInTheDocument();
 
-		expect(await screen.findByText('mfa.challenge.totpLabel')).toBeInTheDocument();
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toHaveAttribute(
-			'aria-selected',
-			'true',
-		);
+		// 切到「邮箱验证」：面板与码面一起消失，邮箱表单出现
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' }));
+		expect(await screen.findByText('mfa.challenge.emailLabel')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'auth.appApproval.start' })).toBeNull();
+		expect(screen.queryByText('mfa.challenge.orEnterCode')).toBeNull();
+		expect(document.getElementById('totp-code')).toBeNull();
+		expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'mfa-tab-email');
+
+		// 切回「身份验证器」：面板与码面一起恢复
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		expect(
+			await screen.findByRole('button', { name: 'auth.appApproval.start' }),
+		).toBeInTheDocument();
+		expect(screen.getByText('mfa.challenge.orEnterCode')).toBeInTheDocument();
+		expect(document.getElementById('totp-code')).toBeInTheDocument();
+		expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'mfa-tab-totp');
+		// 没点过发起，也不该有审批会话在跑
+		expect(screen.queryByTestId('app-approval-code')).toBeNull();
 	});
 
 	it('falls back to all code methods when requiredMfaMethods has no code method', async () => {
@@ -257,8 +229,8 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
-		// 三种码方法 + 首位「App 确认」
-		expect(screen.getAllByRole('tab')).toHaveLength(4);
+		// 只有三种码方法，没有「App 确认」页签
+		expect(screen.getAllByRole('tab')).toHaveLength(3);
 	});
 
 	it('uses enrolledMfaMethods over requiredMfaMethods (only enrolled methods shown)', async () => {
@@ -271,25 +243,20 @@ describe('MFAChallengePage', () => {
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
-		// App 确认 + enrolled 的两个码方法
-		expect(screen.getAllByRole('tab')).toHaveLength(3);
+		expect(screen.getAllByRole('tab')).toHaveLength(2);
 	});
 
-	it('keeps 「App 确认」available when only one code method is enrolled', async () => {
+	it('keeps the App approval panel when only one code method is enrolled', async () => {
 		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['email'] });
 
 		renderMFAChallenge();
 
-		// 挑战令牌在场 → 首位仍是「App 确认」；单码方法时标签栏只有 App + 该方法
-		await waitFor(() => {
-			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabApp' })).toBeInTheDocument();
-		});
-		expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-			'mfa.challenge.tabApp',
-			'mfa.challenge.tabEmail',
-		]);
-		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabTOTP' })).not.toBeInTheDocument();
-		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
+		// 单一码方法：无标签条，直接落到邮箱表单
+		expect(await screen.findByText('mfa.challenge.emailLabel')).toBeInTheDocument();
+		expect(screen.queryByRole('tablist')).toBeNull();
+		expect(screen.queryByRole('tab')).toBeNull();
+		// 面板属于身份验证器面板，邮箱面不渲染它
+		expect(screen.queryByRole('button', { name: 'auth.appApproval.start' })).toBeNull();
 	});
 
 	it('shows risk banner when riskLevel is present', async () => {
@@ -314,8 +281,7 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});
@@ -368,7 +334,6 @@ describe('MFAChallengePage', () => {
 				</MemoryRouter>,
 			);
 
-			await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
 			await waitFor(() => {
 				expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 			});
@@ -400,8 +365,7 @@ describe('MFAChallengePage', () => {
 			</MemoryRouter>,
 		);
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});
@@ -420,13 +384,16 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 备用恢复码是验证器页签内的次级操作：先切到该页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 备用恢复码是验证器面板内的次级操作（不单列页签）
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'mfa.challenge.useBackup' })).toBeInTheDocument();
 		});
 
 		await user.click(screen.getByRole('button', { name: 'mfa.challenge.useBackup' }));
+		// 备用恢复码模式只显示备用码表单：App 面板与验证码输入框一起收起
+		expect(screen.queryByRole('button', { name: 'auth.appApproval.start' })).toBeNull();
+		expect(screen.queryByText('mfa.challenge.orEnterCode')).toBeNull();
+		expect(document.getElementById('totp-code')).toBeNull();
 		await user.type(screen.getByPlaceholderText('mfa.challenge.backupPlaceholder'), 'ABCDEFGH');
 		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
 
@@ -440,10 +407,9 @@ describe('MFAChallengePage', () => {
 	it('does not offer backup codes when TOTP is not enrolled', async () => {
 		seedPreAuth({ requiredMfaMethods: [], enrolledMfaMethods: ['email'] });
 
-		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabEmail' }));
+		// 单一码方法（邮箱）：无标签条，直接就是邮箱面
 		await waitFor(() => {
 			expect(screen.getByText('mfa.challenge.emailLabel')).toBeInTheDocument();
 		});
@@ -488,8 +454,7 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});
@@ -515,8 +480,7 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});
@@ -539,8 +503,7 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});
@@ -593,7 +556,7 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabEmail' }));
+		// 单一码方法（邮箱）：无标签条，直接就是邮箱面
 		await waitFor(() => {
 			expect(screen.getByText('mfa.challenge.emailLabel')).toBeInTheDocument();
 		});
@@ -609,11 +572,9 @@ describe('MFAChallengePage', () => {
 	it('does not render a send button for TOTP-only challenges', async () => {
 		seedPreAuth({ requiredMfaMethods: ['totp'] });
 
-		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});
@@ -650,8 +611,7 @@ describe('MFAChallengePage', () => {
 		const user = userEvent.setup();
 		renderMFAChallenge();
 
-		// 默认页签是「App 确认」：码面用例先切到验证器页签
-		await user.click(await screen.findByRole('tab', { name: 'mfa.challenge.tabTOTP' }));
+		// 默认选中「身份验证器」且同屏：码面直接可用（单一方法时无标签条）
 		await waitFor(() => {
 			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
 		});

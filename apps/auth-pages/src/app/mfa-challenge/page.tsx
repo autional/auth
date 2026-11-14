@@ -29,10 +29,11 @@ import { userFromAccessToken } from '@/lib/session-user';
 type CodeMethod = 'totp' | 'sms' | 'email';
 type VerifyMethod = CodeMethod | 'backup';
 /**
- * 页签：与登录页同款「标签栏在最上面」——「App 确认」排第一，其后是码方法。
- * 有挑战令牌时才有 App 页签（没有令牌就无从发起审批）。
+ * 页签 = 码方法（与登录页同款「标签栏在最上面」）。
+ * 「在 App 中确认」不是并列页签，而是身份验证器面板内的首选路径（免验证码），
+ * 与手动输入验证码同屏：先给 App 审批，下面再给码面。
  */
-type TabKey = 'app' | 'totp' | 'sms' | 'email';
+type TabKey = CodeMethod;
 
 // 登录页/mfa-setup 写入的挑战会话（oauth/callback 写入子集：无 email/phone/riskLevel）
 interface PreAuthData {
@@ -143,7 +144,7 @@ export default function MFAChallengePage() {
 
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
-	const [activeTab, setActiveTab] = useState<TabKey>('app');
+	const [activeTab, setActiveTab] = useState<TabKey>('totp');
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -188,16 +189,15 @@ export default function MFAChallengePage() {
 		setPreAuth(parsed);
 	}, [navigate, loginPath]);
 
-	// 页签 = 「App 确认」+ 码方法（与登录页同款：标签栏在最上面，App 排第一）。
-	// 没有挑战令牌就没有可发起的审批，此时只列码方法。
-	const tabs = useMemo<TabKey[]>(() => {
-		const codeTabs = deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods);
-		return preAuth?.challengeToken ? ['app', ...codeTabs] : codeTabs;
-	}, [preAuth]);
+	// 页签 = 可见码方法（标签栏在最上面）。默认落到首个（CODE_METHOD_ORDER 保证 totp 优先）。
+	const tabs = useMemo<TabKey[]>(
+		() => deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods),
+		[preAuth],
+	);
 
 	useEffect(() => {
 		if (preAuth && !tabs.includes(activeTab)) {
-			// 回落落点是标签栏首项（有挑战令牌时即「App 确认」；deriveTabs 保证非空）
+			// 回落落点是标签栏首项（deriveTabs 保证非空）
 			setActiveTab(tabs[0]);
 			setTotpFallback(false);
 		}
@@ -209,13 +209,14 @@ export default function MFAChallengePage() {
 	const backupForm = useForm<BackupFormData>({ resolver: zodResolver(backupSchema) });
 
 	// 切到某个码方法时聚焦其验证码输入框（替代 autoFocus：jsx-a11y/no-autofocus）。
-	// 「App 确认」页签没有输入框，不聚焦（只有切到码方法才抢焦点）。
 	// 用 RHF 的 setFocus 而不是自建 ref：输入框 ref 由 register() 接管，另加 ref 会被覆盖。
+	// 只在当前页签确有该表单时聚焦（标签栏回落后到首个可用方法，避免对未渲染表单抢焦点）。
 	useEffect(() => {
+		if (!tabs.includes(activeTab)) return;
 		if (activeTab === 'totp') totpForm.setFocus('code');
 		else if (activeTab === 'sms') smsForm.setFocus('code');
 		else if (activeTab === 'email') emailForm.setFocus('code');
-	}, [activeTab, totpForm, smsForm, emailForm]);
+	}, [activeTab, tabs, totpForm, smsForm, emailForm]);
 
 	// 会话租户：登录挑战写入值优先，slug 名单兜底（公开 API 无租户头）
 	const tenantIdForSession =
@@ -345,15 +346,6 @@ export default function MFAChallengePage() {
 		setTotpFallback(false);
 		setError('');
 		document.getElementById(`mfa-tab-${nextKey}`)?.focus();
-	};
-
-	// 「App 确认」页签的回落动作：切到首个码方法（标签栏式宿主才需要的退出口）
-	const goToFirstCodeMethod = () => {
-		const firstCode = tabs.find((existing): existing is CodeMethod => existing !== 'app');
-		if (!firstCode) return;
-		setActiveTab(firstCode);
-		setTotpFallback(false);
-		setError('');
 	};
 
 	// 单方法时无标签条，不声明 tabpanel 语义
@@ -486,7 +478,6 @@ export default function MFAChallengePage() {
 	}
 
 	const tabLabel = (key: TabKey) => {
-		if (key === 'app') return t('mfa.challenge.tabApp');
 		if (key === 'totp') return t('mfa.challenge.tabTOTP');
 		return key === 'sms' ? t('mfa.challenge.tabSMS') : t('mfa.challenge.tabEmail');
 	};
@@ -555,52 +546,55 @@ export default function MFAChallengePage() {
 				</div>
 			)}
 
-			{/* 「App 确认」：普通页签（排首位），选中时才挂载；不自动发起 */}
-			{activeTab === 'app' && (
-				<div {...tabPanelProps('app')}>
-					<AppApprovalPanel
-						challengeToken={preAuth.challengeToken}
-						onConfirmed={finishLogin}
-						onFallback={goToFirstCodeMethod}
-					/>
-				</div>
-			)}
-
+			{/*
+			 * 身份验证器面板 = 首选「在 App 中确认」（免验证码）+ 手动输入验证码，同屏从上到下。
+			 * 同屏宿主不传 onFallback（码面就在下面，不需要「改用验证码」按钮）。
+			 * 不自动发起审批：用户点「在 App 中确认」才建会话。
+			 */}
 			{activeTab === 'totp' && !totpFallback && (
-				<form
-					{...tabPanelProps('totp')}
-					onSubmit={totpForm.handleSubmit((data) => handleSubmit(data.code, 'totp'))}
-					className="space-y-4"
-				>
-					<div className="space-y-2">
-						<Label htmlFor="totp-code">{t('mfa.challenge.totpLabel')}</Label>
-						<Input
-							id="totp-code"
-							type="text"
-							inputMode="numeric"
-							maxLength={6}
-							placeholder={t('mfa.challenge.codePlaceholder')}
-							{...totpForm.register('code')}
-							error={totpForm.formState.errors.code?.message}
-						/>
-						<p className="text-xs text-[var(--color-text-secondary)]">
-							{t('mfa.challenge.totpHelp')}
-						</p>
+				<div {...tabPanelProps('totp')} className="space-y-4">
+					{preAuth.challengeToken && (
+						<AppApprovalPanel challengeToken={preAuth.challengeToken} onConfirmed={finishLogin} />
+					)}
+					<div className="flex items-center gap-3 text-xs text-[var(--color-text-secondary)]">
+						<span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
+						{t('mfa.challenge.orEnterCode')}
+						<span className="h-px flex-1 bg-[var(--color-border-subtle)]" />
 					</div>
-					<Button type="submit" fullWidth isLoading={submitting}>
-						{t('mfa.challenge.verify')}
-					</Button>
-					<button
-						type="button"
-						onClick={() => {
-							setTotpFallback(true);
-							setError('');
-						}}
-						className="w-full text-center text-sm text-brand-text hover:underline"
+					<form
+						onSubmit={totpForm.handleSubmit((data) => handleSubmit(data.code, 'totp'))}
+						className="space-y-4"
 					>
-						{t('mfa.challenge.useBackup')}
-					</button>
-				</form>
+						<div className="space-y-2">
+							<Label htmlFor="totp-code">{t('mfa.challenge.totpLabel')}</Label>
+							<Input
+								id="totp-code"
+								type="text"
+								inputMode="numeric"
+								maxLength={6}
+								placeholder={t('mfa.challenge.codePlaceholder')}
+								{...totpForm.register('code')}
+								error={totpForm.formState.errors.code?.message}
+							/>
+							<p className="text-xs text-[var(--color-text-secondary)]">
+								{t('mfa.challenge.totpHelp')}
+							</p>
+						</div>
+						<Button type="submit" fullWidth isLoading={submitting}>
+							{t('mfa.challenge.verify')}
+						</Button>
+						<button
+							type="button"
+							onClick={() => {
+								setTotpFallback(true);
+								setError('');
+							}}
+							className="w-full text-center text-sm text-brand-text hover:underline"
+						>
+							{t('mfa.challenge.useBackup')}
+						</button>
+					</form>
+				</div>
 			)}
 
 			{activeTab === 'sms' && (
