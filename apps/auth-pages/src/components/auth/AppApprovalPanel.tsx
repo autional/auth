@@ -172,6 +172,8 @@ export default function AppApprovalPanel({
 			void (async () => {
 				try {
 					const res = await apiClient.get(STATUS_PATH, { params: { token } });
+					// 取消/撤销后 sessionRef 已被清空：丢弃迟到响应，避免误判 confirmed（并发取消回归）
+					if (sessionRef.current !== token) return;
 					const data = (res?.data ?? null) as StatusResponse | null;
 					failures = 0;
 					setPollFailed(false);
@@ -202,6 +204,8 @@ export default function AppApprovalPanel({
 						else setPhase('cancelled');
 					}
 				} catch {
+					// 同上：取消后的迟到失败不累计计数，避免回到未发起态仍弹「网络重试」
+					if (sessionRef.current !== token) return;
 					failures += 1;
 					if (failures >= POLL_FAILURE_LIMIT) setPollFailed(true);
 				}

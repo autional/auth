@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import React from 'react';
 
 // 「用 App 确认」回归锁：
@@ -234,5 +234,55 @@ describe('AppApprovalPanel', () => {
 		).toHaveLength(1);
 		// 未重新发起：只有最初的 initiate 一次 POST
 		expect(mockPost.mock.calls.filter(([url]) => url === INITIATE_PATH)).toHaveLength(1);
+	});
+
+	// 取消是**并发**动作：点「取消本次请求」时可能正好有一次 GET 在途。
+	// 服务端已按取消前的会话签发了凭证，迟到的 confirmed 若被采信，用户会在
+	// 明确取消后被静默登录（误判成功）。回归锁：迟到响应必须被丢弃。
+	it('取消后迟到的 confirmed 不得改变 UI（不得误判登录成功）', async () => {
+		vi.useFakeTimers();
+		try {
+			// 可控 deferred：轮询发起后请求挂起，由测试决定何时、以什么状态 resolve
+			let resolveStatus: ((value: unknown) => void) | undefined;
+			const pendingStatus = new Promise<unknown>((resolve) => {
+				resolveStatus = resolve;
+			});
+			mockGet.mockReturnValue(pendingStatus);
+
+			const { onConfirmed } = renderPanel();
+
+			fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.start' }));
+			// 发起链是纯微任务（指纹 → POST → setPhase），不需要推进时钟
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(0);
+			});
+			expect(screen.getByTestId('app-approval-code')).toHaveTextContent('482913');
+
+			// 触发一次轮询（2s 间隔）：请求发出后挂起，处于「在途」状态
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(2000);
+			});
+			expect(mockGet).toHaveBeenCalledWith(STATUS_PATH, { params: { token: 'sess-1' } });
+			expect(typeof resolveStatus).toBe('function');
+
+			// 在途期间取消：sessionRef 被清空，phase 回到 init
+			fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.cancel' }));
+			expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
+
+			// 迟到的 confirmed 到达：必须被丢弃
+			await act(async () => {
+				resolveStatus?.({ data: { status: 'confirmed', accessToken: 'AT-late', refreshToken: 'RT-late' } });
+				await vi.advanceTimersByTimeAsync(0);
+			});
+
+			// 仍在未发起态：发起按钮在场、审批码不在场、确认态文案不在场
+			expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
+			expect(screen.queryByTestId('app-approval-code')).toBeNull();
+			expect(screen.queryByText('auth.appApproval.confirmedTitle')).toBeNull();
+			// 关键断言：没触发登录落地（迟到 token 不得被使用）
+			expect(onConfirmed).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
