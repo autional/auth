@@ -458,14 +458,19 @@ export default function LoginPage() {
 	// 从地址栏剥离 fragment（不落 sessionStorage/localStorage、不打日志、不上报）。
 	// 票据无效/过期/账号不匹配由后端返回 requires_mfa 表达 → 走既有挑战页回落，本页不判错。
 	const mfaTicketRef = useRef('');
+	// 票据归属的 OAuth client_id（Phase 1 受众绑定）：与票据同源同生命周期——
+	// 无票据时该值不参与任何提交（见 onSubmit 的 mfaTicket 分支）。
+	const mfaClientIdRef = useRef('');
 	const mfaFragmentConsumedRef = useRef(false);
 	useEffect(() => {
 		// 一次性消费：StrictMode 双执行下复跑会读到已剥离的空 fragment
 		if (mfaFragmentConsumedRef.current) return;
 		mfaFragmentConsumedRef.current = true;
-		const { ticket, identity } = consumeMfaTicketFragment();
+		const { ticket, identity, clientId } = consumeMfaTicketFragment();
 		if (ticket) {
 			mfaTicketRef.current = ticket;
+			// 旧版 App 的 fragment 没有 client_id → 保持空串，登录体不携带该键
+			mfaClientIdRef.current = clientId;
 		}
 		// identity 只做预填：用户已输入（含浏览器自动填充）时绝不覆盖
 		if (identity && !getValues('identity')) {
@@ -637,6 +642,18 @@ export default function LoginPage() {
 			// mfa_ticket）。票据由 URL fragment 交付、已在挂载时从地址栏剥离。
 			if (mfaTicketRef.current) {
 				loginData.mfaTicket = mfaTicketRef.current;
+				// 票据桥（Phase 1，docs/MFA-BRIDGE-BOUNDARY-PHASE1 §5.8）：随票提交受众
+				// client_id（拦截器落 client_id）与回跳地址（落 mfa_redirect）。
+				// 两者都是「有票才发」：无票登录的请求体键集合必须与改造前逐 key 相同。
+				// client_id 缺失（旧版 App 的 fragment）→ 不发该键，由后端按无票回落。
+				if (mfaClientIdRef.current) {
+					loginData.clientId = mfaClientIdRef.current;
+				}
+				// mfa_redirect = 登录页 redirect 查询参数原值；无该参数则不发送
+				// （Phase 1 服务端只做 host 一致性审计，不拒绝）。
+				if (redirect) {
+					loginData.mfaRedirect = redirect;
+				}
 			}
 			const res = await authLoginPost(loginData as any);
 			loginResult = res;

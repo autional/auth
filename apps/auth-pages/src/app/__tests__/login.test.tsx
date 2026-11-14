@@ -94,9 +94,15 @@ function renderLogin() {
 
 // 带 slug 路由的渲染（useParams 生效）；用于验证 slug 解析失败时的页面形态。
 function renderLoginWithSlug() {
+	return renderLoginWithSlugAt('/acme-corp/login');
+}
+
+// 指定初始路由（含 query）的 slug 渲染：登录页 redirect 查询参数由 MemoryRouter 提供，
+// 而 fragment（票据）来自真实 window.location，两者互不干扰。
+function renderLoginWithSlugAt(path: string) {
 	return render(
 		<QueryClientProvider client={queryClient}>
-			<MemoryRouter initialEntries={['/acme-corp/login']}>
+			<MemoryRouter initialEntries={[path]}>
 				<Routes>
 					<Route path=":tenantSlug/login" element={<LoginPage />} />
 				</Routes>
@@ -578,5 +584,159 @@ describe('LoginPage - MFA 票据（fragment）', () => {
 			identity: 'bob@example.com',
 			mfaTicket: 'mt_abc',
 		});
+	});
+});
+
+// ============================================================
+// MFA 票据桥（Phase 1，docs/MFA-BRIDGE-BOUNDARY-PHASE1 §5.8）
+//   · fragment 增 `client_id`（公开标识，与票据同一条投递路径，读后一并剥离）
+//   · 有票：登录体补 clientId（拦截器统一 camel→snake 落 client_id）+ mfaRedirect（redirect 原值）
+//   · 无票：请求体键全集与改造前逐 key 相同 —— 边界字段不得泄漏到普通登录
+// ============================================================
+describe('LoginPage - MFA 票据桥（Phase 1）', () => {
+	const identityField = () => screen.getByPlaceholderText('auth.login.identityPlaceholder');
+	const passwordField = () => screen.getByPlaceholderText('auth.login.passwordPlaceholder');
+	const submitButton = () => screen.getByRole('button', { name: 'login.submit' });
+
+	// 非真实 ULID：避免与「前端源码 client_id 字面量 = 0」守卫冲突，本页也不校验票据/受众格式
+	const CLIENT_ID = 'client_test_bridge01';
+	const SUCCESS = { accessToken: 'token-abc', refreshToken: 'refresh-abc', user: { id: '1' } };
+
+	beforeEach(() => {
+		window.history.replaceState(null, '', '/acme-corp/login');
+	});
+
+	afterEach(() => {
+		window.history.replaceState(null, '', '/acme-corp/login');
+		sessionStorage.removeItem('mfa_pre_auth');
+	});
+
+	it('有票：随密码提交 clientId 与 mfaRedirect（落 client_id / mfa_redirect）', async () => {
+		window.history.replaceState(
+			null,
+			'',
+			`/acme-corp/login#mfa_ticket=mt_abc&identity=alice%40example.com&client_id=${CLIENT_ID}`,
+		);
+		mockAuthLoginPost.mockResolvedValue(SUCCESS);
+		const user = userEvent.setup();
+		renderLoginWithSlugAt('/acme-corp/login?redirect=%2Fdashboard%3Fmfa_sso%3D1');
+
+		// client_id 与票据同路径：随 fragment 一并剥离，不残留地址栏
+		await waitFor(() => expect(window.location.hash).toBe(''));
+		expect(window.location.pathname + window.location.search).toBe('/acme-corp/login');
+
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		const body = mockAuthLoginPost.mock.calls[0][0];
+		expect(body).toMatchObject({
+			identity: 'alice@example.com',
+			mfaTicket: 'mt_abc',
+			clientId: CLIENT_ID,
+			mfaRedirect: '/dashboard?mfa_sso=1',
+		});
+		// 线上键名由 shared 拦截器统一 camel→snake 落定
+		expect(snakeCaseKeys(body)).toMatchObject({
+			mfa_ticket: 'mt_abc',
+			client_id: CLIENT_ID,
+			mfa_redirect: '/dashboard?mfa_sso=1',
+		});
+		// 票据与受众同样不落任何持久层
+		expect(sessionStorage.getItem('client_id')).toBeNull();
+		expect(localStorage.getItem('client_id')).toBeNull();
+	});
+
+	it('有票但 fragment 无 client_id（旧版 App）→ 不发 clientId，不被凭空补值', async () => {
+		window.history.replaceState(null, '', '/acme-corp/login#mfa_ticket=mt_abc');
+		mockAuthLoginPost.mockResolvedValue(SUCCESS);
+		const user = userEvent.setup();
+		renderLoginWithSlugAt('/acme-corp/login?redirect=%2Fdashboard');
+
+		await waitFor(() => expect(window.location.hash).toBe(''));
+
+		await user.type(identityField(), 'alice');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		const body = mockAuthLoginPost.mock.calls[0][0];
+		expect(body).not.toHaveProperty('clientId');
+		expect(snakeCaseKeys(body)).not.toHaveProperty('client_id');
+		// mfa_redirect 与 client_id 相互独立：仍按 redirect 原值提交
+		expect(body).toMatchObject({ mfaTicket: 'mt_abc', mfaRedirect: '/dashboard' });
+	});
+
+	it('有票但登录页无 redirect 查询参数 → 不发 mfaRedirect', async () => {
+		window.history.replaceState(null, '', `/acme-corp/login#mfa_ticket=mt_abc&client_id=${CLIENT_ID}`);
+		mockAuthLoginPost.mockResolvedValue(SUCCESS);
+		const user = userEvent.setup();
+		renderLoginWithSlugAt('/acme-corp/login');
+
+		await waitFor(() => expect(window.location.hash).toBe(''));
+
+		await user.type(identityField(), 'alice');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		const body = mockAuthLoginPost.mock.calls[0][0];
+		expect(body).not.toHaveProperty('mfaRedirect');
+		expect(snakeCaseKeys(body)).not.toHaveProperty('mfa_redirect');
+		expect(body).toMatchObject({ mfaTicket: 'mt_abc', clientId: CLIENT_ID });
+	});
+
+	it('无票：请求体键全集与改造前完全一致（边界字段零泄漏）', async () => {
+		mockAuthLoginPost.mockResolvedValue(SUCCESS);
+		const user = userEvent.setup();
+		// 同样的 redirect 查询存在也不得触发 mfa_redirect：字段只在有票时才会出现
+		renderLoginWithSlugAt('/acme-corp/login?redirect=%2Fdashboard');
+
+		await user.type(identityField(), 'testuser');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		const body = mockAuthLoginPost.mock.calls[0][0];
+		// 基线（改造前实测，见 git 历史同样用例）：无票请求体的键全集必须逐 key 相同。
+		// 任何一个新键出现在这里都说明「边界字段泄漏到普通登录」——直接失败。
+		expect(Object.keys(body).sort()).toEqual([
+			'identity',
+			'password',
+			'passwordTransmission',
+			'tenantId',
+		]);
+		expect(body).not.toHaveProperty('clientId');
+		expect(body).not.toHaveProperty('mfaRedirect');
+		expect(body).not.toHaveProperty('mfaTicket');
+	});
+
+	it('有票（含 client_id）但票据失效 → 仍回落既有 MFA 挑战页，不额外报错', async () => {
+		window.history.replaceState(
+			null,
+			'',
+			`/acme-corp/login#mfa_ticket=mt_expired&client_id=${CLIENT_ID}`,
+		);
+		mockAuthLoginPost.mockResolvedValue({ requiresMfa: true, challengeToken: 'ct-invalid' });
+		const user = userEvent.setup();
+		renderLoginWithSlugAt('/acme-corp/login');
+
+		await waitFor(() => expect(window.location.hash).toBe(''));
+
+		await user.type(identityField(), 'alice');
+		await user.type(passwordField(), 'pass123');
+		await user.click(submitButton());
+
+		await waitFor(() => expect(mockAuthLoginPost).toHaveBeenCalled());
+		expect(mockAuthLoginPost.mock.calls[0][0]).toMatchObject({
+			mfaTicket: 'mt_expired',
+			clientId: CLIENT_ID,
+		});
+		await waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith(
+				expect.stringContaining('/acme-corp/mfa-challenge'),
+			);
+		});
+		expect(mockLoginWithTokens).not.toHaveBeenCalled();
 	});
 });
