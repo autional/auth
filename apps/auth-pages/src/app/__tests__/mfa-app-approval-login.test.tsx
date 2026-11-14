@@ -117,15 +117,13 @@ describe('MFA 挑战页 · 用 App 确认 → 登录落地', () => {
 			</MemoryRouter>,
 		);
 
-		// 「用 App 确认」标签排在码方法之前；默认仍停在 TOTP，要求用户主动切过去
-		const appTab = await screen.findByRole('tab', { name: 'auth.appApproval.tab' });
-		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toHaveAttribute(
-			'aria-selected',
-			'true',
-		);
+		// 「用 App 确认」与验证码同屏常驻：不需要切页签，直接点发起按钮
+		const startButton = await screen.findByRole('button', { name: 'auth.appApproval.start' });
+		expect(screen.queryByRole('tab', { name: 'auth.appApproval.tab' })).not.toBeInTheDocument();
+		// 码面同时在场（TOTP 是默认码方法）——两个入口一屏可见
+		expect(document.getElementById('totp-code')).toBeInTheDocument();
 
-		fireEvent.click(appTab);
-		fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.start' }));
+		fireEvent.click(startButton);
 
 		await waitFor(
 			() => {

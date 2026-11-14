@@ -28,8 +28,8 @@ import { userFromAccessToken } from '@/lib/session-user';
 
 type CodeMethod = 'totp' | 'sms' | 'email';
 type VerifyMethod = CodeMethod | 'backup';
-/** 「用 App 确认」不是码方法：它把最后一跳交给已登录的身份验证器（无码面）。 */
-type TabKey = CodeMethod | 'app';
+/** 页签只承载码方法；「用 App 确认」与码面同屏常驻，不占页签。 */
+type TabKey = CodeMethod;
 
 // 登录页/mfa-setup 写入的挑战会话（oauth/callback 写入子集：无 email/phone/riskLevel）
 interface PreAuthData {
@@ -185,17 +185,16 @@ export default function MFAChallengePage() {
 		setPreAuth(parsed);
 	}, [navigate, loginPath]);
 
-	// 「用 App 确认」放在码方法之前，但只在拿到挑战令牌时才出现（无令牌无从 initiate）；
-	// 默认仍停在原 TOTP tab（不改变既有默认行为）。
-	const tabs = useMemo<TabKey[]>(() => {
-		const codeTabs = deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods);
-		return preAuth?.challengeToken ? (['app'] as TabKey[]).concat(codeTabs) : codeTabs;
-	}, [preAuth]);
+	// 页签只列码方法；「用 App 确认」不入页签（由下方常驻面板承载，与码面同屏）。
+	const tabs = useMemo<TabKey[]>(
+		() => deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods),
+		[preAuth],
+	);
 
 	useEffect(() => {
 		if (preAuth && !tabs.includes(activeTab)) {
-			// 回落时优先码方法：'app' 是需要用户主动点的路径，不能成为默认落点
-			setActiveTab(tabs.find((key) => key !== 'app') || tabs[0]);
+			// 回落落点是首个码方法（deriveTabs 保证非空）
+			setActiveTab(tabs[0]);
 			setTotpFallback(false);
 		}
 	}, [preAuth, tabs, activeTab]);
@@ -211,7 +210,6 @@ export default function MFAChallengePage() {
 		if (activeTab === 'totp') totpForm.setFocus('code');
 		else if (activeTab === 'sms') smsForm.setFocus('code');
 		else if (activeTab === 'email') emailForm.setFocus('code');
-		// 'app' 无输入框：不聚焦（对未注册字段 setFocus 会触发 RHF 告警）
 	}, [activeTab, totpForm, smsForm, emailForm]);
 
 	// 会话租户：登录挑战写入值优先，slug 名单兜底（公开 API 无租户头）
@@ -474,17 +472,23 @@ export default function MFAChallengePage() {
 	}
 
 	const tabLabel = (key: TabKey) =>
-		key === 'app'
-			? t('auth.appApproval.tab')
-			: key === 'totp'
-				? t('mfa.challenge.tabTOTP')
-				: key === 'sms'
-					? t('mfa.challenge.tabSMS')
-					: t('mfa.challenge.tabEmail');
+		key === 'totp'
+			? t('mfa.challenge.tabTOTP')
+			: key === 'sms'
+				? t('mfa.challenge.tabSMS')
+				: t('mfa.challenge.tabEmail');
 
 	return (
 		<AuthCard>
 			<AuthHeader title={t('mfa.challenge.title')} subtitle={t('mfa.challenge.subtitle')} />
+
+			{/* 「用 App 确认」同屏常驻：与码面并列可见，不占页签，也不自动发起 */}
+			{preAuth.challengeToken && (
+				<AppApprovalPanel
+					challengeToken={preAuth.challengeToken}
+					onConfirmed={finishLogin}
+				/>
+			)}
 
 			{tabs.length > 1 && (
 				<div
@@ -546,19 +550,6 @@ export default function MFAChallengePage() {
 				</div>
 			)}
 
-			{activeTab === 'app' && (
-				<div {...tabPanelProps('app')}>
-					<AppApprovalPanel
-						challengeToken={preAuth.challengeToken}
-						onFallback={() => {
-							setActiveTab(tabs.find((key) => key !== 'app') || 'totp');
-							setTotpFallback(false);
-							setError('');
-						}}
-						onConfirmed={finishLogin}
-					/>
-				</div>
-			)}
 
 			{activeTab === 'totp' && !totpFallback && (
 				<form

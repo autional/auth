@@ -148,9 +148,9 @@ describe('MFAChallengePage', () => {
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
-		// 「用 App 确认」排在最前（它优先于码方法；无码面）
-		expect(screen.getByRole('tab', { name: 'auth.appApproval.tab' })).toBeInTheDocument();
-		expect(screen.getAllByRole('tab')).toHaveLength(3);
+		// 「用 App 确认」不再是页签：它是与码面同屏的常驻面板
+		expect(screen.queryByRole('tab', { name: 'auth.appApproval.tab' })).not.toBeInTheDocument();
+		expect(screen.getAllByRole('tab')).toHaveLength(2);
 		expect(screen.getByRole('button', { name: 'mfa.challenge.useBackup' })).toBeInTheDocument();
 
 		// AUTH2-01：标签条具备完整 tab 语义，当前面板与选中标签关联
@@ -164,6 +164,21 @@ describe('MFAChallengePage', () => {
 		expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'mfa-tab-totp');
 	});
 
+	it('shows the App-approval entry and the code input on the same screen (no tab switch)', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+
+		renderMFAChallenge();
+
+		// 不点任何页签：默认码方法（TOTP）的 6 位码输入框已就位
+		await waitFor(() => {
+			expect(screen.getByText('mfa.challenge.totpLabel')).toBeInTheDocument();
+		});
+		expect(document.getElementById('totp-code')).toBeInTheDocument();
+		// 「用 App 确认」的发起按钮同屏常驻（不是页签，也无需切换）
+		expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
+		expect(screen.queryByRole('tab', { name: 'auth.appApproval.tab' })).not.toBeInTheDocument();
+	});
+
 	it('falls back to all code methods when requiredMfaMethods has no code method', async () => {
 		seedPreAuth({ requiredMfaMethods: ['password'] });
 
@@ -173,7 +188,7 @@ describe('MFAChallengePage', () => {
 			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabTOTP' })).toBeInTheDocument();
-		expect(screen.getAllByRole('tab')).toHaveLength(4);
+		expect(screen.getAllByRole('tab')).toHaveLength(3);
 	});
 
 	it('uses enrolledMfaMethods over requiredMfaMethods (only enrolled methods shown)', async () => {
@@ -186,7 +201,7 @@ describe('MFAChallengePage', () => {
 		});
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabEmail' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabSMS' })).not.toBeInTheDocument();
-		expect(screen.getAllByRole('tab')).toHaveLength(3);
+		expect(screen.getAllByRole('tab')).toHaveLength(2);
 	});
 
 	it('shows a single enrolled method without a tab strip', async () => {

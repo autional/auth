@@ -57,8 +57,11 @@ interface StatusResponse {
 interface AppApprovalPanelProps {
 	/** 登录页面持有的 MFA 挑战令牌（审批会话的授权依据）。 */
 	challengeToken: string;
-	/** 放弃 App 审批，回落到验证码方式。 */
-	onFallback: () => void;
+	/**
+	 * 放弃 App 审批，回落到验证码方式（可选）。
+	 * 宿主把码面与面板同屏常驻时**不传**：不存在回落动作，也就不渲染回落按钮。
+	 */
+	onFallback?: () => void;
 	/**
 	 * 审批通过：把服务端签发的会话交回页面，由页面执行与码方法**完全相同**的登录落地
 	 * （loginWithTokens + anchorSessionFromToken + 回程跳转）。
@@ -243,7 +246,8 @@ export default function AppApprovalPanel({
 		setPollFailed(false);
 	};
 
-	const fallbackButton = (
+	// 只有页签式宿主传 onFallback 才给回落按钮；同屏宿主不传 → null（码面本来就在旁边）
+	const fallbackButton = onFallback ? (
 		<button
 			type="button"
 			onClick={onFallback}
@@ -251,7 +255,7 @@ export default function AppApprovalPanel({
 		>
 			{t('auth.appApproval.useCode')}
 		</button>
-	);
+	) : null;
 
 	if (phase === 'confirmed') {
 		return (
