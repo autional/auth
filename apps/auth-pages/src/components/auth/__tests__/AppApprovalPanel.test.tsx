@@ -206,4 +206,33 @@ describe('AppApprovalPanel', () => {
 
 		expect(() => unmount()).not.toThrow();
 	});
+
+	// 等待态必须自带退出口：同屏宿主不传 onFallback，没有回落按钮，
+	// 缺了「取消本次请求」用户只能白等 300s TTL。
+	it('等待态点「取消本次请求」→ 撤销会话一次并回到未发起态', async () => {
+		renderPanel();
+
+		fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.start' }));
+		await waitFor(() => {
+			expect(screen.getByTestId('app-approval-code')).toHaveTextContent('482913');
+		});
+
+		// 等待态：卡住提示在场（引导用户确认手机端已登录）
+		expect(screen.getByText('auth.appApproval.stuckHint')).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'auth.appApproval.cancel' }));
+
+		// 回到未发起态：发起按钮重现、审批码消失（不自动重发）
+		expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
+		expect(screen.queryByTestId('app-approval-code')).toBeNull();
+		expect(screen.queryByText('auth.appApproval.stuckHint')).toBeNull();
+
+		// 撤销只用 initiate 拿到的 session_token，且只发一次
+		expect(mockPost).toHaveBeenCalledWith(REVOKE_PATH, { token: 'sess-1' });
+		expect(
+			mockPost.mock.calls.filter(([url]) => url === REVOKE_PATH),
+		).toHaveLength(1);
+		// 未重新发起：只有最初的 initiate 一次 POST
+		expect(mockPost.mock.calls.filter(([url]) => url === INITIATE_PATH)).toHaveLength(1);
+	});
 });

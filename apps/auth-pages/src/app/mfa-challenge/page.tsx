@@ -550,7 +550,6 @@ export default function MFAChallengePage() {
 				</div>
 			)}
 
-
 			{activeTab === 'totp' && !totpFallback && (
 				<form
 					{...tabPanelProps('totp')}

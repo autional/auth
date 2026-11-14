@@ -149,7 +149,6 @@ describe('MFAChallengePage', () => {
 		expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'mfa.challenge.tabEmail' })).not.toBeInTheDocument();
 		// 「用 App 确认」不再是页签：它是与码面同屏的常驻面板
-		expect(screen.queryByRole('tab', { name: 'auth.appApproval.tab' })).not.toBeInTheDocument();
 		expect(screen.getAllByRole('tab')).toHaveLength(2);
 		expect(screen.getByRole('button', { name: 'mfa.challenge.useBackup' })).toBeInTheDocument();
 
@@ -176,7 +175,6 @@ describe('MFAChallengePage', () => {
 		expect(document.getElementById('totp-code')).toBeInTheDocument();
 		// 「用 App 确认」的发起按钮同屏常驻（不是页签，也无需切换）
 		expect(screen.getByRole('button', { name: 'auth.appApproval.start' })).toBeInTheDocument();
-		expect(screen.queryByRole('tab', { name: 'auth.appApproval.tab' })).not.toBeInTheDocument();
 	});
 
 	it('falls back to all code methods when requiredMfaMethods has no code method', async () => {

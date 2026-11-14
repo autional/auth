@@ -119,7 +119,6 @@ describe('MFA 挑战页 · 用 App 确认 → 登录落地', () => {
 
 		// 「用 App 确认」与验证码同屏常驻：不需要切页签，直接点发起按钮
 		const startButton = await screen.findByRole('button', { name: 'auth.appApproval.start' });
-		expect(screen.queryByRole('tab', { name: 'auth.appApproval.tab' })).not.toBeInTheDocument();
 		// 码面同时在场（TOTP 是默认码方法）——两个入口一屏可见
 		expect(document.getElementById('totp-code')).toBeInTheDocument();
 

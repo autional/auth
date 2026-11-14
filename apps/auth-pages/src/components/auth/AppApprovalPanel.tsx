@@ -246,6 +246,16 @@ export default function AppApprovalPanel({
 		setPollFailed(false);
 	};
 
+	/**
+	 * 等待态的唯一退出口：停轮询 + 撤销本次会话 + 回到未发起态。
+	 * 同屏宿主不传 onFallback（没有回落按钮），缺了它用户只能白等 TTL。
+	 */
+	const cancelWaiting = () => {
+		stopPolling();
+		revokeCurrent();
+		retry();
+	};
+
 	// 只有页签式宿主传 onFallback 才给回落按钮；同屏宿主不传 → null（码面本来就在旁边）
 	const fallbackButton = onFallback ? (
 		<button
@@ -378,7 +388,17 @@ export default function AppApprovalPanel({
 				</p>
 			)}
 
-			{fallbackButton}
+			<p className="text-center text-xs text-[var(--color-text-muted)]">
+				{t('auth.appApproval.stuckHint')}
+			</p>
+
+			<button
+				type="button"
+				onClick={cancelWaiting}
+				className="w-full text-center text-sm text-brand-text hover:underline"
+			>
+				{t('auth.appApproval.cancel')}
+			</button>
 		</div>
 	);
 }
