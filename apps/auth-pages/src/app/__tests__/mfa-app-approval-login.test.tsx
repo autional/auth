@@ -117,10 +117,10 @@ describe('MFA 挑战页 · 用 App 确认 → 登录落地', () => {
 			</MemoryRouter>,
 		);
 
-		// 「用 App 确认」与验证码同屏常驻：不需要切页签，直接点发起按钮
+		// 「App 确认」是第一个页签且默认选中：不需要切页签，直接点发起按钮
 		const startButton = await screen.findByRole('button', { name: 'auth.appApproval.start' });
-		// 码面同时在场（TOTP 是默认码方法）——两个入口一屏可见
-		expect(document.getElementById('totp-code')).toBeInTheDocument();
+		// 码面在自己的页签里，默认页签不渲染它
+		expect(document.getElementById('totp-code')).toBeNull();
 
 		fireEvent.click(startButton);
 

@@ -28,8 +28,11 @@ import { userFromAccessToken } from '@/lib/session-user';
 
 type CodeMethod = 'totp' | 'sms' | 'email';
 type VerifyMethod = CodeMethod | 'backup';
-/** 页签只承载码方法；「用 App 确认」与码面同屏常驻，不占页签。 */
-type TabKey = CodeMethod;
+/**
+ * 页签：与登录页同款「标签栏在最上面」——「App 确认」排第一，其后是码方法。
+ * 有挑战令牌时才有 App 页签（没有令牌就无从发起审批）。
+ */
+type TabKey = 'app' | 'totp' | 'sms' | 'email';
 
 // 登录页/mfa-setup 写入的挑战会话（oauth/callback 写入子集：无 email/phone/riskLevel）
 interface PreAuthData {
@@ -140,7 +143,7 @@ export default function MFAChallengePage() {
 
 	const [preAuth, setPreAuth] = useState<PreAuthData | null>(null);
 	const [fatal, setFatal] = useState<'' | 'expired' | 'used' | 'exhausted'>('');
-	const [activeTab, setActiveTab] = useState<TabKey>('totp');
+	const [activeTab, setActiveTab] = useState<TabKey>('app');
 	// 身份验证器面板内的备用恢复码子模式（与 TOTP 同腿验证，不单列标签）
 	const [totpFallback, setTotpFallback] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
@@ -185,15 +188,16 @@ export default function MFAChallengePage() {
 		setPreAuth(parsed);
 	}, [navigate, loginPath]);
 
-	// 页签只列码方法；「用 App 确认」不入页签（由下方常驻面板承载，与码面同屏）。
-	const tabs = useMemo<TabKey[]>(
-		() => deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods),
-		[preAuth],
-	);
+	// 页签 = 「App 确认」+ 码方法（与登录页同款：标签栏在最上面，App 排第一）。
+	// 没有挑战令牌就没有可发起的审批，此时只列码方法。
+	const tabs = useMemo<TabKey[]>(() => {
+		const codeTabs = deriveTabs(preAuth?.requiredMfaMethods, preAuth?.enrolledMfaMethods);
+		return preAuth?.challengeToken ? ['app', ...codeTabs] : codeTabs;
+	}, [preAuth]);
 
 	useEffect(() => {
 		if (preAuth && !tabs.includes(activeTab)) {
-			// 回落落点是首个码方法（deriveTabs 保证非空）
+			// 回落落点是标签栏首项（有挑战令牌时即「App 确认」；deriveTabs 保证非空）
 			setActiveTab(tabs[0]);
 			setTotpFallback(false);
 		}
@@ -204,7 +208,8 @@ export default function MFAChallengePage() {
 	const emailForm = useForm<MFASMSFormData>({ resolver: zodResolver(mfaSmsSchema) });
 	const backupForm = useForm<BackupFormData>({ resolver: zodResolver(backupSchema) });
 
-	// 切到某个验证方式时聚焦其验证码输入框（替代 autoFocus：jsx-a11y/no-autofocus）。
+	// 切到某个码方法时聚焦其验证码输入框（替代 autoFocus：jsx-a11y/no-autofocus）。
+	// 「App 确认」页签没有输入框，不聚焦（只有切到码方法才抢焦点）。
 	// 用 RHF 的 setFocus 而不是自建 ref：输入框 ref 由 register() 接管，另加 ref 会被覆盖。
 	useEffect(() => {
 		if (activeTab === 'totp') totpForm.setFocus('code');
@@ -342,6 +347,15 @@ export default function MFAChallengePage() {
 		document.getElementById(`mfa-tab-${nextKey}`)?.focus();
 	};
 
+	// 「App 确认」页签的回落动作：切到首个码方法（标签栏式宿主才需要的退出口）
+	const goToFirstCodeMethod = () => {
+		const firstCode = tabs.find((existing): existing is CodeMethod => existing !== 'app');
+		if (!firstCode) return;
+		setActiveTab(firstCode);
+		setTotpFallback(false);
+		setError('');
+	};
+
 	// 单方法时无标签条，不声明 tabpanel 语义
 	const tabPanelProps = (key: TabKey) =>
 		tabs.length > 1
@@ -471,24 +485,15 @@ export default function MFAChallengePage() {
 		);
 	}
 
-	const tabLabel = (key: TabKey) =>
-		key === 'totp'
-			? t('mfa.challenge.tabTOTP')
-			: key === 'sms'
-				? t('mfa.challenge.tabSMS')
-				: t('mfa.challenge.tabEmail');
+	const tabLabel = (key: TabKey) => {
+		if (key === 'app') return t('mfa.challenge.tabApp');
+		if (key === 'totp') return t('mfa.challenge.tabTOTP');
+		return key === 'sms' ? t('mfa.challenge.tabSMS') : t('mfa.challenge.tabEmail');
+	};
 
 	return (
 		<AuthCard>
 			<AuthHeader title={t('mfa.challenge.title')} subtitle={t('mfa.challenge.subtitle')} />
-
-			{/* 「用 App 确认」同屏常驻：与码面并列可见，不占页签，也不自动发起 */}
-			{preAuth.challengeToken && (
-				<AppApprovalPanel
-					challengeToken={preAuth.challengeToken}
-					onConfirmed={finishLogin}
-				/>
-			)}
 
 			{tabs.length > 1 && (
 				<div
@@ -547,6 +552,17 @@ export default function MFAChallengePage() {
 					{preAuth.riskLevel === 'low' && t('mfa.riskLevel.low')}
 					{preAuth.riskLevel === 'medium' && t('mfa.riskLevel.medium')}
 					{preAuth.riskLevel === 'high' && t('mfa.riskLevel.high')}
+				</div>
+			)}
+
+			{/* 「App 确认」：普通页签（排首位），选中时才挂载；不自动发起 */}
+			{activeTab === 'app' && (
+				<div {...tabPanelProps('app')}>
+					<AppApprovalPanel
+						challengeToken={preAuth.challengeToken}
+						onConfirmed={finishLogin}
+						onFallback={goToFirstCodeMethod}
+					/>
 				</div>
 			)}
 
