@@ -567,6 +567,9 @@ export default function MFASetupPage() {
 				>
 					{t('auth.mfa.done')}
 				</Button>
+				<Button variant="outline" fullWidth onClick={() => navigate('/logout')}>
+					{t('auth.mfa.reloginToVerify')}
+				</Button>
 			</div>
 		);
 	};
@@ -701,13 +704,21 @@ export default function MFASetupPage() {
 					</a>
 				</div>
 
-				<div className="text-center text-sm">
+				<div className="space-y-2 text-center text-sm">
 					<button
 						type="button"
 						onClick={() => navigate(tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard')}
 						className="text-brand-text hover:underline"
 					>
 						{t('auth.mfa.back')}
+					</button>
+					{/* 已启用态同样要能立刻走一次新因子验证：登出后重新登录会触发 MFA 挑战 */}
+					<button
+						type="button"
+						onClick={() => navigate('/logout')}
+						className="block w-full text-brand-text hover:underline"
+					>
+						{t('auth.mfa.reloginToVerify')}
 					</button>
 				</div>
 			</AuthCard>

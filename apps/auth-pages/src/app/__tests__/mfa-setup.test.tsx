@@ -164,6 +164,35 @@ describe('MFASetupPage', () => {
 			});
 		});
 
+		it('offers sign-out-and-relogin right after activation (navigates to /logout)', async () => {
+			mockEnableMFA.mockResolvedValue({ ...ENABLE_RESPONSE });
+			mockVerifyTOTPMFA.mockResolvedValue({ valid: true });
+
+			const user = userEvent.setup();
+			renderMFASetup();
+
+			await waitFor(() => {
+				expect(screen.getByText('auth.mfa.setupTitle')).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByText('auth.mfa.setupAuthApp'));
+
+			await waitFor(() => {
+				expect(screen.getByText('auth.mfa.setupStep2Title')).toBeInTheDocument();
+			});
+
+			await user.type(screen.getByPlaceholderText('auth.mfa.codePlaceholder'), '123456');
+			await user.click(screen.getByRole('button', { name: 'auth.mfa.setupVerifyAndEnable' }));
+
+			await waitFor(() => {
+				expect(screen.getByText('auth.mfa.setupStep3Title')).toBeInTheDocument();
+			});
+
+			// 文案与行为一致：开了 MFA 必须能真的重新登录验证一次新因子
+			await user.click(screen.getByRole('button', { name: 'auth.mfa.reloginToVerify' }));
+			expect(mockNavigate).toHaveBeenCalledWith('/logout');
+		});
+
 		it('shows error when totp/verify rejects with invalid-code code', async () => {
 			mockEnableMFA.mockResolvedValue({ ...ENABLE_RESPONSE });
 			mockVerifyTOTPMFA.mockRejectedValue({
@@ -293,6 +322,18 @@ describe('MFASetupPage', () => {
 			expect(screen.getByText('auth.mfa.disableBtn')).toBeInTheDocument();
 			// 无密码输入面
 			expect(screen.queryByPlaceholderText('auth.mfa.disablePlaceholder')).not.toBeInTheDocument();
+		});
+
+		it('offers sign-out-and-relogin in the enabled state card', async () => {
+			const user = userEvent.setup();
+			renderMFASetup();
+
+			await waitFor(() => {
+				expect(screen.getByText('auth.mfa.enabledStatus')).toBeInTheDocument();
+			});
+
+			await user.click(screen.getByRole('button', { name: 'auth.mfa.reloginToVerify' }));
+			expect(mockNavigate).toHaveBeenCalledWith('/logout');
 		});
 
 		it('disables TOTP by verification code (not password)', async () => {

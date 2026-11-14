@@ -10,6 +10,7 @@ import { EntryRouter } from '@/components/EntryRouter';
 import { TenantIndexRedirect } from '@/components/TenantIndexRedirect';
 import { TenantSwitchChip } from '@/components/TenantSwitchChip';
 import { BareActivityRedirect } from '@/components/BareActivityRedirect';
+import { BareToTenantRedirect } from '@/components/BareToTenantRedirect';
 
 // Pages — route-level code splitting via React.lazy
 const LoginPage = lazy(() => import('./app/page'));
@@ -200,7 +201,15 @@ export default function App() {
 								<Route path="/invite/:token" element={<InvitePage />} />
 
 								{/* Protected routes */}
-								<Route path="/mfa-challenge" element={<MFAChallengePage />} />
+								{/* 裸路由一律先做租户段规范化（可解析租户 → /<slug>/<同名>），租户孪生路由不套 */}
+								<Route
+									path="/mfa-challenge"
+									element={
+										<BareToTenantRedirect>
+											<MFAChallengePage />
+										</BareToTenantRedirect>
+									}
+								/>
 								<Route path="/mfa" element={<Navigate to="/mfa-challenge" replace />} />
 								<Route path="/:tenantSlug/mfa-challenge" element={<MFAChallengePage />} />
 								<Route
@@ -230,9 +239,11 @@ export default function App() {
 								<Route
 									path="/mfa-setup"
 									element={
-										<RequireAuth>
-											<MFASetupPage />
-										</RequireAuth>
+										<BareToTenantRedirect>
+											<RequireAuth>
+												<MFASetupPage />
+											</RequireAuth>
+										</BareToTenantRedirect>
 									}
 								/>
 								<Route
@@ -246,9 +257,11 @@ export default function App() {
 								<Route
 									path="/passkey"
 									element={
-										<RequireAuth>
-											<PasskeyPage />
-										</RequireAuth>
+										<BareToTenantRedirect>
+											<RequireAuth>
+												<PasskeyPage />
+											</RequireAuth>
+										</BareToTenantRedirect>
 									}
 								/>
 								<Route
@@ -262,9 +275,11 @@ export default function App() {
 								<Route
 									path="/account-deletion"
 									element={
-										<RequireAuth>
-											<AccountDeletionPage />
-										</RequireAuth>
+										<BareToTenantRedirect>
+											<RequireAuth>
+												<AccountDeletionPage />
+											</RequireAuth>
+										</BareToTenantRedirect>
 									}
 								/>
 								<Route
@@ -278,9 +293,11 @@ export default function App() {
 								<Route
 									path="/account"
 									element={
-										<RequireAuth>
-											<AccountPage />
-										</RequireAuth>
+										<BareToTenantRedirect>
+											<RequireAuth>
+												<AccountPage />
+											</RequireAuth>
+										</BareToTenantRedirect>
 									}
 								/>
 								<Route
@@ -297,9 +314,11 @@ export default function App() {
 								<Route
 									path="/account/recovery-codes"
 									element={
-										<RequireAuth>
-											<RecoveryCodesPage />
-										</RequireAuth>
+										<BareToTenantRedirect to="/recovery-codes">
+											<RequireAuth>
+												<RecoveryCodesPage />
+											</RequireAuth>
+										</BareToTenantRedirect>
 									}
 								/>
 								<Route
@@ -351,9 +370,11 @@ export default function App() {
 								<Route
 									path="/verify-identity"
 									element={
-										<RequireAuth>
-											<VerifyIdentityPage />
-										</RequireAuth>
+										<BareToTenantRedirect>
+											<RequireAuth>
+												<VerifyIdentityPage />
+											</RequireAuth>
+										</BareToTenantRedirect>
 									}
 								/>
 								<Route
