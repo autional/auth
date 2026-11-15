@@ -35,6 +35,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Lint（含 warning 上限）：`--max-warnings 191` 写在 apps/auth-pages/package.json#scripts.lint，
+      # 是**既有存量上限**（191 条全是历史遗留，以 @typescript-eslint/no-explicit-any 为主；
+      # 2026-11-15 实测 `eslint --fix src/` 一条都减不下来）。**新增 1 条 warning 即失败**。
+      # 修掉存量就顺手把数字减一；禁止为了过门把上限调大。
       - name: Lint
         run: pnpm lint
 
