@@ -9,7 +9,7 @@ import { Button, Input, Label } from '@autional/ui';
 import { authLoginPost, authCaptchaChallenge, authMe } from '@autional/shared/generated/api';
 import { loadAuthExtras } from '@/lib/api';
 import { hasStorageHeadroom, persistSessionWithRetry, purgeRebuildableCaches } from '@/lib/storage-health';
-import { loginWithTokens, useAuthStore, getAccessToken, isValidRedirect, initiateOAuthLogin, extractSlugFromPath, getPortalUrl, API_BASE_URL, crossAppUrl, TRUST_CENTER_URL } from '@autional/shared';
+import { loginWithTokens, useAuthStore, getAccessToken, isValidRedirect, initiateOAuthLogin, PORTAL_LOGIN_SCOPES, extractSlugFromPath, getPortalUrl, API_BASE_URL, crossAppUrl, TRUST_CENTER_URL } from '@autional/shared';
 import { useResolvedTenantSlug } from '@/hooks/use-tenant-slug';
 import { createLoginSchema } from '@/lib/validators';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
@@ -257,8 +257,10 @@ export default function LoginPage() {
 						return;
 					}
 					// 以回程目标为 state.redirect 起 PKCE：授权成功后直达目标站点，
-					// 由目标站点用自己的 client 完成会话建立（修复 target 缺省 = 回跳自身）
-					initiateOAuthLogin(clientId, redirect);
+					// 由目标站点用自己的 client 完成会话建立（修复 target 缺省 = 回跳自身）。
+					// scope 必须用门户档：目标站点是首方门户，写接口（MFA/通知流/账号绑定…）
+					// 需要业务写 scope；只申请基础档会「登录成功、写操作 403」（2026-11-14）。
+					initiateOAuthLogin(clientId, redirect, { scope: PORTAL_LOGIN_SCOPES });
 				} catch {
 					setAutoRedirectChecking(false);
 				}
