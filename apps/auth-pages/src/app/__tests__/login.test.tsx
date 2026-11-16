@@ -119,6 +119,7 @@ let mockLoginMethods: string[] | undefined;
 let mockOAuthProviders: any[] = [];
 let mockConfigTenantId: string | undefined = 't-test';
 let mockDeviceFingerprintEnabled = false;
+let mockPasskeyEnabled: boolean | undefined;
 
 // 设备指纹模块：默认关闭（与租户策略默认 false 一致）；用例可开门控并断言登录体。
 const mockComputeDeviceFingerprint = vi.fn(async () => 'dfp_0123456789abcdef');
@@ -135,6 +136,7 @@ vi.mock('@/hooks/use-auth-page-init', () => ({
 				tenantId: mockConfigTenantId,
 				loginMethods: mockLoginMethods,
 				deviceFingerprintEnabled: mockDeviceFingerprintEnabled,
+				passkeyEnabled: mockPasskeyEnabled,
 			},
 			isLoading: false,
 			isError: false,
@@ -159,6 +161,7 @@ beforeEach(() => {
 	mockOAuthProviders = [];
 	mockConfigTenantId = 't-test';
 	mockDeviceFingerprintEnabled = false;
+	mockPasskeyEnabled = undefined;
 });
 
 afterEach(() => {
@@ -448,6 +451,137 @@ describe('LoginPage - passkey 入口', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'auth.login.passkeyTab' }));
 
 		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));
+	});
+
+	// ============================================================
+	// B3：passkey 已是第一步认证
+	//   · 首选：passkey 入口排在密码 / 验证码之前（标签与首推按钮都置顶）
+	//   · 条件式：后台静默尝试，不打断用户输入，密码提交照常
+	//   · 域约束：`.com` 注册域不渲染入口、不发起条件式请求
+	// ============================================================
+	function stubHostname(hostname: string) {
+		const original = window.location;
+		delete (window as any).location;
+		(window as any).location = Object.defineProperties(
+			{},
+			{
+				...Object.getOwnPropertyDescriptors(original),
+				hostname: { get: () => hostname, configurable: true },
+			},
+		);
+		return () => Object.defineProperty(window, 'location', { value: original, writable: true });
+	}
+
+	const follows = (a: HTMLElement, b: HTMLElement) =>
+		Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+	it('passkey 置首选：首推入口与标签都排在密码 / 验证码之前', async () => {
+		mockLoginMethods = ['password', 'passkey', 'email_code'];
+		enablePasskeySupport(false);
+
+		renderLogin();
+
+		const cta = await screen.findByTestId('passkey-primary-cta');
+		const identity = screen.getByPlaceholderText('auth.login.identityPlaceholder');
+		const submit = screen.getByRole('button', { name: 'login.submit' });
+		// 首推入口在密码表单（identity / 提交按钮）之前
+		expect(follows(cta, identity)).toBe(true);
+		expect(follows(cta, submit)).toBe(true);
+
+		// 标签顺序：passkey → password → email_code
+		const passkeyTab = screen.getByRole('button', { name: 'auth.login.passkeyTab' });
+		const passwordTab = screen.getByRole('button', { name: 'auth.login.passwordTab' });
+		const emailTab = screen.getByRole('button', { name: 'auth.login.emailCodeTab' });
+		expect(follows(passkeyTab, passwordTab)).toBe(true);
+		expect(follows(passwordTab, emailTab)).toBe(true);
+	});
+
+	it('租户关闭 passkey（passkeyEnabled === false）时不渲染首推入口与标签', async () => {
+		mockLoginMethods = ['password', 'passkey'];
+		mockPasskeyEnabled = false;
+		enablePasskeySupport(true);
+
+		renderLogin();
+
+		await waitFor(() =>
+			expect(screen.getByPlaceholderText('auth.login.identityPlaceholder')).toBeInTheDocument(),
+		);
+		expect(screen.queryByTestId('passkey-primary-cta')).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'auth.login.passkeyTab' }),
+		).not.toBeInTheDocument();
+	});
+
+	it('`.com` 注册域不渲染 passkey 入口，也不发起条件式请求', async () => {
+		mockLoginMethods = ['password', 'passkey'];
+		enablePasskeySupport(true);
+		const restore = stubHostname('auth.autional.com');
+		try {
+			renderLogin();
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			expect(screen.queryByTestId('passkey-primary-cta')).not.toBeInTheDocument();
+			expect(
+				screen.queryByRole('button', { name: 'auth.login.passkeyTab' }),
+			).not.toBeInTheDocument();
+			expect(mockWebauthnBegin).not.toHaveBeenCalled();
+			expect(navigator.credentials.get).not.toHaveBeenCalled();
+		} finally {
+			restore();
+		}
+	});
+
+	// 死路防护：租户只开 passkey，而当前域不提供 passkey → 不能整页无登录入口
+	it('`.com` 域 + 租户仅开 passkey → 保留密码表单，不留死路', async () => {
+		mockLoginMethods = ['passkey'];
+		enablePasskeySupport(false);
+		const restore = stubHostname('auth.autional.com');
+		try {
+			renderLogin();
+			expect(
+				await screen.findByPlaceholderText('auth.login.identityPlaceholder'),
+			).toBeInTheDocument();
+			expect(screen.queryByTestId('passkey-primary-cta')).not.toBeInTheDocument();
+		} finally {
+			restore();
+		}
+	});
+
+	it('条件式在后台静默尝试，不打断输入、不阻塞密码提交', async () => {
+		mockLoginMethods = ['passkey', 'password'];
+		enablePasskeySupport(true);
+		mockWebauthnBegin.mockResolvedValue({
+			publicKey: { challenge: 'Y2hhbGxlbmdl', allowCredentials: [] },
+		});
+		let conditionalOpts: any;
+		(navigator.credentials.get as any).mockImplementation((opts: any) => {
+			if (opts.mediation === 'conditional') {
+				conditionalOpts = opts;
+				return new Promise((_resolve, reject) => {
+					opts.signal?.addEventListener('abort', () =>
+						reject(new DOMException('aborted', 'AbortError')),
+					);
+				});
+			}
+			return Promise.resolve(null);
+		});
+		mockAuthLoginPost.mockResolvedValue({
+			accessToken: 'token-abc',
+			refreshToken: 'refresh-abc',
+			user: { id: '1' },
+		});
+
+		const user = userEvent.setup();
+		renderLogin();
+		await waitFor(() => expect(conditionalOpts).toBeTruthy());
+
+		// 条件式请求挂起中：输入与提交照常（不弹窗、不报错、不抢占）
+		await user.type(screen.getByPlaceholderText('auth.login.identityPlaceholder'), 'testuser');
+		await user.type(screen.getByPlaceholderText('auth.login.passwordPlaceholder'), 'pass123');
+		await user.click(screen.getByRole('button', { name: 'login.submit' }));
+
+		await waitFor(() => expect(mockLoginWithTokens).toHaveBeenCalled());
+		expect(screen.queryByTestId('passkey-error')).not.toBeInTheDocument();
 	});
 });
 

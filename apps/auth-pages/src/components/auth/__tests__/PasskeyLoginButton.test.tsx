@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import React from 'react';
@@ -160,8 +160,9 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 	});
 
 	// 回归锁（2026-10-21 线上：本机无可发现凭据时浏览器返回 NotAllowedError，
-	// 旧实现当作用户取消静默吞掉，表现为「点按钮没反应」）。
-	it('无可用可发现凭据（NotAllowedError）时显示提示而非静默', async () => {
+	// 旧实现当作用户取消静默吞掉，表现为「点按钮没反应」；B3 起改为**非红色**人话提示
+	// + 降级出路 —— 仍不得静默，但取消不该被当成故障）。
+	it('无可用可发现凭据 / 用户取消（NotAllowedError）时给非红色提示而非静默', async () => {
 		vi.mocked(navigator.credentials.get).mockRejectedValueOnce(
 			new DOMException('no credentials available', 'NotAllowedError'),
 		);
@@ -170,8 +171,10 @@ describe('PasskeyLoginButton - AUTH-53⑤ 会话锚定', () => {
 		fireEvent.click(screen.getByTestId('passkey-submit-button'));
 
 		await waitFor(() => {
-			expect(screen.getByTestId('passkey-error')).toHaveTextContent('passkey.noCredentialHint');
+			expect(screen.getByTestId('passkey-hint')).toHaveTextContent('passkey.cancelledHint');
 		});
+		// 取消属可预期结果，不是红色错误
+		expect(screen.queryByTestId('passkey-error')).not.toBeInTheDocument();
 	});
 
 	// 回归锁（2026-10-21 线上：complete 返回 problem 契约 404/61000004，
@@ -349,5 +352,169 @@ describe('PasskeyLoginButton - 条件式请求生命周期', () => {
 		fireEvent.click(screen.getByTestId('passkey-submit-button'));
 
 		await waitFor(() => expect(conditionalOpts.signal.aborted).toBe(true));
+	});
+});
+
+// ============================================================
+// B3：passkey 已是第一步认证 —— 域约束（`.com` 不提供）+ 降级文案
+//   · `.com` 注册域：入口隐身、条件式请求不发出（RP ID 不可跨注册域）
+//   · 设备不支持 / 用户取消 / 超时 / 租户关闭：非红色人话 + 「改用密码 / 验证码」出路
+//   · 只有真实服务端故障才走红色 error
+// ============================================================
+let originalLocation: Location | null = null;
+
+// jsdom 的 location.hostname 不可在实例上重定义 → 整体替换 location（同 login.test.tsx 口径）
+function stubHostname(hostname: string) {
+	if (!originalLocation) originalLocation = window.location;
+	const original = originalLocation;
+	delete (window as any).location;
+	(window as any).location = Object.defineProperties(
+		{},
+		{
+			...Object.getOwnPropertyDescriptors(original),
+			hostname: { get: () => hostname, configurable: true },
+		},
+	);
+}
+
+function renderButtonWith(onFallback?: () => void) {
+	return render(
+		<MemoryRouter initialEntries={['/demo/login']}>
+			<Routes>
+				<Route
+					path=":tenantSlug/login"
+					element={<PasskeyLoginButton tenantId="tenant-1" onFallback={onFallback} />}
+				/>
+			</Routes>
+		</MemoryRouter>,
+	);
+}
+
+describe('PasskeyLoginButton - `.com` 注册域不提供 passkey', () => {
+	afterEach(() => {
+		if (originalLocation) {
+			Object.defineProperty(window, 'location', { value: originalLocation, writable: true });
+			originalLocation = null;
+		}
+	});
+
+	it('`.com` 域不渲染入口，也不发起 begin 请求', async () => {
+		stubHostname('auth.autional.com');
+
+		renderButtonWith();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(screen.queryByTestId('passkey-login-button')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('passkey-submit-button')).not.toBeInTheDocument();
+		expect(vi.mocked(authWebauthnAuthenticateBeginPost)).not.toHaveBeenCalled();
+	});
+
+	it('`.com` 域不发起条件式请求', async () => {
+		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(async () => true);
+		stubHostname('auth.autional.com');
+
+		renderConditional();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(vi.mocked(authWebauthnAuthenticateBeginPost)).not.toHaveBeenCalled();
+		expect(navigator.credentials.get).not.toHaveBeenCalled();
+	});
+});
+
+describe('PasskeyLoginButton - 降级文案与出路', () => {
+	it('设备不支持 Passkey 时给明确人话 + 降级入口，不发起请求', () => {
+		delete (window as any).PublicKeyCredential;
+		const onFallback = vi.fn();
+
+		renderButtonWith(onFallback);
+
+		expect(screen.getByTestId('passkey-unsupported-hint')).toHaveTextContent(
+			'passkey.deviceUnsupportedHint',
+		);
+		expect(screen.queryByTestId('passkey-submit-button')).not.toBeInTheDocument();
+		expect(vi.mocked(authWebauthnAuthenticateBeginPost)).not.toHaveBeenCalled();
+
+		fireEvent.click(screen.getByTestId('passkey-submit-button-fallback'));
+		expect(onFallback).toHaveBeenCalledTimes(1);
+	});
+
+	it('用户取消 → 非红色提示 + 降级入口（不弹红色错误）', async () => {
+		vi.mocked(navigator.credentials.get).mockRejectedValueOnce(
+			new DOMException('cancelled', 'NotAllowedError'),
+		);
+		const onFallback = vi.fn();
+
+		renderButtonWith(onFallback);
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-hint')).toHaveTextContent('passkey.cancelledHint');
+		});
+		expect(screen.queryByTestId('passkey-error')).not.toBeInTheDocument();
+
+		fireEvent.click(screen.getByTestId('passkey-submit-button-fallback'));
+		expect(onFallback).toHaveBeenCalledTimes(1);
+	});
+
+	it('验证超时 → 超时人话（非红色）', async () => {
+		vi.mocked(navigator.credentials.get).mockRejectedValueOnce(
+			new DOMException('timed out', 'TimeoutError'),
+		);
+
+		renderButtonWith();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-hint')).toHaveTextContent('passkey.timeoutHint');
+		});
+		expect(screen.queryByTestId('passkey-error')).not.toBeInTheDocument();
+	});
+
+	it('租户关闭 passkey（403 passkey disabled by tenant policy）→ 降级文案', async () => {
+		vi.mocked(authWebauthnAuthenticateBeginPost).mockRejectedValueOnce({
+			message: 'Request failed with status code 403',
+			response: {
+				status: 403,
+				data: { code: 40300009, title: 'passkey disabled by tenant policy', status: 403 },
+			},
+		});
+
+		renderButtonWith();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-hint')).toHaveTextContent('passkey.tenantDisabledHint');
+		});
+		expect(screen.queryByTestId('passkey-error')).not.toBeInTheDocument();
+	});
+
+	it('浏览器不支持条件式自动填充 → 不出请求，并说明原因', async () => {
+		(window.PublicKeyCredential as any).isConditionalMediationAvailable = vi.fn(
+			async () => false,
+		);
+
+		renderConditional();
+
+		await waitFor(() => {
+			expect(screen.getByTestId('passkey-conditional-unavailable')).toHaveTextContent(
+				'passkey.conditionalUnavailableHint',
+			);
+		});
+		expect(vi.mocked(authWebauthnAuthenticateBeginPost)).not.toHaveBeenCalled();
+	});
+
+	it('主动 abort（AbortError）不显示任何提示', async () => {
+		vi.mocked(navigator.credentials.get).mockRejectedValueOnce(
+			new DOMException('aborted', 'AbortError'),
+		);
+
+		renderButtonWith();
+		fireEvent.click(screen.getByTestId('passkey-submit-button'));
+
+		await waitFor(() => {
+			expect(vi.mocked(navigator.credentials.get)).toHaveBeenCalled();
+		});
+		expect(screen.queryByTestId('passkey-hint')).not.toBeInTheDocument();
+		expect(screen.queryByTestId('passkey-error')).not.toBeInTheDocument();
 	});
 });

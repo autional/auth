@@ -41,6 +41,7 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { clearDashboardSlug, getDashboardSlug } from '@/lib/dashboard-slug';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { PasskeyLoginButton } from '@/components/auth/PasskeyLoginButton';
+import { isPasskeyHostAllowed } from '@/lib/passkey-support';
 import { MagicLinkForm } from '@/components/auth/MagicLinkForm';
 import { PasswordInput } from '@/components/form/PasswordInput';
 import { useTenantBrandingStore } from '@autional/shared/branding';
@@ -188,8 +189,31 @@ export default function LoginPage() {
 		if (authConfig?.passkeyEnabled === false) {
 			methods = methods.filter((m) => m !== 'passkey');
 		}
+		// 域约束（B3）：passkey 的 RP ID 绑定注册域，`.com` 注册域下发起必然 origin/RP 校验失败
+		// → 入口、标签、条件式请求全部不下发（组件侧另有同源守卫兜底）。
+		if (!isPasskeyHostAllowed()) {
+			methods = methods.filter((m) => m !== 'passkey');
+			// 兜底：租户只开 passkey 而当前域不提供 → 至少保留密码表单，避免整页无登录入口
+			if (methods.length === 0) methods = ['password'];
+		} else if (methods.includes('passkey')) {
+			// passkey 已是第一步认证（后端 /webauthn/authenticate/begin|complete）：置为首选，
+			// 排在密码 / 验证码之前；其余方法保持服务端下发顺序。
+			methods = ['passkey', ...methods.filter((m) => m !== 'passkey')];
+		}
 		return methods;
 	}, [authConfig]);
+
+	// passkey 入口是否展示（租户未关闭 + 当前域允许 + 设备具备 WebAuthn 由组件内部判定）
+	const passkeyPreferred = loginMethods.includes('passkey');
+
+	// 降级目标：passkey 不可用时用户应去哪儿（优先密码，其次验证码族）
+	const fallbackLoginMethod = useMemo(
+		() =>
+			(['password', 'email_code', 'phone_code', 'magic_link', 'qr'] as const).find((m) =>
+				loginMethods.includes(m),
+			) ?? 'password',
+		[loginMethods],
+	);
 
 	// Filter active login method based on available methods
 	useEffect(() => {
@@ -1006,14 +1030,38 @@ export default function LoginPage() {
 						</div>
 					)}
 
+				{/* passkey 首选入口（B3）：租户未关闭 + 当前域允许时，置于密码 / 验证码方法之前。
+				    设备不支持 / 用户取消 / 超时 / 租户关闭 → 组件内部给非红色人话 + 降级出路。
+				    配置未决（slugConfigLoading）不渲染：避免「先冒出来又消失」的跳动。 */}
+				{passkeyPreferred && !slugConfigLoading && loginMethod !== 'passkey' && (
+					<div className="space-y-3">
+						<PasskeyLoginButton
+							variant="primary"
+							testId="passkey-primary-cta"
+							tenantId={slugAuthConfig?.tenantId || watch('tenantId')}
+							onFallback={() => setLoginMethod(fallbackLoginMethod)}
+						/>
+						<div className="relative">
+							<div className="absolute inset-0 flex items-center">
+								<span className="w-full border-t border-[var(--color-border)]" />
+							</div>
+							<div className="relative flex justify-center text-xs uppercase">
+								<span className="bg-[var(--color-bg-primary)] px-2 text-[var(--color-text-secondary)]">
+									{t('login.or')}
+								</span>
+							</div>
+						</div>
+					</div>
+				)}
+
 				{/* Login method tabs */}
 				{loginMethods.length > 1 && (
 					<div className="flex rounded-md bg-[var(--color-bg-muted)] p-1">
 						{[
+							{ key: 'passkey', icon: Fingerprint, label: t('auth.login.passkeyTab') },
 							{ key: 'password', icon: Lock, label: t('auth.login.passwordTab') },
 							{ key: 'qr', icon: QrCode, label: t('auth.login.qrTab') },
 							{ key: 'magic_link', icon: Mail, label: t('magicLink.title') },
-							{ key: 'passkey', icon: Fingerprint, label: t('auth.login.passkeyTab') },
 							{
 								key: 'email_code',
 								icon: Inbox,

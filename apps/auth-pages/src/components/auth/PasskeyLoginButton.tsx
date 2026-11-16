@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { Button } from '@autional/ui';
 import { Fingerprint } from 'lucide-react';
-import { apiClient, extractApiError, loginWithTokens } from '@autional/shared';
+import { extractApiError, loginWithTokens } from '@autional/shared';
 import {
 	authWebauthnAuthenticateBeginPost,
 	authWebauthnAuthenticateCompletePost,
@@ -13,6 +13,12 @@ import { loadAuthExtras } from '@/lib/api';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { getPostLoginTarget } from '@/lib/post-login-redirect';
 import { useI18n } from '@/lib/i18n';
+import {
+	classifyPasskeyFailure,
+	isConditionalMediationSupported,
+	isPasskeyHostAllowed,
+	isPasskeySupported,
+} from '@/lib/passkey-support';
 
 function base64urlToBuffer(base64url: string): ArrayBuffer {
 	const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
@@ -36,7 +42,25 @@ interface PasskeyLoginButtonProps {
 	 * 两种模式互斥挂载，避免同一页面同时存在多个 WebAuthn 请求。
 	 */
 	mode?: 'button' | 'conditional';
+	/** 视觉权重：passkey 为首选入口时用 primary（默认 outline = 备选入口）。 */
+	variant?: 'primary' | 'secondary' | 'outline';
+	/** 触发按钮的 data-testid（登录页首推入口另给值，与标签页面板区分）。 */
+	testId?: string;
+	/** 降级入口（改用密码 / 验证码登录）：用户取消、超时、设备不支持时展示。 */
+	onFallback?: () => void;
 }
+
+type PasskeyNotice = { tone: 'hint' | 'error'; text: string };
+
+// 降级原因 → 文案键。可预期结果（取消/超时/设备不支持/租户关闭）一律走 hint（非红色），
+// 只有服务端真实故障才走 error（红色）。
+const HINT_KEY_BY_FAILURE = {
+	cancelled: 'passkey.cancelledHint',
+	timeout: 'passkey.timeoutHint',
+	security: 'passkey.securityErrorHint',
+	unsupported: 'passkey.deviceUnsupportedHint',
+	tenant_disabled: 'passkey.tenantDisabledHint',
+} as const;
 
 // 全页共享的条件式请求控制器：显式登录或切换标签时先中止旧请求，
 // 否则浏览器会以 "A request is already pending." 拒绝后续 get()。
@@ -50,38 +74,48 @@ function abortActiveConditional() {
 }
 
 /**
- * PasskeyLoginButton — WebAuthn Conditional UI integration.
+ * PasskeyLoginButton — WebAuthn 登录入口（第一步认证）。
  *
  * 条件式 UI 只在 mode="conditional"（密码表单内）启动：
  *   WebAuthn Conditional Mediation — 绑定 `autocomplete="username webauthn"` 输入框，
- *   浏览器在自动填充列表里提供 passkey，不弹登录框。
+ *   浏览器在自动填充列表里提供 passkey，不弹登录框，也**不打断用户输入**。
  *
  * mode="button" 只响应用户点击，不在挂载时发起任何 WebAuthn 请求。
  * 条件式请求用 AbortController 管理，卸载/切标签/显式登录时立即 abort。
  * 密码自动填充交给浏览器原生 autocomplete，不发起 Credential Management 请求
  * （那会在页面打开时弹出非 passkey 的密码选择框）。
+ *
+ * 三条降级约束（B3）：
+ *   · `.com` 注册域不提供 passkey —— 不渲染入口、不发起条件式请求（RP ID 不可跨注册域）；
+ *   · 设备不支持 / 无法条件式 / 用户取消 / 超时 → 人话说明 + 「改用密码 / 验证码」出路，
+ *     其中取消与超时属可预期结果，**不弹红色错误**；
+ *   · 租户关闭（后端 403 passkey disabled by tenant policy）→ 同样给降级出路。
  */
-export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: PasskeyLoginButtonProps) {
+export function PasskeyLoginButton({
+	email,
+	tenantId,
+	mode = 'button',
+	variant = 'outline',
+	testId = 'passkey-submit-button',
+	onFallback,
+}: PasskeyLoginButtonProps) {
 	const { t } = useI18n();
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState('');
+	const [notice, setNotice] = useState<PasskeyNotice | null>(null);
+	const [conditionalUnavailable, setConditionalUnavailable] = useState(false);
 	const { tenantSlug } = useParams();
 	const [searchParams] = useSearchParams();
 	const redirect = searchParams.get('redirect');
 
-	const isSupported =
-		typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
+	// 域白名单：`.com` 注册域下 passkey 必然 origin 校验失败 → 组件彻底隐身
+	const hostAllowed = isPasskeyHostAllowed();
+	const isSupported = isPasskeySupported();
 
 	// === 条件UI (Conditional Mediation)：仅在密码表单内启动 ===
 	useEffect(() => {
-		if (mode !== 'conditional' || !isSupported) return;
+		if (mode !== 'conditional' || !hostAllowed || !isSupported) return;
 		// 条件式 UI 必须绑定到用户名输入框，否则浏览器无自动填充载体
 		if (!document.querySelector('input[autocomplete~="webauthn"]')) return;
-		if (
-			typeof (window.PublicKeyCredential as any)?.isConditionalMediationAvailable !== 'function'
-		) {
-			return;
-		}
 
 		const controller = new AbortController();
 		abortActiveConditional();
@@ -89,9 +123,13 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 
 		(async () => {
 			try {
-				// 检查浏览器是否支持条件UI
-				const available = await (window.PublicKeyCredential as any).isConditionalMediationAvailable();
-				if (!available || controller.signal.aborted) return;
+				// 检查浏览器是否支持条件UI（不支持 → 只保留按钮入口，并说明原因）
+				const available = await isConditionalMediationSupported();
+				if (controller.signal.aborted) return;
+				if (!available) {
+					setConditionalUnavailable(true);
+					return;
+				}
 
 				// 1. 从服务端获取认证挑战（空 email + mediation 表示 discoverable 挑战）
 				const beginData = await authWebauthnAuthenticateBeginPost({
@@ -158,9 +196,10 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 					user: completeData.user,
 				});
 			} catch (err: any) {
-				// NotAllowedError/AbortError = 用户取消或主动中止 — 静默忽略
+				// 条件式是**静默**尝试：NotAllowedError/AbortError = 用户取消或主动中止，
+				// 不打断正在输入的用户，也不留任何提示（显式按钮仍可用）。
 				if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return;
-				// 其他错误静默失败, 不阻塞用户通过常规方式登录
+				// 其他错误同样静默失败, 不阻塞用户通过常规方式登录
 			} finally {
 				if (activeConditionalController === controller) {
 					activeConditionalController = null;
@@ -174,7 +213,7 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 				activeConditionalController = null;
 			}
 		};
-	}, [mode, isSupported, tenantId]);
+	}, [mode, hostAllowed, isSupported, tenantId]);
 
 	const handlePasskeyLogin = async () => {
 		if (!isSupported) return;
@@ -182,7 +221,7 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 		// 否则会报 "A request is already pending."。
 		abortActiveConditional();
 		setLoading(true);
-		setError('');
+		setNotice(null);
 
 		try {
 			// 1. Request authentication options from server
@@ -242,55 +281,109 @@ export function PasskeyLoginButton({ email, tenantId, mode = 'button' }: Passkey
 			await loadAuthExtras().catch(() => {});
 			window.location.href = getPostLoginTarget({ tenantSlug, redirect, user: data.user });
 		} catch (err: any) {
-			if (err.name === 'AbortError') {
+			if (err?.name === 'AbortError') {
 				// 主动中止（切标签/显式登录抢占）不打扰用户
-				setError('');
-			} else if (err.name === 'NotAllowedError') {
-				// 无可用可发现凭据与用户取消同为 NotAllowedError，不能静默：
-				// 静默会让「点了没反应」无从排查（2026-10-21 线上实证）。
-				setError(t('passkey.noCredentialHint'));
-			} else {
-				// Problem 契约无 message 字段，标题在 title；直接取 err.message 会退化成
-				// axios 的 "Request failed with status code 404"。
-				const { code, message } = extractApiError(err, t('passkey.loginFailed'));
-				// 61000004：无凭据记录；61000101：该租户下查无此用户（地址栏租户与残留租户
-				// 不一致的典型表现）。两者都给可操作文案，不透出后端英文 title。
-				setError(
+				setNotice(null);
+				return;
+			}
+			const kind = classifyPasskeyFailure(err);
+			if (kind !== 'error') {
+				// 可预期结果：取消 / 超时 / 域校验失败 / 设备不支持 / 租户关闭
+				// → 非红色人话 + 降级入口（继续用密码 / 验证码），不当故障报错
+				setNotice({ tone: 'hint', text: t(HINT_KEY_BY_FAILURE[kind]) });
+				return;
+			}
+			// Problem 契约无 message 字段，标题在 title；直接取 err.message 会退化成
+			// axios 的 "Request failed with status code 404"。
+			const { code, message } = extractApiError(err, t('passkey.loginFailed'));
+			// 61000004：无凭据记录；61000101：该租户下查无此用户（地址栏租户与残留租户
+			// 不一致的典型表现）。两者都给可操作文案，不透出后端英文 title。
+			setNotice({
+				tone: 'error',
+				text:
 					String(code) === '61000004'
 						? t('passkey.credentialNotFound')
 						: String(code) === '61000101'
 							? t('passkey.userNotFound')
 							: message,
-				);
-			}
+			});
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	if (!isSupported) return null;
+	// `.com` 注册域：不渲染入口（按钮与条件式提示都不出）
+	if (!hostAllowed) return null;
+
+	const fallbackLink = onFallback ? (
+		<button
+			type="button"
+			onClick={onFallback}
+			className="mx-auto block text-xs text-brand-text transition-all duration-200 hover:underline decoration-2 underline-offset-4"
+			data-testid={`${testId}-fallback`}
+		>
+			{t('passkey.usePasswordInstead')}
+		</button>
+	) : null;
 
 	if (mode === 'conditional') {
-		return null;
+		// 条件式 UI 不渲染按钮；仅在「设备支持 passkey 但不支持自动填充」时补一句说明，
+		// 让用户知道自动填充里为什么没有 passkey（显式按钮入口仍在）。
+		return conditionalUnavailable ? (
+			<p
+				className="mt-2 text-center text-xs text-[var(--color-text-muted)]"
+				data-testid="passkey-conditional-unavailable"
+				role="status"
+			>
+				{t('passkey.conditionalUnavailableHint')}
+			</p>
+		) : null;
+	}
+
+	if (!isSupported) {
+		// 设备/浏览器不具备 WebAuthn：不留空白，给明确人话 + 降级出路
+		return (
+			<div data-testid="passkey-login-button" className="space-y-1">
+				<p
+					className="text-center text-xs text-[var(--color-text-muted)]"
+					data-testid="passkey-unsupported-hint"
+					role="status"
+					aria-live="polite"
+				>
+					{t('passkey.deviceUnsupportedHint')}
+				</p>
+				{fallbackLink}
+			</div>
+		);
 	}
 
 	return (
 		<div data-testid="passkey-login-button">
 			<Button
-				variant="outline"
+				variant={variant}
 				fullWidth
 				onClick={handlePasskeyLogin}
 				isLoading={loading}
-				data-testid="passkey-submit-button"
+				data-testid={testId}
 			>
 				<Fingerprint className="mr-2 h-4 w-4" />
 				{t('passkey.submitLogin')}
 			</Button>
-			{error && (
-				<p className="mt-2 text-center text-xs text-danger-text" data-testid="passkey-error">
-					{error}
+			{notice && (
+				<p
+					className={`mt-2 text-center text-xs ${
+						notice.tone === 'error'
+							? 'text-danger-text'
+							: 'text-[var(--color-text-muted)]'
+					}`}
+					data-testid={notice.tone === 'error' ? 'passkey-error' : 'passkey-hint'}
+					role={notice.tone === 'error' ? 'alert' : 'status'}
+					aria-live="polite"
+				>
+					{notice.text}
 				</p>
 			)}
+			{notice && fallbackLink && <div className="mt-1">{fallbackLink}</div>}
 		</div>
 	);
 }
