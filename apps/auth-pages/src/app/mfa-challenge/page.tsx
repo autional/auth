@@ -23,6 +23,8 @@ import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import AppApprovalPanel from '@/components/auth/AppApprovalPanel';
+import { TotpCountdown } from '@/components/auth/TotpCountdown';
+import { shouldShowTotpExpiryHint } from '@/lib/totp-countdown';
 import { ERROR_CODES, errorCodeOf, semanticsOfError } from '@/lib/error-semantics';
 import { userFromAccessToken } from '@/lib/session-user';
 
@@ -283,6 +285,13 @@ export default function MFAChallengePage() {
 			}
 			if (isThrottled(err)) {
 				setError(t('mfa.challenge.throttled'));
+				return;
+			}
+			// 首轮失败已定性 STALE-OR-ROUNDING：TOTP 码过期/跨周期（±1 窗口外的 61000402）。
+			// 失败语义不变（仍留本页、仍进 role="alert"），只把文案换成「等倒计时刷新后输新码」，
+			// 否则用户会在同一窗口里反复重试同一个已失效的码。
+			if (shouldShowTotpExpiryHint(type, errorCodeOf(err), ERROR_CODES.MFA_INVALID_CODE)) {
+				setError(t('mfa.challenge.codeExpiredHint'));
 				return;
 			}
 			if (semanticsOfError(err)?.uiObservation === 'form_error') {
@@ -576,6 +585,8 @@ export default function MFAChallengePage() {
 								{...totpForm.register('code')}
 								error={totpForm.formState.errors.code?.message}
 							/>
+							{/* 周期剩余秒数：让用户在输入前就知道码什么时候会换掉（30s 栅格） */}
+							<TotpCountdown />
 							<p className="text-xs text-[var(--color-text-secondary)]">
 								{t('mfa.challenge.totpHelp')}
 							</p>

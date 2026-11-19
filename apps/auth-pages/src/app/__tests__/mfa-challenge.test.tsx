@@ -511,12 +511,58 @@ describe('MFAChallengePage', () => {
 		await user.type(screen.getByPlaceholderText('mfa.challenge.codePlaceholder'), '000000');
 		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
 
+		// TOTP + 61000402 = 首轮定性的 STALE-OR-ROUNDING：文案换成「可能已过期，等倒计时刷新」，
+		// 但失败语义不变（仍留本页、仍进 role="alert"）
+		await waitFor(() => {
+			expect(screen.getByText('mfa.challenge.codeExpiredHint')).toBeInTheDocument();
+		});
+		expect(screen.getByRole('alert')).toHaveTextContent('mfa.challenge.codeExpiredHint');
+		expect(screen.queryByText('mfa.challenge.verifyFailed')).toBeNull();
+		expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+		// 挑战令牌未被清除（留在本页等倒计时刷新后重试）
+		expect(sessionStorage.getItem('mfa_pre_auth')).not.toBeNull();
+	});
+
+	it('keeps the generic failure copy for 61000402 on non-TOTP methods (no misleading expiry hint)', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+		mockVerifyMFAChallenge.mockRejectedValue({
+			response: { status: 400, data: { code: 61000402, message: 'invalid MFA code' } },
+		});
+
+		const user = userEvent.setup();
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' })).toBeInTheDocument();
+		});
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' }));
+		await user.type(screen.getByPlaceholderText('mfa.challenge.codePlaceholder'), '000000');
+		await user.click(screen.getByRole('button', { name: 'mfa.challenge.verify' }));
+
+		// sms 码不是周期码：61000402 仍是普通失败（提示不能被「等倒计时」误导）
 		await waitFor(() => {
 			expect(screen.getByText('mfa.challenge.verifyFailed')).toBeInTheDocument();
 		});
-		// AUTH2-02：错误条是 live region（读屏可播报）
-		expect(screen.getByRole('alert')).toHaveTextContent('mfa.challenge.verifyFailed');
-		expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+		expect(screen.queryByText('mfa.challenge.codeExpiredHint')).toBeNull();
+	});
+
+	it('renders the TOTP period countdown next to the code input (not on other methods)', async () => {
+		seedPreAuth({ requiredMfaMethods: ['totp', 'sms'] });
+
+		const user = userEvent.setup();
+		renderMFAChallenge();
+
+		await waitFor(() => {
+			expect(screen.getByPlaceholderText('mfa.challenge.codePlaceholder')).toBeInTheDocument();
+		});
+		// 倒计时是 live region（aria-live=polite），且挂在验证码输入框旁边
+		const countdown = screen.getByTestId('totp-countdown');
+		expect(countdown).toHaveAttribute('aria-live', 'polite');
+		expect(countdown.getAttribute('data-totp-seconds')).toMatch(/^\d+$/);
+
+		// 切到短信面：周期倒计时不适用，随 TOTP 面板一起收起
+		await user.click(screen.getByRole('tab', { name: 'mfa.challenge.tabSMS' }));
+		expect(screen.queryByTestId('totp-countdown')).toBeNull();
 	});
 
 	it('sends an SMS code from the challenge page and starts the resend cooldown', async () => {
