@@ -41,24 +41,9 @@ const TrialPage = lazy(() => import('./app/trial/page'));
 const InvitePage = lazy(() => import('./app/invite/page'));
 // TASK-LS-06 登出确认页：oauth 无 hint 无会话浏览器支 302 的承接面（裸段，与 /logout 同族）
 const LogoutConfirmPage = lazy(() => import('./app/logout-confirm/page'));
-// CookieConsentBanner — 已隐藏 (2026-07-29)
-// 隐藏原因:
-//   1. 应用零 cookie 使用 — 整个项目无 document.cookie 调用
-//   2. analytics 开关有 UI 但无实际追踪代码消费该值
-//   3. 存储使用 Zustand persist → localStorage，非 cookie
-//   4. 条文中文字样误导用户（"Cookie 偏好"），实际不涉及任何 cookie
-// 保留依据:
-//   - 如需将来接入 cookie 合规（如 Google Analytics），取消注释即可恢复
-//   - i18n 翻译键（cookie.*）和组件文件均保留，恢复时零改动
-//   - Zustand store + 已存用户的 consent 数据不受影响
-// import { CookieConsentBanner } from '@/components/ui/CookieConsentBanner';
+// Cookie 同意 UI 与 analytics loader 已删除 (2026-11-21)：
+// 应用不加载分析/营销脚本，只保留登录所需的必要安全 cookie（__Host-did / oauth_bind_state）。
 import { SessionExpiryBanner } from '@/components/ui/SessionExpiryBanner';
-import { useAnalyticsLoader } from '@/hooks/use-analytics-loader';
-
-function AnalyticsInit() {
-	useAnalyticsLoader();
-	return null;
-}
 
 function LogoutHandler() {
 	// AUTH-40：裸 /logout 无 URL 租户段，用登录期锚定的 slug 标记补回租户上下文，
@@ -155,8 +140,6 @@ export default function App() {
 				<AppContent />
 				<AuthBrandingInitializer />
 				<AppHeader />
-				{/* CookieConsentBanner 已隐藏 — 见 import 注释 */}
-				<AnalyticsInit />
 				<SessionExpiryBanner />
 				<ErrorBoundary devMode={import.meta.env.DEV}>
 					<Suspense
