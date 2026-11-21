@@ -16,10 +16,11 @@
     "node": "24.x"
   },
   "devDependencies": {
-    "@vercel/config": "^0.7.2",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
+    "@vercel/config": "^0.7.2",
+    "@vitest/coverage-v8": "3.2.0",
     "@vitest/ui": "4.1.6",
     "jsdom": "29.1.1",
     "react": "19.2.5",
