@@ -9,6 +9,7 @@ const base = {
 	password: 'Password123!',
 	confirmPassword: 'Password123!',
 	agreeTerms: true as const,
+	agreeCrossBorder: true as const,
 	invitation_code: 'INV-123',
 };
 

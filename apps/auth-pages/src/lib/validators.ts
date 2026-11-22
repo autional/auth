@@ -44,6 +44,9 @@ export function createRegisterSchema(t: TFunction, policy?: PasswordPolicy, mode
 			.regex(/^[a-zA-Z0-9_]+$/, t('validation.usernamePattern')),
 		password: createPasswordSchema(t, policy),
 		confirmPassword: z.string().min(1, t('validation.confirmPassword')),
+		agreeCrossBorder: z.literal(true, {
+			errorMap: () => ({ message: t('validation.agreeCrossBorder') }),
+		}),
 		agreeTerms: z.literal(true, {
 			errorMap: () => ({ message: t('validation.agreeTerms') }),
 		}),

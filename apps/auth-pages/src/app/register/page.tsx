@@ -250,6 +250,7 @@ export default function RegisterPage() {
 
 	const watchedUsername = watch('username');
 	const watchedAgreeTerms = watch('agreeTerms');
+	const watchedAgreeCrossBorder = watch('agreeCrossBorder');
 	const watchedPassword = watch('password');
 	const watchedInviteEmail = watch('email' as any) as string | undefined;
 
@@ -499,6 +500,20 @@ export default function RegisterPage() {
 				void fetchLegalDocumentVersion('terms', lang).then((version) =>
 					authMeConsentPost({
 						scope: 'terms',
+						granted: true,
+						metadata: version ? { version } : undefined,
+					}).catch(() => {
+						// consent 记录失败静默处理，不阻塞注册成功流程
+					}),
+				);
+			}
+
+			// PIPL 第 39 条：跨境传输单独同意（独立勾选，不与条款/隐私勾选合并）。
+			// 版本取 privacy 文档真值；取不到则不带 version。
+			if (watchedAgreeCrossBorder) {
+				void fetchLegalDocumentVersion('privacy', lang).then((version) =>
+					authMeConsentPost({
+						scope: 'cross_border_transfer',
 						granted: true,
 						metadata: version ? { version } : undefined,
 					}).catch(() => {
@@ -864,6 +879,27 @@ export default function RegisterPage() {
 						</label>
 						{errors.agreeTerms && (
 							<p className="text-xs text-danger-text">{errors.agreeTerms.message}</p>
+						)}
+					</div>
+
+					<div className="space-y-2">
+						<label className="flex items-start gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
+							<input
+								id="agreeCrossBorder"
+								name="agreeCrossBorder"
+								type="checkbox"
+								className="mt-0.5 h-4 w-4 rounded-xs border-[var(--color-border-strong)] text-[var(--color-brand)] focus:ring-[var(--color-brand)] transition-all duration-200 checked:scale-110"
+								checked={watchedAgreeCrossBorder || false}
+								onChange={(e) =>
+									setValue('agreeCrossBorder' as any, e.target.checked as true, {
+										shouldValidate: true,
+									})
+								}
+							/>
+							<span>{t('register.agreeCrossBorder')}</span>
+						</label>
+						{errors.agreeCrossBorder && (
+							<p className="text-xs text-danger-text">{errors.agreeCrossBorder.message}</p>
 						)}
 					</div>
 

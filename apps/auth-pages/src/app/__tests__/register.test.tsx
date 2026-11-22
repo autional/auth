@@ -174,7 +174,8 @@ describe('RegisterPage', () => {
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
-		await user.click(screen.getByRole('checkbox'));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeTerms/ }));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeCrossBorder/ }));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
 
@@ -195,7 +196,8 @@ describe('RegisterPage', () => {
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
-		await user.click(screen.getByRole('checkbox'));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeTerms/ }));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeCrossBorder/ }));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
 
@@ -211,6 +213,17 @@ describe('RegisterPage', () => {
 		});
 		expect(mockCompliancePublicLegalDocuments).toHaveBeenCalledWith({
 			doc_type: 'terms',
+			lang: 'zh-CN',
+		});
+		await waitFor(() => {
+			expect(mockAuthMeConsentPost).toHaveBeenCalledWith({
+				scope: 'cross_border_transfer',
+				granted: true,
+				metadata: { version: 'v2' },
+			});
+		});
+		expect(mockCompliancePublicLegalDocuments).toHaveBeenCalledWith({
+			doc_type: 'privacy',
 			lang: 'zh-CN',
 		});
 	});
@@ -229,7 +242,8 @@ describe('RegisterPage', () => {
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
-		await user.click(screen.getByRole('checkbox'));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeTerms/ }));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeCrossBorder/ }));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
 
@@ -279,7 +293,8 @@ describe('RegisterPage', () => {
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
-		await user.click(screen.getByRole('checkbox'));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeTerms/ }));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeCrossBorder/ }));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
 
@@ -308,7 +323,8 @@ describe('RegisterPage', () => {
 		await user.type(screen.getByPlaceholderText('register.usernamePlaceholder'), 'newuser');
 		await user.type(screen.getByPlaceholderText('register.passwordPlaceholder'), 'Str0ngPass!');
 		await user.type(screen.getByPlaceholderText('register.confirmPasswordPlaceholder'), 'Str0ngPass!');
-		await user.click(screen.getByRole('checkbox'));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeTerms/ }));
+		await user.click(screen.getByRole('checkbox', { name: /register\.agreeCrossBorder/ }));
 
 		await user.click(screen.getByRole('button', { name: 'register.submit' }));
 
