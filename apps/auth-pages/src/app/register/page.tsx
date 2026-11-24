@@ -17,7 +17,7 @@ import { registerAccount, sendVerificationEmail } from '@/lib/api-tenant';
 import { checkPasswordBreached } from '@/lib/breach-check';
 import { fetchLegalDocumentVersion } from '@/lib/legal-document';
 import { loadAuthExtras, registerByInvitation } from '@/lib/api';
-import { loginWithTokens, bffLogin, isBFFAvailable, useAuthStore, navigateTo } from '@autional/shared';
+import { loginWithTokens, bffLogin, isBFFAvailable, isValidRedirect, useAuthStore, navigateTo } from '@autional/shared';
 import { anchorSessionFromToken } from '@/lib/anchor-session';
 import { processPasswordForTransmission } from '@/lib/password-transmission';
 import { createRegisterSchema } from '@/lib/validators';
@@ -230,6 +230,15 @@ export default function RegisterPage() {
 	// 邀请深链：/invite/:token 会跳到 ?invitation_code=...，此处预填并强制进入邀请流程
 	const [searchParams] = useSearchParams();
 	const presetInvitationCode = (searchParams.get('invitation_code') || '').trim();
+	// OAuth 回程：登录页把 authorize 的 redirect 透传到注册页；注册成功后回到该地址
+	// （未登录时 authorize 会再次引导登录，已建立会话则直接续走授权码流程）。
+	const redirectParam = (searchParams.get('redirect') || '').trim();
+	const postRegisterUrl =
+		redirectParam && isValidRedirect(redirectParam)
+			? redirectParam
+			: tenantSlug
+				? `/${tenantSlug}/dashboard`
+				: '/dashboard';
 	const invitationFlow = membershipMode === 'invitation_only' || presetInvitationCode !== '';
 
 	// Build dynamic schema
@@ -554,15 +563,15 @@ export default function RegisterPage() {
 		}
 	};
 
-	// Auto-redirect to dashboard after successful registration if user doesn't interact
+	// Auto-redirect after successful registration if user doesn't interact.
+	// postRegisterUrl 优先回到 OAuth authorize（注册由登录/授权链路发起时）。
 	useEffect(() => {
 		if (!registrationSuccess) return;
-		const dashUrl = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard';
 		const timer = setTimeout(() => {
-			window.location.href = dashUrl;
+			window.location.href = postRegisterUrl;
 		}, 12000);
 		return () => clearTimeout(timer);
-	}, [registrationSuccess]);
+	}, [registrationSuccess, postRegisterUrl]);
 
 	function renderUsernameHint() {
 		if (errors.username) return null;
@@ -622,9 +631,7 @@ export default function RegisterPage() {
 					<PasskeyRegisterButton
 						password={registeredPassword}
 						tenantId={authConfig?.tenantId || selectedTenantId || undefined}
-						onSkip={() =>
-							(window.location.href = tenantSlug ? `/${tenantSlug}/dashboard` : '/dashboard')
-						}
+						onSkip={() => (window.location.href = postRegisterUrl)}
 					/>
 				)}
 			</AuthCard>

@@ -1355,7 +1355,15 @@ export default function LoginPage() {
 				<div className="text-center text-sm">
 					{t('login.noAccount')}{' '}
 					<Link
-						to={tenantSlug ? `/${tenantSlug}/register` : '/'}
+						to={
+							tenantSlug
+								? `/${tenantSlug}/register${
+										searchParams.get('redirect')
+											? `?redirect=${encodeURIComponent(searchParams.get('redirect') as string)}`
+											: ''
+									}`
+								: '/'
+						}
 						className="text-brand-text transition-all duration-200 hover:underline decoration-2 underline-offset-4"
 					>
 						{t('login.register')}
